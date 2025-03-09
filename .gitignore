@@ -90,4 +90,5 @@ logs/
 .Trashes
 ehthumbs.db
 Thumbs.db
-backup_txt/
+/backup_txt/
+/data/
