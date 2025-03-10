@@ -38,9 +38,11 @@ import {
 import { usePromptApi } from '../../hooks/usePromptApi';
 import { PromptParameter, PromptTestResponse } from '../../types/prompt';
 
+// TestRunner.tsx interface (add to the file)
 interface TestRunnerProps {
   promptId: string;
-  parameters: PromptParameter[];
+  parameters: any[];
+  runTest: (parameters: Record<string, any>) => Promise<any>;
 }
 
 /**

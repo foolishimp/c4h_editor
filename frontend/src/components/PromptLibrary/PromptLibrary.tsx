@@ -1,150 +1,74 @@
 // File: frontend/src/components/PromptLibrary/PromptLibrary.tsx
 
-import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Flex,
-  Grid,
-  GridItem,
-  Heading,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  Badge,
-  Text,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  IconButton,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-  useColorModeValue,
-  FormControl,
-  FormLabel
-} from '@chakra-ui/react';
-import {
-  SearchIcon,
-  AddIcon,
-  SettingsIcon,
-  DeleteIcon,
-  CopyIcon,
-  EditIcon
-} from '@chakra-ui/icons';
-import { usePromptApi } from '../../hooks/usePromptApi';
-import { PromptListItem } from '../../types/prompt';
-import TimeAgo from '../common/TimeAgo';
-// Import as default components
+import { useState, useEffect } from 'react';
+import { Prompt } from '../../types/prompt';
 import PromptEditor from '../PromptEditor/PromptEditor';
+import TimeAgo from '../common/TimeAgo';
+import { usePromptApi } from '../../hooks/usePromptApi';
 
-interface PromptLibraryProps {
-  onPromptSelect?: (promptId: string) => void;
-}
+export const PromptLibrary: React.FC = () => {
+  const [prompts, setPrompts] = useState<any[]>([]);
+  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newPromptId, setNewPromptId] = useState('');
+  const [newPromptDesc, setNewPromptDesc] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-/**
- * Library component for browsing and managing prompts
- */
-const PromptLibrary: React.FC<PromptLibraryProps> = ({
-  onPromptSelect
-}) => {
-  // State
-  const [prompts, setPrompts] = useState<PromptListItem[]>([]);
-  const [filteredPrompts, setFilteredPrompts] = useState<PromptListItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
-  const [newPromptId, setNewPromptId] = useState<string>('');
-  const [newPromptAuthor, setNewPromptAuthor] = useState<string>('');
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  
-  // Modal controls
   const { 
-    isOpen: isCreateModalOpen, 
-    onOpen: onCreateModalOpen, 
-    onClose: onCreateModalClose 
-  } = useDisclosure();
-  
-  const { 
-    isOpen: isDeleteModalOpen, 
-    onOpen: onDeleteModalOpen, 
-    onClose: onDeleteModalClose 
-  } = useDisclosure();
-  
-  const { 
-    isOpen: isCloneModalOpen, 
-    onOpen: onCloneModalOpen, 
-    onClose: onCloneModalClose 
-  } = useDisclosure();
-  
-  // API hooks
-  const { 
-    loading, 
     getPrompts, 
-    deletePrompt, 
+    getPrompt, 
     createPrompt, 
-    clonePrompt 
+    updatePrompt, 
+    testPrompt, 
+    getPromptHistory
   } = usePromptApi();
-  
-  // Load prompts
+
+  // Add missing getPromptVersion function since it's used by PromptEditor
+  const getPromptVersion = async (promptId: string, version: string): Promise<Prompt> => {
+    // Call getPrompt with version parameter
+    return getPrompt(promptId, version);
+  };
+
   useEffect(() => {
+    // Fetch prompts on component mount
     fetchPrompts();
   }, []);
-  
-  // Filter prompts when search query changes
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredPrompts(prompts);
-      return;
-    }
-    
-    const query = searchQuery.toLowerCase();
-    const filtered = prompts.filter(prompt => 
-      prompt.id.toLowerCase().includes(query) ||
-      prompt.title.toLowerCase().includes(query) ||
-      prompt.author.toLowerCase().includes(query)
-    );
-    
-    setFilteredPrompts(filtered);
-  }, [searchQuery, prompts]);
-  
-  // Fetch prompts from API
+
   const fetchPrompts = async () => {
+    setLoading(true);
     try {
       const data = await getPrompts();
       setPrompts(data);
-      setFilteredPrompts(data);
-    } catch (error) {
-      console.error('Error fetching prompts:', error);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load prompts. Please try again.');
+      console.error('Error fetching prompts:', err);
+    } finally {
+      setLoading(false);
     }
   };
-  
-  // Select a prompt
-  const handlePromptSelect = (promptId: string) => {
-    setSelectedPrompt(promptId);
-    if (onPromptSelect) {
-      onPromptSelect(promptId);
-    }
-    setIsEditing(true);
-  };
-  
-  // Create a new prompt
-  const handleCreatePrompt = async () => {
-    if (!newPromptId || !newPromptAuthor) return;
-    
+
+  const handleSelectPrompt = async (promptId: string) => {
     try {
-      const data = {
+      const prompt = await getPrompt(promptId);
+      setSelectedPrompt(prompt);
+      setError(null);
+    } catch (err) {
+      setError(`Failed to load prompt ${promptId}.`);
+      console.error('Error fetching prompt:', err);
+    }
+  };
+
+  const handleCreatePrompt = async () => {
+    if (!newPromptId) {
+      setError('Prompt ID is required');
+      return;
+    }
+
+    try {
+      // Create basic prompt template
+      const newPrompt = {
         id: newPromptId,
         template: {
           text: "# Prompt Template\n\nYour prompt content here...",
@@ -159,331 +83,155 @@ const PromptLibrary: React.FC<PromptLibraryProps> = ({
           }
         },
         metadata: {
-          author: newPromptAuthor,
-          description: "",
+          author: "User",
+          description: newPromptDesc || "",
           tags: [],
           version: "1.0.0",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         },
-        commit_message: `Created new prompt: ${newPromptId}`,
-        author: newPromptAuthor
+        commit_message: "Initial creation",
+        author: "User"
       };
-      
-      await createPrompt(data);
-      onCreateModalClose();
+
+      await createPrompt(newPrompt);
+      await fetchPrompts();
+      setShowCreateForm(false);
       setNewPromptId('');
-      setNewPromptAuthor('');
-      fetchPrompts();
+      setNewPromptDesc('');
+      setError(null);
       
       // Select the newly created prompt
-      setSelectedPrompt(newPromptId);
-      if (onPromptSelect) {
-        onPromptSelect(newPromptId);
-      }
-      setIsEditing(true);
-    } catch (error) {
-      console.error('Error creating prompt:', error);
+      const createdPrompt = await getPrompt(newPromptId);
+      setSelectedPrompt(createdPrompt);
+    } catch (err) {
+      setError('Failed to create prompt. Please check if the ID already exists.');
+      console.error('Error creating prompt:', err);
     }
   };
-  
-  // Delete a prompt
-  const handleDeletePrompt = async (promptId: string) => {
+
+  // Adapter function for updatePrompt to match PromptEditor's expected signature
+  const handleUpdatePrompt = async (prompt: Prompt): Promise<void> => {
     try {
-      await deletePrompt(
-        promptId, 
-        `Deleted prompt: ${promptId}`, 
-        'System'
-      );
-      onDeleteModalClose();
-      fetchPrompts();
-      
-      // Deselect the prompt if it was selected
-      if (selectedPrompt === promptId) {
-        setSelectedPrompt(null);
-        setIsEditing(false);
-      }
-    } catch (error) {
-      console.error('Error deleting prompt:', error);
+      // Assuming updatePrompt expects id and data separately
+      await updatePrompt(prompt.id, {
+        template: prompt.template,
+        metadata: prompt.metadata,
+        commit_message: "Updated via editor",
+        author: prompt.metadata.author || "User"
+      });
+      await fetchPrompts();
+      setError(null);
+    } catch (err) {
+      setError('Failed to update prompt.');
+      console.error('Error updating prompt:', err);
+      throw err; // Re-throw for the PromptEditor to handle
     }
   };
-  
-  // Clone a prompt
-  const handleClonePrompt = async (sourceId: string, newId: string) => {
-    if (!newId || !sourceId) return;
-    
-    try {
-      await clonePrompt(sourceId, newId, newPromptAuthor || 'System');
-      onCloneModalClose();
-      setNewPromptId('');
-      fetchPrompts();
-      
-      // Select the newly cloned prompt
-      setSelectedPrompt(newId);
-      if (onPromptSelect) {
-        onPromptSelect(newId);
-      }
-      setIsEditing(true);
-    } catch (error) {
-      console.error('Error cloning prompt:', error);
-    }
+
+  // Adapter function for onSave to match PromptEditor's expected signature
+  const handleSavePrompt = async (prompt: Prompt): Promise<void> => {
+    return handleUpdatePrompt(prompt);
   };
-  
-  // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-  
-  // Reset edit mode
-  const handleBackToLibrary = () => {
-    setIsEditing(false);
-  };
-  
-  // Background colors
-  const bgColor = useColorModeValue('white', 'gray.800');
-  const hoverBgColor = useColorModeValue('gray.50', 'gray.700');
-  const selectedBgColor = useColorModeValue('blue.50', 'blue.900');
-  
-  // If in editing mode, show the prompt editor
-  if (isEditing && selectedPrompt) {
-    return (
-      <Box>
-        <Button 
-          leftIcon={<ArrowBackIcon />} 
-          mb={4} 
-          onClick={handleBackToLibrary}
-        >
-          Back to Library
-        </Button>
-        <PromptEditor 
-          promptId={selectedPrompt} 
-          onSave={() => fetchPrompts()} 
-        />
-      </Box>
-    );
-  }
-  
+
   return (
-    <Box>
-      <Flex justify="space-between" align="center" mb={4}>
-        <Heading size="lg">Prompt Library</Heading>
-        <Button
-          leftIcon={<AddIcon />}
-          colorScheme="blue"
-          onClick={onCreateModalOpen}
-        >
-          New Prompt
-        </Button>
-      </Flex>
-      
-      <InputGroup mb={4}>
-        <InputLeftElement pointerEvents="none">
-          <SearchIcon color="gray.300" />
-        </InputLeftElement>
-        <Input
-          placeholder="Search prompts..."
-          value={searchQuery}
-          onChange={handleSearchChange}
-        />
-      </InputGroup>
-      
-      <Box borderWidth="1px" borderRadius="md" overflow="hidden">
-        <Table variant="simple">
-          <Thead>
-            <Tr>
-              <Th>ID</Th>
-              <Th>Title</Th>
-              <Th>Author</Th>
-              <Th>Updated</Th>
-              <Th>Version</Th>
-              <Th>Actions</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            {filteredPrompts.map((prompt) => (
-              <Tr
-                key={prompt.id}
-                bg={selectedPrompt === prompt.id ? selectedBgColor : bgColor}
-                _hover={{ bg: hoverBgColor }}
-                cursor="pointer"
-                onClick={() => handlePromptSelect(prompt.id)}
+    <div className="card">
+      <div className="grid grid-2">
+        {/* Left sidebar */}
+        <div className="prompt-list p-3" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="card-title">Prompts</h3>
+            <button 
+              className="btn-primary" 
+              onClick={() => setShowCreateForm(!showCreateForm)}
+            >
+              {showCreateForm ? 'Cancel' : 'New Prompt'}
+            </button>
+          </div>
+
+          {/* Create form */}
+          {showCreateForm && (
+            <div className="card mb-4 p-3">
+              <h4 className="mb-3">Create New Prompt</h4>
+              
+              <div className="mb-3">
+                <label htmlFor="newPromptId">ID (required)</label>
+                <input
+                  id="newPromptId"
+                  value={newPromptId}
+                  onChange={(e) => setNewPromptId(e.target.value)}
+                  placeholder="e.g., my-prompt-001"
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              
+              <div className="mb-3">
+                <label htmlFor="newPromptDesc">Description</label>
+                <input
+                  id="newPromptDesc"
+                  value={newPromptDesc}
+                  onChange={(e) => setNewPromptDesc(e.target.value)}
+                  placeholder="Brief description"
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              
+              <button 
+                className="btn-success w-full"
+                onClick={handleCreatePrompt}
               >
-                <Td fontWeight="medium">{prompt.id}</Td>
-                <Td>{prompt.title}</Td>
-                <Td>{prompt.author}</Td>
-                <Td>
-                  <TimeAgo date={prompt.updated_at} />
-                </Td>
-                <Td>
-                  <Badge colorScheme="blue">{prompt.version}</Badge>
-                </Td>
-                <Td onClick={(e) => e.stopPropagation()}>
-                  <Menu>
-                    <MenuButton
-                      as={IconButton}
-                      icon={<SettingsIcon />}
-                      variant="ghost"
-                      size="sm"
-                    />
-                    <MenuList>
-                      <MenuItem 
-                        icon={<EditIcon />}
-                        onClick={() => handlePromptSelect(prompt.id)}
-                      >
-                        Edit
-                      </MenuItem>
-                      <MenuItem 
-                        icon={<CopyIcon />}
-                        onClick={() => {
-                          setSelectedPrompt(prompt.id);
-                          setNewPromptId(`${prompt.id}_copy`);
-                          onCloneModalOpen();
-                        }}
-                      >
-                        Clone
-                      </MenuItem>
-                      <MenuItem 
-                        icon={<DeleteIcon />}
-                        color="red.500"
-                        onClick={() => {
-                          setSelectedPrompt(prompt.id);
-                          onDeleteModalOpen();
-                        }}
-                      >
-                        Delete
-                      </MenuItem>
-                    </MenuList>
-                  </Menu>
-                </Td>
-              </Tr>
-            ))}
-            
-            {filteredPrompts.length === 0 && (
-              <Tr>
-                <Td colSpan={6} textAlign="center" py={4}>
-                  {loading ? (
-                    <Text>Loading prompts...</Text>
-                  ) : (
-                    <Text>
-                      {searchQuery
-                        ? `No prompts matching "${searchQuery}"`
-                        : "No prompts found. Create your first prompt!"}
-                    </Text>
-                  )}
-                </Td>
-              </Tr>
-            )}
-          </Tbody>
-        </Table>
-      </Box>
-      
-      {/* Create Prompt Modal */}
-      <Modal isOpen={isCreateModalOpen} onClose={onCreateModalClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Create New Prompt</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <FormControl isRequired mb={4}>
-              <FormLabel>Prompt ID</FormLabel>
-              <Input
-                placeholder="my_prompt_id"
-                value={newPromptId}
-                onChange={(e) => setNewPromptId(e.target.value)}
-              />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Author</FormLabel>
-              <Input
-                placeholder="Your Name"
-                value={newPromptAuthor}
-                onChange={(e) => setNewPromptAuthor(e.target.value)}
-              />
-            </FormControl>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onCreateModalClose}>
-              Cancel
-            </Button>
-            <Button
-              colorScheme="blue"
-              onClick={handleCreatePrompt}
-              isDisabled={!newPromptId || !newPromptAuthor}
-            >
-              Create
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-      
-      {/* Delete Confirmation Modal */}
-      <Modal isOpen={isDeleteModalOpen} onClose={onDeleteModalClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Delete Prompt</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <Text>
-              Are you sure you want to delete prompt "{selectedPrompt}"? This action cannot be undone.
-            </Text>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onDeleteModalClose}>
-              Cancel
-            </Button>
-            <Button
-              colorScheme="red"
-              onClick={() => selectedPrompt && handleDeletePrompt(selectedPrompt)}
-            >
-              Delete
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-      
-      {/* Clone Prompt Modal */}
-      <Modal isOpen={isCloneModalOpen} onClose={onCloneModalClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Clone Prompt</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <FormControl isRequired mb={4}>
-              <FormLabel>New Prompt ID</FormLabel>
-              <Input
-                placeholder="cloned_prompt_id"
-                value={newPromptId}
-                onChange={(e) => setNewPromptId(e.target.value)}
-              />
-            </FormControl>
-            <FormControl isRequired>
-              <FormLabel>Author</FormLabel>
-              <Input
-                placeholder="Your Name"
-                value={newPromptAuthor}
-                onChange={(e) => setNewPromptAuthor(e.target.value)}
-              />
-            </FormControl>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onCloneModalClose}>
-              Cancel
-            </Button>
-            <Button
-              colorScheme="blue"
-              onClick={() => selectedPrompt && handleClonePrompt(selectedPrompt, newPromptId)}
-              isDisabled={!newPromptId || !newPromptAuthor}
-            >
-              Clone
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-    </Box>
+                Create Prompt
+              </button>
+            </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div className="p-3 mb-3 bg-red-100 border border-red-300 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+
+          {/* Prompts list */}
+          {loading ? (
+            <p>Loading prompts...</p>
+          ) : prompts.length === 0 ? (
+            <p>No prompts found. Create your first prompt!</p>
+          ) : (
+            <div>
+              {prompts.map((prompt) => (
+                <div 
+                  key={prompt.id}
+                  className={`card mb-2 p-3 cursor-pointer ${selectedPrompt?.id === prompt.id ? 'border-blue-500 bg-blue-50' : ''}`}
+                  onClick={() => handleSelectPrompt(prompt.id)}
+                >
+                  <div className="font-bold">{prompt.id}</div>
+                  <div className="text-gray-700">{prompt.title || 'Untitled'}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    <div>Version: {prompt.version}</div>
+                    <div>By: {prompt.author}</div>
+                    <div>Updated: <TimeAgo date={prompt.updated_at} /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right side - editor */}
+        <div className="p-3">
+          <PromptEditor
+            prompt={selectedPrompt}
+            onSave={handleSavePrompt}
+            onUpdate={handleUpdatePrompt}
+            onTest={testPrompt}
+            onGetHistory={getPromptHistory}
+            onGetVersion={getPromptVersion}
+          />
+        </div>
+      </div>
+    </div>
   );
 };
-
-// Missing import for ArrowBackIcon
-import { ArrowBackIcon } from '@chakra-ui/icons';
 
 export default PromptLibrary;

@@ -38,7 +38,8 @@ import DiffViewer from '../common/DiffViewer';
 interface VersionControlProps {
   promptId: string;
   currentVersion: string;
-  onVersionChange: (version: string) => void;
+  onVersionChange: (versionId: string) => void;
+  fetchHistory: () => Promise<any>;
 }
 
 /**

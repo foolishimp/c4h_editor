@@ -3,15 +3,20 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import time
+import logging
+import traceback
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 # Fix imports to use absolute paths instead of relative paths
-from backend.models.prompt import Prompt, PromptVersion, PromptTestCase
+from backend.models.prompt import Prompt, PromptVersion, PromptTestCase, PromptTemplate, PromptMetadata, PromptConfig, PromptParameter
 from backend.services.prompt_repository import PromptRepository
 from backend.services.lineage_tracker import LineageTracker
-from backend.services.llm_service import LLMService, ModelResponse  # Add LLM service import
-from backend.dependencies import get_prompt_repository, get_lineage_tracker, get_llm_service  # Updated dependency
+from backend.services.llm_service import LLMService, ModelResponse
+from backend.dependencies import get_prompt_repository, get_lineage_tracker, get_llm_service
+
+# Create logger
+logger = logging.getLogger(__name__)
 
 # Create the router object
 router = APIRouter(prefix="/api/v1/prompts", tags=["prompts"])
@@ -54,14 +59,14 @@ class PromptHistoryResponse(BaseModel):
 class PromptTestRequest(BaseModel):
     parameters: Dict[str, Any]
     test_cases: Optional[List[PromptTestCase]] = None
-    llm_config: Optional[Dict[str, Any]] = None  # Changed from model_config to llm_config to avoid naming conflict
+    llm_config: Optional[Dict[str, Any]] = None
 
 class PromptTestResponse(BaseModel):
     prompt_id: str
     rendered_prompt: str
     parameters: Dict[str, Any]
     model_response: Optional[str] = None
-    model_info: Optional[Dict[str, Any]] = None  # Added model information
+    model_info: Optional[Dict[str, Any]] = None
     test_results: Optional[List[Dict[str, Any]]] = None
     execution_time: float
     timestamp: datetime = datetime.utcnow()
@@ -73,12 +78,61 @@ async def create_prompt(
 ):
     """Create a new prompt."""
     try:
-        # Convert to Prompt model
-        prompt = Prompt(
-            id=request.id,
-            template=request.template,
-            metadata=request.metadata
-        )
+        # Log incoming request data for debugging
+        logger.info(f"Creating prompt with ID: {request.id}")
+        logger.info(f"Template data: {request.template}")
+        logger.info(f"Metadata: {request.metadata}")
+        
+        # Create proper template and metadata objects
+        template_data = request.template
+        metadata_data = request.metadata
+        
+        # Process parameters if they exist in template data
+        parameters = []
+        if "parameters" in template_data:
+            for param in template_data.get("parameters", []):
+                logger.info(f"Processing parameter: {param}")
+                try:
+                    parameters.append(PromptParameter(**param))
+                except ValidationError as e:
+                    logger.error(f"Parameter validation error: {e}")
+                    raise ValueError(f"Invalid parameter data: {e}")
+        
+        # Create PromptTemplate with proper structure
+        try:
+            # Extract config with default empty dict
+            config_data = template_data.get("config", {}) or {}
+            logger.info(f"Config data: {config_data}")
+            
+            # Create config
+            config = PromptConfig(**config_data)
+            
+            template = PromptTemplate(
+                text=template_data.get("text", ""),
+                parameters=parameters,
+                config=config
+            )
+        except ValidationError as e:
+            logger.error(f"Template validation error: {e}")
+            raise ValueError(f"Invalid template data: {e}")
+        
+        # Create PromptMetadata
+        try:
+            metadata = PromptMetadata(**metadata_data)
+        except ValidationError as e:
+            logger.error(f"Metadata validation error: {e}")
+            raise ValueError(f"Invalid metadata data: {e}")
+        
+        # Create Prompt model instance
+        try:
+            prompt = Prompt(
+                id=request.id,
+                template=template,
+                metadata=metadata
+            )
+        except ValidationError as e:
+            logger.error(f"Prompt validation error: {e}")
+            raise ValueError(f"Invalid prompt data: {e}")
         
         # Create prompt in repository
         commit = repo.create_prompt(
@@ -90,6 +144,9 @@ async def create_prompt(
         # Get the created prompt
         created_prompt = repo.get_prompt(prompt.id)
         
+        # Log success
+        logger.info(f"Successfully created prompt with ID: {prompt.id}")
+        
         return PromptResponse(
             id=created_prompt.id,
             version=created_prompt.metadata.version,
@@ -99,8 +156,12 @@ async def create_prompt(
             updated_at=created_prompt.metadata.updated_at
         )
     except ValueError as e:
+        logger.error(f"Value error creating prompt: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        # Log the full exception with stack trace
+        logger.error(f"Error creating prompt: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to create prompt: {str(e)}")
 
 @router.get("", response_model=List[PromptListResponse])
@@ -112,7 +173,122 @@ async def list_prompts(
         prompts = repo.list_prompts()
         return prompts
     except Exception as e:
+        logger.error(f"Error listing prompts: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to list prompts: {str(e)}")
+
+@router.put("/{prompt_id}", response_model=PromptResponse)
+async def update_prompt(
+    prompt_id: str = Path(..., description="The ID of the prompt to update"),
+    request: PromptUpdateRequest = Body(...),
+    repo: PromptRepository = Depends(get_prompt_repository)
+):
+    """Update an existing prompt."""
+    try:
+        # Log incoming request data for debugging
+        logger.info(f"Updating prompt with ID: {prompt_id}")
+        logger.info(f"Template data: {request.template}")
+        logger.info(f"Metadata: {request.metadata}")
+        
+        # Get existing prompt
+        existing_prompt = repo.get_prompt(prompt_id)
+        
+        # Process parameters if they exist in template data
+        parameters = []
+        if "parameters" in request.template:
+            for param in request.template.get("parameters", []):
+                try:
+                    parameters.append(PromptParameter(**param))
+                except ValidationError as e:
+                    logger.error(f"Parameter validation error: {e}")
+                    raise ValueError(f"Invalid parameter data: {e}")
+        
+        # Create PromptTemplate with proper structure
+        try:
+            # Extract config with default empty dict
+            config_data = request.template.get("config", {}) or {}
+            config = PromptConfig(**config_data)
+            
+            template = PromptTemplate(
+                text=request.template.get("text", ""),
+                parameters=parameters,
+                config=config
+            )
+        except ValidationError as e:
+            logger.error(f"Template validation error: {e}")
+            raise ValueError(f"Invalid template data: {e}")
+        
+        # Create PromptMetadata
+        try:
+            metadata = PromptMetadata(**request.metadata)
+        except ValidationError as e:
+            logger.error(f"Metadata validation error: {e}")
+            raise ValueError(f"Invalid metadata data: {e}")
+        
+        # Update prompt with new data
+        try:
+            updated_prompt = Prompt(
+                id=prompt_id,
+                template=template,
+                metadata=metadata,
+                parent_id=existing_prompt.parent_id,
+                lineage=existing_prompt.lineage
+            )
+        except ValidationError as e:
+            logger.error(f"Prompt validation error: {e}")
+            raise ValueError(f"Invalid prompt data: {e}")
+        
+        # Update in repository
+        commit = repo.update_prompt(
+            prompt=updated_prompt,
+            commit_message=request.commit_message,
+            author=request.author
+        )
+        
+        # Get the updated prompt
+        result = repo.get_prompt(prompt_id)
+        
+        # Log success
+        logger.info(f"Successfully updated prompt with ID: {prompt_id}")
+        
+        return PromptResponse(
+            id=result.id,
+            version=result.metadata.version,
+            template=result.template.dict(),
+            metadata=result.metadata.dict(),
+            commit=commit,
+            updated_at=result.metadata.updated_at
+        )
+    except ValueError as e:
+        logger.error(f"Value error updating prompt: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating prompt: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to update prompt: {str(e)}")
+
+# Keep all remaining endpoints unchanged
+@router.delete("/{prompt_id}")
+async def delete_prompt(
+    prompt_id: str = Path(..., description="The ID of the prompt to delete"),
+    commit_message: str = Query(..., description="Commit message"),
+    author: str = Query(..., description="Author of the commit"),
+    repo: PromptRepository = Depends(get_prompt_repository)
+):
+    """Delete a prompt."""
+    try:
+        repo.delete_prompt(
+            prompt_id=prompt_id,
+            commit_message=commit_message,
+            author=author
+        )
+        return {"message": f"Prompt {prompt_id} deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting prompt: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete prompt: {str(e)}")
 
 @router.get("/{prompt_id}", response_model=PromptResponse)
 async def get_prompt(
@@ -144,70 +320,9 @@ async def get_prompt(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"Error getting prompt: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get prompt: {str(e)}")
-
-@router.put("/{prompt_id}", response_model=PromptResponse)
-async def update_prompt(
-    prompt_id: str = Path(..., description="The ID of the prompt to update"),
-    request: PromptUpdateRequest = Body(...),
-    repo: PromptRepository = Depends(get_prompt_repository)
-):
-    """Update an existing prompt."""
-    try:
-        # Get existing prompt
-        existing_prompt = repo.get_prompt(prompt_id)
-        
-        # Update prompt with new data
-        updated_prompt = Prompt(
-            id=prompt_id,
-            template=request.template,
-            metadata=request.metadata,
-            parent_id=existing_prompt.parent_id,
-            lineage=existing_prompt.lineage
-        )
-        
-        # Update in repository
-        commit = repo.update_prompt(
-            prompt=updated_prompt,
-            commit_message=request.commit_message,
-            author=request.author
-        )
-        
-        # Get the updated prompt
-        result = repo.get_prompt(prompt_id)
-        
-        return PromptResponse(
-            id=result.id,
-            version=result.metadata.version,
-            template=result.template.dict(),
-            metadata=result.metadata.dict(),
-            commit=commit,
-            updated_at=result.metadata.updated_at
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update prompt: {str(e)}")
-
-@router.delete("/{prompt_id}")
-async def delete_prompt(
-    prompt_id: str = Path(..., description="The ID of the prompt to delete"),
-    commit_message: str = Query(..., description="Commit message"),
-    author: str = Query(..., description="Author of the commit"),
-    repo: PromptRepository = Depends(get_prompt_repository)
-):
-    """Delete a prompt."""
-    try:
-        repo.delete_prompt(
-            prompt_id=prompt_id,
-            commit_message=commit_message,
-            author=author
-        )
-        return {"message": f"Prompt {prompt_id} deleted successfully"}
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete prompt: {str(e)}")
 
 @router.get("/{prompt_id}/history", response_model=PromptHistoryResponse)
 async def get_prompt_history(
@@ -237,6 +352,8 @@ async def get_prompt_history(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"Error getting prompt history: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get prompt history: {str(e)}")
 
 @router.get("/{prompt_id}/diff")
@@ -253,6 +370,8 @@ async def get_prompt_diff(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"Error getting diff: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get diff: {str(e)}")
 
 @router.post("/{prompt_id}/render")
@@ -270,6 +389,8 @@ async def render_prompt(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Error rendering prompt: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to render prompt: {str(e)}")
 
 @router.post("/{prompt_id}/test", response_model=PromptTestResponse)
@@ -378,6 +499,8 @@ async def test_prompt(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Error testing prompt: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to test prompt: {str(e)}")
 
 @router.post("/{prompt_id}/clone")
@@ -428,4 +551,6 @@ async def clone_prompt(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.error(f"Error cloning prompt: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to clone prompt: {str(e)}")

@@ -35,7 +35,7 @@ class PromptRepository:
         Args:
             repo_path: Path to the git repository
         """
-        self.repo_path = Path(repo_path)
+        self.repo_path = Path(repo_path).resolve()  # Use absolute path
         self._init_repo()
         logger.info(f"Prompt repository initialized at {repo_path}")
     
@@ -101,19 +101,59 @@ class PromptRepository:
         
         # Write prompt to file
         serialized = self._serialize_prompt(prompt)
+        
+        # Log the path for debugging
+        logger.info(f"Writing prompt to file: {str(prompt_path)}")
+        
+        # Ensure parent directory exists
+        prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write the file
         with open(prompt_path, "w") as f:
             json.dump(serialized, f, indent=2)
         
-        # Commit to git
-        self.repo.git.add(str(prompt_path))
-        commit = self.repo.git.commit(
-            "-m", commit_message,
-            "--author", f"{author} <{author}@example.com>"
-        )
+        # Verify file exists before git operations
+        if not prompt_path.exists():
+            logger.error(f"Failed to write prompt file: {str(prompt_path)}")
+            raise IOError(f"Failed to write prompt file: {str(prompt_path)}")
+            
+        logger.info(f"File written successfully: {str(prompt_path)}")
         
-        logger.info(f"Prompt '{prompt.id}' created with commit {commit}")
+        # Use absolute path for git operations
+        abs_path = str(prompt_path.resolve())
+        logger.info(f"Adding file to git: {abs_path}")
         
-        return commit
+        try:
+            # Commit to git - use relative path from repo root
+            rel_path = prompt_path.relative_to(self.repo_path)
+            logger.info(f"Using relative path for git add: {rel_path}")
+            
+            self.repo.git.add(str(rel_path))
+            commit = self.repo.git.commit(
+                "-m", commit_message,
+                "--author", f"{author} <{author}@example.com>"
+            )
+            
+            logger.info(f"Prompt '{prompt.id}' created with commit {commit}")
+            
+            return commit
+        except Exception as e:
+            logger.error(f"Git error: {str(e)}")
+            # Try again with full path as fallback
+            try:
+                self.repo.git.add(abs_path)
+                commit = self.repo.git.commit(
+                    "-m", commit_message,
+                    "--author", f"{author} <{author}@example.com>"
+                )
+                logger.info(f"Prompt '{prompt.id}' created with commit {commit} (using absolute path)")
+                return commit
+            except Exception as e2:
+                logger.error(f"Git error with absolute path: {str(e2)}")
+                # File exists but git operation failed
+                # We'll leave the file on disk but log the error
+                logger.error(f"Failed to commit prompt to git, but file was written to disk: {str(prompt_path)}")
+                raise
     
     def get_prompt(self, prompt_id: str, version: Optional[str] = None) -> Prompt:
         """
@@ -136,7 +176,8 @@ class PromptRepository:
         if version:
             try:
                 # Get file content at specific commit
-                content = self.repo.git.show(f"{version}:{prompt_path.relative_to(self.repo_path)}")
+                rel_path = prompt_path.relative_to(self.repo_path)
+                content = self.repo.git.show(f"{version}:{rel_path}")
                 data = json.loads(content)
             except git.exc.GitCommandError as e:
                 logger.error(f"Version '{version}' for prompt '{prompt_id}' not found: {str(e)}")
@@ -178,16 +219,30 @@ class PromptRepository:
         with open(prompt_path, "w") as f:
             json.dump(serialized, f, indent=2)
         
-        # Commit to git
-        self.repo.git.add(str(prompt_path))
-        commit = self.repo.git.commit(
-            "-m", commit_message,
-            "--author", f"{author} <{author}@example.com>"
-        )
-        
-        logger.info(f"Prompt '{prompt.id}' updated with commit {commit}")
-        
-        return commit
+        try:
+            # Commit to git - use relative path from repo root
+            rel_path = prompt_path.relative_to(self.repo_path)
+            
+            self.repo.git.add(str(rel_path))
+            commit = self.repo.git.commit(
+                "-m", commit_message,
+                "--author", f"{author} <{author}@example.com>"
+            )
+            
+            logger.info(f"Prompt '{prompt.id}' updated with commit {commit}")
+            
+            return commit
+        except Exception as e:
+            logger.error(f"Git error: {str(e)}")
+            # Try again with full path as fallback
+            abs_path = str(prompt_path.resolve())
+            self.repo.git.add(abs_path)
+            commit = self.repo.git.commit(
+                "-m", commit_message,
+                "--author", f"{author} <{author}@example.com>"
+            )
+            logger.info(f"Prompt '{prompt.id}' updated with commit {commit} (using absolute path)")
+            return commit
     
     def delete_prompt(self, prompt_id: str, commit_message: str, author: str) -> str:
         """
@@ -208,18 +263,35 @@ class PromptRepository:
             logger.error(f"Failed to delete: Prompt with ID '{prompt_id}' not found")
             raise ValueError(f"Prompt with ID '{prompt_id}' not found")
         
-        # Remove file
-        self.repo.git.rm(str(prompt_path))
-        
-        # Commit to git
-        commit = self.repo.git.commit(
-            "-m", commit_message,
-            "--author", f"{author} <{author}@example.com>"
-        )
-        
-        logger.info(f"Prompt '{prompt_id}' deleted with commit {commit}")
-        
-        return commit
+        try:
+            # Remove file using relative path
+            rel_path = prompt_path.relative_to(self.repo_path)
+            self.repo.git.rm(str(rel_path))
+            
+            # Commit to git
+            commit = self.repo.git.commit(
+                "-m", commit_message,
+                "--author", f"{author} <{author}@example.com>"
+            )
+            
+            logger.info(f"Prompt '{prompt_id}' deleted with commit {commit}")
+            
+            return commit
+        except Exception as e:
+            logger.error(f"Git error: {str(e)}")
+            # Try again with full path as fallback
+            abs_path = str(prompt_path.resolve())
+            self.repo.git.rm(abs_path)
+            
+            # Commit to git
+            commit = self.repo.git.commit(
+                "-m", commit_message,
+                "--author", f"{author} <{author}@example.com>"
+            )
+            
+            logger.info(f"Prompt '{prompt_id}' deleted with commit {commit} (using absolute path)")
+            
+            return commit
     
     def list_prompts(self) -> List[Dict[str, Any]]:
         """
@@ -285,13 +357,14 @@ class PromptRepository:
             raise ValueError(f"Prompt with ID '{prompt_id}' not found")
         
         # Get commit history for file
-        commits = list(self.repo.iter_commits(paths=str(prompt_path)))
+        rel_path = prompt_path.relative_to(self.repo_path)
+        commits = list(self.repo.iter_commits(paths=str(rel_path)))
         
         versions = []
         for commit in commits:
             try:
                 # Get file content at commit
-                content = self.repo.git.show(f"{commit.hexsha}:{prompt_path.relative_to(self.repo_path)}")
+                content = self.repo.git.show(f"{commit.hexsha}:{rel_path}")
                 data = json.loads(content)
                 prompt = self._deserialize_prompt(data)
                 
@@ -329,7 +402,6 @@ class PromptRepository:
             Diff as a string
         """
         prompt_path = self._get_prompt_path(prompt_id)
-        rel_path = prompt_path.relative_to(self.repo_path)
         
         # Check if prompt exists
         if not prompt_path.exists():
@@ -337,7 +409,9 @@ class PromptRepository:
             raise ValueError(f"Prompt with ID '{prompt_id}' not found")
         
         try:
-            # Get diff between commits
+            # Get diff between commits using relative path
+            rel_path = prompt_path.relative_to(self.repo_path)
+            
             diff = self.repo.git.diff(
                 f"{from_version}:{rel_path}",
                 f"{to_version}:{rel_path}"
