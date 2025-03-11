@@ -1,103 +1,233 @@
-import { useState, useCallback } from 'react';
-import axios from 'axios';
+// File: frontend/src/hooks/useWorkOrderApi.ts
+
+import { useState, useEffect, useCallback } from 'react';
+import axios, { AxiosError, AxiosResponse } from 'axios';
 import { 
   WorkOrder, 
-  WorkOrderCreateRequest, 
-  WorkOrderUpdateRequest, 
-  WorkOrderStatus 
+  WorkOrderListItem, 
+  WorkOrderVersion, 
+  WorkOrderTestCase 
 } from '../types/workorder';
+
 import { API_ENDPOINTS } from '../config/api';
 
-export const useWorkOrderApi = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+interface WorkOrderTestResponse {
+  workorder_id: string;
+  rendered_workorder: string;
+  parameters: Record<string, any>;
+  model_response?: string;
+  test_results?: Array<Record<string, any>>;
+  execution_time: number;
+  timestamp: string;
+}
 
-  // Get all work orders
-  const getWorkOrders = useCallback(async (filters?: {
-    status?: WorkOrderStatus,
-    tag?: string,
-    search?: string,
-  }) => {
+export interface UseWorkOrderApiReturn {
+  workorders: WorkOrderListItem[];
+  loading: boolean;
+  error: string | null;
+  getWorkOrders: () => Promise<WorkOrderListItem[]>;
+  getWorkOrder: (id: string, version?: string) => Promise<WorkOrder>;
+  createWorkOrder: (data: any) => Promise<WorkOrder>;
+  updateWorkOrder: (id: string, data: any) => Promise<WorkOrder>;
+  deleteWorkOrder: (id: string, commit_message: string, author: string) => Promise<void>;
+  getWorkOrderHistory: (id: string) => Promise<WorkOrderVersion[]>;
+  getWorkOrderDiff: (id: string, fromVersion: string, toVersion: string) => Promise<string>;
+  renderWorkOrder: (id: string, parameters: Record<string, any>, version?: string) => Promise<string>;
+  testWorkOrder: (id: string, parameters: Record<string, any>, testCases?: WorkOrderTestCase[], version?: string) => Promise<WorkOrderTestResponse>;
+  cloneWorkOrder: (id: string, newId: string, author: string) => Promise<WorkOrder>;
+  // Aliases for backward compatibility
+  fetchWorkOrders: () => Promise<WorkOrderListItem[]>;
+  fetchWorkOrder: (id: string, version?: string) => Promise<WorkOrder>;
+  fetchHistory: (id: string) => Promise<WorkOrderVersion[]>;
+  getDiff: (id: string, fromVersion: string, toVersion: string) => Promise<string>;
+}
+
+export const useWorkOrderApi = (): UseWorkOrderApiReturn => {
+  const [workorders, setWorkOrders] = useState<WorkOrderListItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleResponse = <T,>(response: AxiosResponse<T>): T => {
+    return response.data;
+  };
+
+  const handleError = (error: AxiosError): never => {
+    const message = error.response?.data && 'detail' in (error.response.data as any)
+      ? (error.response.data as any).detail
+      : error.message || 'An unknown error occurred';
+    setError(message);
+    throw new Error(message);
+  };
+
+  const getWorkOrders = useCallback(async (): Promise<WorkOrderListItem[]> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(API_ENDPOINTS.WORKORDERS, { params: filters });
-      setLoading(false);
-      return response.data;
+      const response = await axios.get<WorkOrderListItem[]>(API_ENDPOINTS.WORKORDERS);
+      const data = handleResponse(response);
+      setWorkOrders(data);
+      return data;
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch work orders'));
+      return handleError(err as AxiosError);
+    } finally {
       setLoading(false);
-      throw err;
     }
   }, []);
 
-  // Get a specific work order by ID
-  const getWorkOrder = useCallback(async (workOrderId: string) => {
+  const getWorkOrder = useCallback(async (id: string, version?: string): Promise<WorkOrder> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_ENDPOINTS.WORKORDER(workOrderId)}`);
-      setLoading(false);
-      return response.data;
+      const url = version
+        ? `${API_ENDPOINTS.WORKORDER(id)}?version=${version}`
+        : API_ENDPOINTS.WORKORDER(id);
+      const response = await axios.get<WorkOrder>(url);
+      return handleResponse(response);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch work order'));
+      return handleError(err as AxiosError);
+    } finally {
       setLoading(false);
-      throw err;
     }
   }, []);
 
-  // Create a new work order
-  const createWorkOrder = useCallback(async (workOrderData: WorkOrderCreateRequest) => {
+  const createWorkOrder = useCallback(async (data: any): Promise<WorkOrder> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(API_ENDPOINTS.WORKORDERS, workOrderData);
-      setLoading(false);
-      return response.data;
+      const response = await axios.post<WorkOrder>(API_ENDPOINTS.WORKORDERS, data);
+      return handleResponse(response);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to create work order'));
+      return handleError(err as AxiosError);
+    } finally {
       setLoading(false);
-      throw err;
     }
   }, []);
 
-  // Update a work order
-  const updateWorkOrder = useCallback(async (workOrderId: string, updateData: WorkOrderUpdateRequest) => {
+  const updateWorkOrder = useCallback(async (id: string, data: any): Promise<WorkOrder> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.patch(`${API_ENDPOINTS.WORKORDER(workOrderId)}`, updateData);
-      setLoading(false);
-      return response.data;
+      const response = await axios.put<WorkOrder>(API_ENDPOINTS.WORKORDER(id), data);
+      return handleResponse(response);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to update work order'));
+      return handleError(err as AxiosError);
+    } finally {
       setLoading(false);
-      throw err;
     }
   }, []);
 
-  // Convert a prompt to a work order
-  const convertPromptToWorkOrder = useCallback(async (promptId: string) => {
+  const deleteWorkOrder = useCallback(async (id: string, commit_message: string, author: string): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(`${API_ENDPOINTS.PROMPT(promptId)}/convert-to-workorder`);
-      setLoading(false);
-      return response.data;
+      await axios.delete(`${API_ENDPOINTS.WORKORDER(id)}?commit_message=${encodeURIComponent(commit_message)}&author=${encodeURIComponent(author)}`);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to convert prompt to work order'));
+      handleError(err as AxiosError);
+    } finally {
       setLoading(false);
-      throw err;
     }
   }, []);
+
+  const getWorkOrderHistory = useCallback(async (id: string): Promise<WorkOrderVersion[]> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get<{ versions: WorkOrderVersion[] }>(API_ENDPOINTS.WORKORDER_HISTORY(id));
+      return handleResponse(response).versions;
+    } catch (err) {
+      return handleError(err as AxiosError);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getWorkOrderDiff = useCallback(async (id: string, fromVersion: string, toVersion: string): Promise<string> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get<{ diff: string }>(
+        `${API_ENDPOINTS.WORKORDER_DIFF(id)}?from_version=${fromVersion}&to_version=${toVersion}`
+      );
+      return handleResponse(response).diff;
+    } catch (err) {
+      return handleError(err as AxiosError);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const renderWorkOrder = useCallback(async (id: string, parameters: Record<string, any>, version?: string): Promise<string> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = version
+        ? `${API_ENDPOINTS.WORKORDER_RENDER(id)}?version=${version}`
+        : API_ENDPOINTS.WORKORDER_RENDER(id);
+      const response = await axios.post<{ rendered_workorder: string }>(url, parameters);
+      return handleResponse(response).rendered_workorder;
+    } catch (err) {
+      return handleError(err as AxiosError);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const testWorkOrder = useCallback(async (id: string, parameters: Record<string, any>, testCases?: WorkOrderTestCase[], version?: string): Promise<WorkOrderTestResponse> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const url = version
+        ? `${API_ENDPOINTS.WORKORDER_TEST(id)}?version=${version}`
+        : API_ENDPOINTS.WORKORDER_TEST(id);
+      const response = await axios.post<WorkOrderTestResponse>(url, { 
+        parameters, 
+        test_cases: testCases 
+      });
+      return handleResponse(response);
+    } catch (err) {
+      return handleError(err as AxiosError);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const cloneWorkOrder = useCallback(async (id: string, newId: string, author: string): Promise<WorkOrder> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.post<WorkOrder>(
+        `${API_ENDPOINTS.WORKORDER(id)}/clone?new_id=${newId}&author=${encodeURIComponent(author)}`
+      );
+      return handleResponse(response);
+    } catch (err) {
+      return handleError(err as AxiosError);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    getWorkOrders();
+  }, [getWorkOrders]);
 
   return {
+    workorders,
     loading,
     error,
     getWorkOrders,
     getWorkOrder,
     createWorkOrder,
     updateWorkOrder,
-    convertPromptToWorkOrder
+    deleteWorkOrder,
+    getWorkOrderHistory,
+    getWorkOrderDiff,
+    renderWorkOrder,
+    testWorkOrder,
+    cloneWorkOrder,
+    // Aliases for backward compatibility
+    fetchWorkOrders: getWorkOrders,
+    fetchWorkOrder: getWorkOrder,
+    fetchHistory: getWorkOrderHistory,
+    getDiff: getWorkOrderDiff
   };
 };

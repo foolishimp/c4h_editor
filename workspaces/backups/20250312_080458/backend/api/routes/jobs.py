@@ -1,3 +1,4 @@
+# File: backend/api/routes/jobs.py
 """API routes for job management."""
 
 from typing import List, Dict, Any, Optional
@@ -8,11 +9,12 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, Backgr
 from pydantic import BaseModel
 
 from backend.models.job import Job, JobStatus, JobResult
+from backend.models.prompt import Prompt
 from backend.models.workorder import WorkOrder
-from backend.services.workorder_repository import WorkOrderRepository
+from backend.services.prompt_repository import PromptRepository
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
-from backend.dependencies import get_workorder_repository, get_job_repository, get_c4h_service
+from backend.dependencies import get_prompt_repository, get_job_repository, get_c4h_service
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -54,17 +56,20 @@ class JobListResponse(BaseModel):
 async def submit_job(
     request: JobSubmitRequest,
     background_tasks: BackgroundTasks,
-    workorder_repo: WorkOrderRepository = Depends(get_workorder_repository),
+    prompt_repo: PromptRepository = Depends(get_prompt_repository),
     job_repo: JobRepository = Depends(get_job_repository),
     c4h_service: C4HService = Depends(get_c4h_service)
 ):
     """Submit a work order as a job to the C4H service."""
     try:
         # Retrieve the work order
-        workorder = workorder_repo.get_workorder(request.work_order_id)
+        prompt = prompt_repo.get_prompt(request.work_order_id)
         
-        # We now have a proper WorkOrder already
-        work_order = workorder
+        # Convert to work order if needed
+        if not isinstance(prompt, WorkOrder):
+            work_order = WorkOrder.from_prompt(prompt)
+        else:
+            work_order = prompt
         
         # Create job record
         job = job_repo.create_job(

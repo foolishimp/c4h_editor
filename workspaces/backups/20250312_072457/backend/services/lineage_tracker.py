@@ -1,6 +1,6 @@
 # File: backend/services/lineage_tracker.py
 """
-Service for tracking workorder lineage and usage.
+Service for tracking prompt lineage and usage.
 """
 
 from datetime import datetime
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class LineageTracker:
     """
-    Simple lineage tracker that logs workorder operations.
+    Simple lineage tracker that logs prompt operations.
     This is a placeholder implementation - in production, 
     you would connect to OpenLineage or a similar system.
     """
@@ -54,42 +54,42 @@ class LineageTracker:
         
         logger.info(log_message)
     
-    def track_workorder_creation(self, workorder_id: str, version: str, 
-                              commit_hash: str, metadata: Dict[str, Any]):
-        """Track workorder creation event."""
-        self._log_event("workorder_created", {
-            "workorder_id": workorder_id,
+    def track_prompt_creation(self, prompt_id: str, version: str, 
+                             commit_hash: str, metadata: Dict[str, Any]):
+        """Track prompt creation event."""
+        self._log_event("prompt_created", {
+            "prompt_id": prompt_id,
             "version": version,
             "commit_hash": commit_hash,
             "metadata": metadata
         })
     
-    def track_workorder_update(self, workorder_id: str, version: str, 
-                              commit_hash: str, metadata: Dict[str, Any]):
-        """Track workorder update event."""
-        self._log_event("workorder_updated", {
-            "workorder_id": workorder_id,
+    def track_prompt_update(self, prompt_id: str, version: str, 
+                           commit_hash: str, metadata: Dict[str, Any]):
+        """Track prompt update event."""
+        self._log_event("prompt_updated", {
+            "prompt_id": prompt_id,
             "version": version,
             "commit_hash": commit_hash,
             "metadata": metadata
         })
     
-    def track_workorder_deletion(self, workorder_id: str, commit_hash: str):
-        """Track workorder deletion event."""
-        self._log_event("workorder_deleted", {
-            "workorder_id": workorder_id,
+    def track_prompt_deletion(self, prompt_id: str, commit_hash: str):
+        """Track prompt deletion event."""
+        self._log_event("prompt_deleted", {
+            "prompt_id": prompt_id,
             "commit_hash": commit_hash
         })
     
-    def track_workorder_test(self, workorder_id: str, version: str, 
+    def track_prompt_test(self, prompt_id: str, version: str, 
                          parameters: Dict[str, Any], 
-                         rendered_workorder: str, 
+                         rendered_prompt: str, 
                          model_response: Optional[str] = None):
-        """Track workorder test event."""
-        self._log_event("workorder_tested", {
-            "workorder_id": workorder_id,
+        """Track prompt test event."""
+        self._log_event("prompt_tested", {
+            "prompt_id": prompt_id,
             "version": version,
             "parameters": parameters,
-            "rendered_workorder": rendered_workorder,
+            "rendered_prompt": rendered_prompt,
             "model_response": model_response
         })

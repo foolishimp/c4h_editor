@@ -5,8 +5,8 @@ Dependency injection functions for FastAPI endpoints.
 from fastapi import Depends
 from pathlib import Path
 
-# Import the new WorkOrderRepository
-from backend.services.workorder_repository import WorkOrderRepository
+# Fix imports to use absolute paths
+from backend.services.prompt_repository import PromptRepository
 from backend.services.lineage_tracker import LineageTracker
 from backend.services.llm_service import LLMService
 from backend.services.job_repository import JobRepository
@@ -19,13 +19,13 @@ _llm_service = None
 _job_repository = None
 _c4h_service = None
 
-def get_workorder_repository():
-    """Get or create a workorder repository instance."""
+def get_prompt_repository():
+    """Get or create a prompt repository instance."""
     global _prompt_repository
     if _prompt_repository is None:
-        repo_path = Path("./data/workorder_repository")
+        repo_path = Path("./data/prompt_repository")
         repo_path.parent.mkdir(exist_ok=True)
-        _prompt_repository = WorkOrderRepository(str(repo_path))
+        _prompt_repository = PromptRepository(str(repo_path))
     return _prompt_repository
 
 def get_lineage_tracker():

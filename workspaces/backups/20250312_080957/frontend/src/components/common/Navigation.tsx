@@ -38,7 +38,7 @@ const Navigation: React.FC = () => {
   
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Work Orders', icon: <DescriptionIcon />, path: '/workorders' },
+    { text: 'Prompts', icon: <DescriptionIcon />, path: '/prompts' },
     { text: 'Work Orders', icon: <WorkIcon />, path: '/workorders' },
     { text: 'Jobs', icon: <ScheduleIcon />, path: '/jobs' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },

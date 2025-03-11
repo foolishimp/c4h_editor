@@ -49,10 +49,12 @@ function App() {
         <Box sx={{ display: 'flex', height: '100vh' }}>
           <Navigation />
           <Box component="main" sx={{ flexGrow: 1, p: 3, mt: '64px', ml: { md: '240px' }, width: { md: 'calc(100% - 240px)' } }}>
+            <DebugInfo />
             <Routes>
-              <Route path="/" element={<Navigate replace to="/workorders" />} />
-              <Route path="/workorders" element={<PromptLibrary />} />
-              <Route path="/workorders/:workOrderId" element={<PromptLibrary />} />
+              <Route path="/" element={<Navigate replace to="/prompts" />} />
+              <Route path="/prompts" element={<PromptLibrary />} />
+              <Route path="/prompts/:promptId" element={<PromptLibrary />} />
+              <Route path="/workorders/:workOrderId" element={<WorkOrderEditor />} />
               <Route path="/jobs" element={<JobsList />} />
               <Route path="/jobs/:jobId" element={<JobDetails />} />
             </Routes>

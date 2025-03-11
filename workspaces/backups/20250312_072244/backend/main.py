@@ -10,15 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from backend.api.routes.workorders import router as workorders_router
+from backend.api.routes.prompts import router as prompts_router
 from backend.api.routes.jobs import router as jobs_router
-from backend.services.workorder_repository import WorkOrderRepository
+from backend.services.prompt_repository import PromptRepository
 from backend.services.lineage_tracker import LineageTracker
 from backend.services.llm_service import LLMService
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config import load_config
-from backend.dependencies import get_workorder_repository, get_lineage_tracker, get_llm_service, get_job_repository, get_c4h_service
+from backend.dependencies import get_prompt_repository, get_lineage_tracker, get_llm_service, get_job_repository, get_c4h_service
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     logger.info("Application starting up")
     
     # Make sure dependencies are initialized
-    get_workorder_repository()
+    get_prompt_repository()
     get_lineage_tracker()
     get_job_repository()
     
@@ -73,11 +73,11 @@ app.add_middleware(
 )
 
 # Initialize repository directory from config
-repo_path = Path(config.get("repository", {}).get("path", "./data/workorder_repository"))
+repo_path = Path(config.get("repository", {}).get("path", "./data/prompt_repository"))
 repo_path.parent.mkdir(exist_ok=True)
 
 # Include routers - fix to use the imported router directly
-app.include_router(workorders_router)
+app.include_router(prompts_router)
 app.include_router(jobs_router)
 
 # Add health check endpoint
