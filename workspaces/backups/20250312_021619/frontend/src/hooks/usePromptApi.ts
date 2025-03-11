@@ -9,7 +9,10 @@ import {
   PromptTestResponse 
 } from '../types/prompt';
 
-import { API_ENDPOINTS } from '../config/api';
+
+// For TypeScript to recognize Vite's import.meta.env
+/// <reference types="vite/client" />
+const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export interface UsePromptApiReturn {
   prompts: PromptListItem[];
@@ -53,7 +56,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get<PromptListItem[]>(API_ENDPOINTS.PROMPTS);
+      const response = await axios.get<PromptListItem[]>(`${API_URL}/prompts`);
       const data = handleResponse(response);
       setPrompts(data);
       return data;
@@ -68,9 +71,9 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const url = version
-        ? `${API_ENDPOINTS.PROMPT(id)}?version=${version}`
-        : API_ENDPOINTS.PROMPT(id);
+      const url = version 
+        ? `${API_URL}/prompts/${id}?version=${version}` 
+        : `${API_URL}/prompts/${id}`;
       const response = await axios.get<Prompt>(url);
       return handleResponse(response);
     } catch (err) {
@@ -84,7 +87,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post<Prompt>(API_ENDPOINTS.PROMPTS, data);
+      const response = await axios.post<Prompt>(`${API_URL}/prompts`, data);
       return handleResponse(response);
     } catch (err) {
       return handleError(err as AxiosError);
@@ -97,7 +100,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.put<Prompt>(API_ENDPOINTS.PROMPT(id), data);
+      const response = await axios.put<Prompt>(`${API_URL}/prompts/${id}`, data);
       return handleResponse(response);
     } catch (err) {
       return handleError(err as AxiosError);
@@ -110,7 +113,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      await axios.delete(`${API_ENDPOINTS.PROMPT(id)}?commit_message=${encodeURIComponent(commit_message)}&author=${encodeURIComponent(author)}`);
+      await axios.delete(`${API_URL}/prompts/${id}?commit_message=${encodeURIComponent(commit_message)}&author=${encodeURIComponent(author)}`);
     } catch (err) {
       handleError(err as AxiosError);
     } finally {
@@ -122,7 +125,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get<{ versions: PromptVersion[] }>(API_ENDPOINTS.PROMPT_HISTORY(id));
+      const response = await axios.get<{ versions: PromptVersion[] }>(`${API_URL}/prompts/${id}/history`);
       return handleResponse(response).versions;
     } catch (err) {
       return handleError(err as AxiosError);
@@ -136,7 +139,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setError(null);
     try {
       const response = await axios.get<{ diff: string }>(
-        `${API_ENDPOINTS.PROMPT_DIFF(id)}?from_version=${fromVersion}&to_version=${toVersion}`
+        `${API_URL}/prompts/${id}/diff?from_version=${fromVersion}&to_version=${toVersion}`
       );
       return handleResponse(response).diff;
     } catch (err) {
@@ -150,9 +153,9 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const url = version
-        ? `${API_ENDPOINTS.PROMPT_RENDER(id)}?version=${version}`
-        : API_ENDPOINTS.PROMPT_RENDER(id);
+      const url = version 
+        ? `${API_URL}/prompts/${id}/render?version=${version}` 
+        : `${API_URL}/prompts/${id}/render`;
       const response = await axios.post<{ rendered_prompt: string }>(url, parameters);
       return handleResponse(response).rendered_prompt;
     } catch (err) {
@@ -166,9 +169,9 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setLoading(true);
     setError(null);
     try {
-      const url = version
-        ? `${API_ENDPOINTS.PROMPT_TEST(id)}?version=${version}`
-        : API_ENDPOINTS.PROMPT_TEST(id);
+      const url = version 
+        ? `${API_URL}/prompts/${id}/test?version=${version}` 
+        : `${API_URL}/prompts/${id}/test`;
       const response = await axios.post<PromptTestResponse>(url, { parameters });
       return handleResponse(response);
     } catch (err) {
@@ -183,7 +186,7 @@ export const usePromptApi = (): UsePromptApiReturn => {
     setError(null);
     try {
       const response = await axios.post<Prompt>(
-        `${API_ENDPOINTS.PROMPT(id)}/clone?new_id=${newId}&author=${encodeURIComponent(author)}`
+        `${API_URL}/prompts/${id}/clone?new_id=${newId}&author=${encodeURIComponent(author)}`
       );
       return handleResponse(response);
     } catch (err) {

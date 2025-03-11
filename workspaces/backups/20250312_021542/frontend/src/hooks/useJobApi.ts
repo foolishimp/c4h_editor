@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import axios from 'axios';
 import { Job, JobCreateRequest, JobStatus, JobUpdateRequest } from '../types/job';
-import { API_ENDPOINTS } from '../config/api';
+
+const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const useJobApi = () => {
   const [loading, setLoading] = useState(false);
@@ -17,7 +18,7 @@ export const useJobApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(API_ENDPOINTS.JOBS, { params: filters });
+      const response = await axios.get(`${API_BASE_URL}/api/jobs`, { params: filters });
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -32,7 +33,7 @@ export const useJobApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_ENDPOINTS.JOB(jobId)}`);
+      const response = await axios.get(`${API_BASE_URL}/api/jobs/${jobId}`);
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -47,7 +48,7 @@ export const useJobApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(API_ENDPOINTS.JOBS, jobData);
+      const response = await axios.post(`${API_BASE_URL}/api/jobs`, jobData);
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -62,7 +63,7 @@ export const useJobApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.patch(`${API_ENDPOINTS.JOB(jobId)}`, updateData);
+      const response = await axios.patch(`${API_BASE_URL}/api/jobs/${jobId}`, updateData);
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -82,7 +83,7 @@ export const useJobApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_ENDPOINTS.JOB_LOGS(jobId)}`);
+      const response = await axios.get(`${API_BASE_URL}/api/jobs/${jobId}/logs`);
       setLoading(false);
       return response.data;
     } catch (err) {

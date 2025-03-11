@@ -6,7 +6,8 @@ import {
   WorkOrderUpdateRequest, 
   WorkOrderStatus 
 } from '../types/workorder';
-import { API_ENDPOINTS } from '../config/api';
+
+const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const useWorkOrderApi = () => {
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(API_ENDPOINTS.WORKORDERS, { params: filters });
+      const response = await axios.get(`${API_BASE_URL}/api/workorders`, { params: filters });
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -36,7 +37,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_ENDPOINTS.WORKORDER(workOrderId)}`);
+      const response = await axios.get(`${API_BASE_URL}/api/workorders/${workOrderId}`);
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -51,7 +52,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(API_ENDPOINTS.WORKORDERS, workOrderData);
+      const response = await axios.post(`${API_BASE_URL}/api/workorders`, workOrderData);
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -66,7 +67,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.patch(`${API_ENDPOINTS.WORKORDER(workOrderId)}`, updateData);
+      const response = await axios.patch(`${API_BASE_URL}/api/workorders/${workOrderId}`, updateData);
       setLoading(false);
       return response.data;
     } catch (err) {
@@ -81,7 +82,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(`${API_ENDPOINTS.PROMPT(promptId)}/convert-to-workorder`);
+      const response = await axios.post(`${API_BASE_URL}/api/prompts/${promptId}/convert-to-workorder`);
       setLoading(false);
       return response.data;
     } catch (err) {

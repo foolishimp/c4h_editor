@@ -46,9 +46,9 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Router>
-        <Box sx={{ display: 'flex', height: '100vh' }}>
+        <div className="app">
           <Navigation />
-          <Box component="main" sx={{ flexGrow: 1, p: 3, mt: '64px', ml: { md: '240px' }, width: { md: 'calc(100% - 240px)' } }}>
+          <div className="content">
             <DebugInfo />
             <Routes>
               <Route path="/" element={<Navigate replace to="/prompts" />} />
@@ -58,8 +58,8 @@ function App() {
               <Route path="/jobs" element={<JobsList />} />
               <Route path="/jobs/:jobId" element={<JobDetails />} />
             </Routes>
-          </Box>
-        </Box>
+          </div>
+        </div>
       </Router>
     </ThemeProvider>
   );

@@ -89,13 +89,14 @@ const Navigation: React.FC = () => {
   return (
     <>
       <AppBar 
-        position="fixed"
+        position="fixed" 
         sx={{ 
           zIndex: theme.zIndex.drawer + 1,
-          width: '100%'
+          marginLeft: !isMobile ? drawerWidth : 0,
+          width: !isMobile ? `calc(100% - ${drawerWidth}px)` : '100%',
         }}
       >
-        <Toolbar sx={{ paddingLeft: isMobile ? 2 : 3 }}>
+        <Toolbar>
           {isMobile && (
             <IconButton
               color="inherit"
@@ -125,10 +126,22 @@ const Navigation: React.FC = () => {
             boxSizing: 'border-box',
           },
         }}
-        PaperProps={{ style: { position: 'absolute' } }}
       >
         {drawer}
       </Drawer>
+      
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          ml: { md: `${drawerWidth}px` },
+          mt: '64px'
+        }}
+      >
+        {/* Main content will be rendered here by the Router */}
+      </Box>
     </>
   );
 };
