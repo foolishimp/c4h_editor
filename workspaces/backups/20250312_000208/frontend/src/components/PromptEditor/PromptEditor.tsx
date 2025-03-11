@@ -1,10 +1,10 @@
+// File: frontend/src/components/PromptEditor/PromptEditor.tsx
+
 import { useState, useEffect } from 'react';
 import { Prompt } from '../../types/prompt';
 // Fix import statements to use default imports
 import MetadataPanel from './MetadataPanel';
 import ParameterPanel from './ParameterPanel';
-import TestRunner from './TestRunner';
-import VersionControl from './VersionControl';
 
 // Define the component props interface
 interface PromptEditorProps {
@@ -205,8 +205,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
 
       {activeTab === 'versions' && (
         // Assuming VersionControl takes different props than previously defined
-        <div>
-          <VersionControl promptId={editedPrompt.id} currentVersion={editedPrompt.metadata.version} onVersionChange={(version) => onGetVersion(editedPrompt.id, version)} fetchHistory={() => onGetHistory(editedPrompt.id)} />
+        <div className="card p-3">
+          <h4>Version History</h4>
           {/* Replace with your actual VersionControl implementation */}
           <div>
             Version control component would go here.
@@ -222,8 +222,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
 
       {activeTab === 'test' && (
         // Assuming TestRunner takes different props than previously defined
-        <div>
-          <TestRunner promptId={editedPrompt.id} parameters={editedPrompt.template.parameters} runTest={(params) => onTest(editedPrompt.id, params)} />
+        <div className="card p-3">
+          <h4>Test Prompt</h4>
           {/* Replace with your actual TestRunner implementation */}
           <div>
             <p>Test with the following parameters:</p>
