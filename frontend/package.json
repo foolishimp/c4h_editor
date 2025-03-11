@@ -16,12 +16,22 @@
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@monaco-editor/react": "^4.6.0",
+    "@mui/material": "^5.15.14",
+    "@mui/icons-material": "^5.15.14",
     "axios": "^1.6.7",
+    "date-fns": "^3.6.0",
     "diff": "^5.2.0",
     "framer-motion": "^11.0.8",
+    "js-yaml": "^4.1.0",
     "monaco-editor": "^0.47.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-diff-viewer-continued": "^3.3.2",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.22.3",
+    "@types/diff": "^5.0.8",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.17.24"    
   },
   "devDependencies": {
     "@types/diff": "^5.0.8",
