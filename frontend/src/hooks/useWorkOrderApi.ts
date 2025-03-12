@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiClient, API_ENDPOINTS } from '../config/api';
 import { WorkOrder, WorkOrderDiff } from '../types/workorder';
 
-const useWorkOrderApi = () => {
+export function useWorkOrderApi() {
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -194,6 +194,4 @@ const useWorkOrderApi = () => {
     renderWorkOrder,
     testWorkOrder
   };
-};
-
-export default useWorkOrderApi;
+}

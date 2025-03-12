@@ -34,8 +34,13 @@ const statusColors = {
   [JobStatus.TIMED_OUT]: '#795548',
 };
 
-const JobDetails: React.FC = () => {
-  const { jobId } = useParams<{ jobId: string }>();
+export interface JobDetailsProps {
+  jobId: string;
+  onClose: () => void;
+  onCancel: (jobId: string) => void;
+}
+
+export function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
   const navigate = useNavigate();
   const { getJob, getJobLogs, cancelJob, pollJobStatus, loading, error } = useJobApi();
   
@@ -101,6 +106,31 @@ const JobDetails: React.FC = () => {
         });
     }
   }, [activeTab, jobId, getJobLogs]);
+
+  useEffect(() => {
+    let intervalId: number | null = null;
+    
+    if (job && (job.status === 'submitted' || job.status === 'running')) {
+      intervalId = window.setInterval(() => {
+        pollJobStatus(job.id)
+          .then(updatedJob => {
+            // Update job status
+            if (updatedJob) {
+              setJob(updatedJob);
+            }
+          })
+          .catch(error => {
+            console.error('Error polling job status:', error);
+          });
+      }, 5000);
+    }
+    
+    return () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [job, pollJobStatus]);
   
   const handleTabChange = (_: React.SyntheticEvent, newValue: string) => {
     setActiveTab(newValue);
@@ -112,6 +142,7 @@ const JobDetails: React.FC = () => {
     try {
       await cancelJob(jobId);
       loadJob(); // Reload job to get updated status
+      onCancel(jobId);
     } catch (err) {
       console.error('Failed to cancel job:', err);
     }
@@ -147,7 +178,10 @@ const JobDetails: React.FC = () => {
     <Box m={2}>
       <Button 
         startIcon={<ArrowBack />} 
-        onClick={() => navigate('/jobs')}
+        onClick={() => {
+          onClose();
+          navigate('/jobs');
+        }}
         sx={{ mb: 2 }}
       >
         Back to Jobs
@@ -411,6 +445,6 @@ const JobDetails: React.FC = () => {
       </Paper>
     </Box>
   );
-};
+}
 
 export default JobDetails;

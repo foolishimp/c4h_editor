@@ -1,4 +1,42 @@
-// File: frontend/src/types/workorder.ts
+export enum WorkOrderStatus {
+  DRAFT = 'draft',
+  SUBMITTED = 'submitted',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  FAILED = 'failed'
+}
+
+export interface WorkOrder {
+  id: string;
+  template: WorkOrderTemplate;
+  metadata: WorkOrderMetadata;
+  parent_id?: string;
+  lineage?: string[];
+  status?: WorkOrderStatus;
+}
+
+export interface WorkOrderTemplate {
+  text: string;
+  parameters: WorkOrderParameter[];
+  config?: WorkOrderConfig;
+}
+
+export interface WorkOrderMetadata {
+  author: string;
+  created_at: string;
+  updated_at: string;
+  description?: string;
+  tags?: string[];
+  target_model?: string;
+  version: string;
+  asset?: string;
+  intent?: string;
+  goal?: string;
+  priority?: string;
+  due_date?: string;
+  assignee?: string;
+}
+
 export enum ParameterType {
   STRING = 'string',
   NUMBER = 'number',
@@ -15,23 +53,6 @@ export interface WorkOrderParameter {
   default?: any;
 }
 
-export interface WorkOrderMetadata {
-  title?: string;
-  author: string;
-  created_at: string; // Use string instead of Date
-  updated_at: string; // Use string instead of Date
-  description?: string;
-  tags?: string[];
-  target_model?: string;
-  version: string;
-  asset?: string;
-  intent?: string;
-  goal?: string;
-  priority?: string;
-  due_date?: string; // Use string instead of Date
-  assignee?: string;
-}
-
 export interface WorkOrderVersion {
   id: string;
   workorder_id: string;
@@ -41,16 +62,6 @@ export interface WorkOrderVersion {
   metadata: WorkOrderMetadata;
   created_at: string; // Use string instead of Date
   author: string;
-}
-
-export interface WorkOrder {
-  id: string;
-  content: string;
-  parameters: WorkOrderParameter[];
-  metadata: WorkOrderMetadata;
-  versions: WorkOrderVersion[];
-  created_at: string; // Use string instead of Date
-  updated_at: string; // Use string instead of Date
 }
 
 export interface WorkOrderDiff {
@@ -73,13 +84,6 @@ export interface WorkOrderConfig {
   parameters?: Record<string, any>;
 }
 
-export interface WorkOrderTemplate {
-  text: string;
-  parameters: WorkOrderParameter[];
-  config: WorkOrderConfig;
-}
-
-// Frontend WorkOrder model (used in the UI components)
 export interface WorkOrderUI {
   id: string;
   name: string;
@@ -93,7 +97,6 @@ export interface WorkOrderUI {
   promptId?: string;
 }
 
-// Type converter function
 export function convertToWorkOrderUI(workOrder: WorkOrder): WorkOrderUI {
   return {
     id: workOrder.id,

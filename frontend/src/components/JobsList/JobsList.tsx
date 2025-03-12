@@ -1,30 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, Paper, Typography, Table, TableBody, TableCell, TableContainer, 
-  TableHead, TableRow, IconButton, Chip, TextField, MenuItem, 
-  Select, FormControl, InputLabel, CircularProgress, Pagination, Alert
-} from '@mui/material';
+import { Box, Paper, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, Chip, TextField, MenuItem, Select, FormControl, InputLabel, CircularProgress, Pagination, Alert } from '@mui/material';
 import { RefreshOutlined, FilterList, Search } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { Job, JobStatus } from '../../types/job';
 import { useJobApi } from '../../hooks/useJobApi';
 import TimeAgo from '../common/TimeAgo';
-
-const statusColors = {
-  [JobStatus.PENDING]: '#9e9e9e',    // Grey
-  [JobStatus.QUEUED]: '#ff9800',     // Orange
-  [JobStatus.RUNNING]: '#2196f3',    // Blue
-  [JobStatus.SUCCEEDED]: '#4caf50',  // Green
-  [JobStatus.FAILED]: '#f44336',     // Red
-  [JobStatus.CANCELED]: '#9c27b0',   // Purple
-  [JobStatus.TIMED_OUT]: '#795548',  // Brown
-};
-
-const JobsList: React.FC = () => {
+import { Job } from '../../types/job';
+import { WorkOrder } from '../../types/workorder';
+export interface JobsListProps {
+  jobs: Job[];
+  workOrders: WorkOrder[];
+  onSelect: (jobId: string) => void;
+  onSubmitJob: (workOrderId: string) => void;
+  onRefresh: () => void;
+}
+export function JobsList({ jobs, workOrders, onSelect, onSubmitJob, onRefresh }: JobsListProps) {
   const navigate = useNavigate();
   const { getJobs, loading, error } = useJobApi();
   
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [internalJobs, setInternalJobs] = useState<Job[]>([]);
   const [statusFilter, setStatusFilter] = useState<JobStatus | ''>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [page, setPage] = useState<number>(1);
@@ -38,7 +32,7 @@ const JobsList: React.FC = () => {
       if (searchQuery) filters.search = searchQuery;
       
       const response = await getJobs(filters);
-      setJobs(response.jobs || []);
+      setInternalJobs(response.jobs || []);
       setTotalPages(Math.ceil((response.total || 1) / 10)); // Assuming 10 items per page
     } catch (err) {
       console.error('Error fetching jobs:', err);
@@ -113,11 +107,11 @@ const JobsList: React.FC = () => {
           </Alert>
         )}
         
-        {loading && jobs.length === 0 ? (
+        {loading && internalJobs.length === 0 ? (
           <Box display="flex" justifyContent="center" p={4}>
             <CircularProgress />
           </Box>
-        ) : jobs.length === 0 ? (
+        ) : internalJobs.length === 0 ? (
           <Alert severity="info">No jobs found</Alert>
         ) : (
           <>
@@ -133,7 +127,7 @@ const JobsList: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {jobs.map((job) => (
+                  {internalJobs.map((job) => (
                     <TableRow 
                       key={job.id} 
                       hover 
@@ -188,6 +182,5 @@ const JobsList: React.FC = () => {
       </Paper>
     </Box>
   );
-};
-
+}
 export default JobsList;

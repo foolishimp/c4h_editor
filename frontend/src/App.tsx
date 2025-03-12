@@ -1,4 +1,8 @@
-// File: frontend/src/App.tsx
+import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
+import JobsList from './components/JobsList/JobsList';
+import JobDetails from './components/JobDetails/JobDetails';
+import { useWorkOrderApi } from './hooks/useWorkOrderApi';
+import { useJobApi } from './hooks/useJobApi';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ChakraProvider, Box } from '@chakra-ui/react';
@@ -8,11 +12,13 @@ import JobsList from './components/JobsList/JobsList';
 import JobDetails from './components/JobDetails/JobDetails';
 import { useWorkOrderApi } from './hooks/useWorkOrderApi';
 import { useJobApi } from './hooks/useJobApi';
+// other imports...
 import { WorkOrder } from './types/workorder';
 
 const App: React.FC = () => {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  
   const { 
     workOrders, 
     loading, 
@@ -29,7 +35,11 @@ const App: React.FC = () => {
   
   const { jobs, getJobs, getJob, submitJob, cancelJob } = useJobApi();
 
-  // Load initial data
+  const handleJobSelect = (jobId: string) => setSelectedJob(jobId);
+  const handleSubmitJob = submitJob;
+  const handleRefresh = getJobs;
+  const handleCancelJob = cancelJob;
+
   useEffect(() => {
     getWorkOrders();
     getJobs();
@@ -75,21 +85,22 @@ const App: React.FC = () => {
                 )
               } />
               <Route path="/jobs" element={
-                selectedJobId ? (
-                  <JobDetails 
-                    jobId={selectedJobId}
-                    onClose={() => setSelectedJobId(null)}
-                    onCancel={cancelJob}
-                  />
-                ) : (
+                <div>
                   <JobsList 
                     jobs={jobs}
-                    onSelect={setSelectedJobId}
-                    onSubmitJob={submitJob}
                     workOrders={workOrders}
-                    onRefresh={getJobs}
+                    onSelect={handleJobSelect}
+                    onSubmitJob={handleSubmitJob}
+                    onRefresh={handleRefresh}
                   />
-                )
+                  {selectedJob && (
+                    <JobDetails 
+                      jobId={selectedJob}
+                      onClose={() => setSelectedJob(null)}
+                      onCancel={handleCancelJob}
+                    />
+                  )}
+                </div>
               } />
             </Routes>
           </Box>

@@ -1,3 +1,23 @@
+export interface WorkOrderEditorProps {
+  workOrderId: string;
+  onSave: () => Promise<any>;
+  onUpdate: () => Promise<any>;
+  onDelete: () => void;
+  onTest: () => void;
+  onRender: () => Promise<string>;
+  onGetHistory: (id: string) => Promise<any>;
+  onGetVersion: (id: string, versionId: string) => Promise<any>;
+}
+export function WorkOrderEditor({
+  workOrderId,
+  onSave,
+  onUpdate,
+  onDelete,
+  onTest,
+  onRender,
+  onGetHistory,
+  onGetVersion
+}: WorkOrderEditorProps) {
 // File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
 import { useState, useEffect } from 'react';
 import { Box, Grid, Typography, Button, CircularProgress, Tabs, Tab } from '@mui/material';
@@ -7,10 +27,25 @@ import { WorkOrderMetadataPanel } from './WorkOrderMetadataPanel';
 import { WorkOrderParameterPanel } from './WorkOrderParameterPanel';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { WorkOrderTestRunner } from './WorkOrderTestRunner';
+  setWorkOrder({
+    id: '',
+    template: {
+      text: '',
+      parameters: []
+    },
+    metadata: {
+      author: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      description: '',
+      tags: [],
+      version: '1.0.0'
+    }
+  });
+
 import Editor from '@monaco-editor/react';
 import useWorkOrderApi from '../../hooks/useWorkOrderApi';
 
-export const WorkOrderEditor = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
@@ -29,6 +64,17 @@ export const WorkOrderEditor = () => {
   const [localWorkOrder, setLocalWorkOrder] = useState<WorkOrder | null>(null);
   const [diffData, setDiffData] = useState<{ [versionId: string]: string }>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  setWorkOrder(prevState => {
+    if (!prevState) return null;
+    return {
+      ...prevState,
+      template: {
+        ...prevState.template,
+        parameters: updatedParameters
+      }
+    };
+  });
 
   useEffect(() => {
     if (id) {
@@ -240,4 +286,6 @@ export const WorkOrderEditor = () => {
       )}
     </Box>
   );
-};
+}
+
+export default WorkOrderEditor;

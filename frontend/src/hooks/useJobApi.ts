@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiClient, API_ENDPOINTS } from '../config/api';
 import { Job } from '../types/job';
 
-const useJobApi = () => {
+export function useJobApi() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -70,6 +70,19 @@ const useJobApi = () => {
     }
   };
 
+  const getJobLogs = async (jobId: string): Promise<any> => {
+    setLoading(true);
+    try {
+      const response = await api.get(`/api/v1/jobs/${jobId}/logs`);
+      setLoading(false);
+      return response.data;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
+      setLoading(false);
+      return null;
+    }
+  };
+
   const pollJobStatus = async (id: string, interval = 2000, maxAttempts = 30) => {
     let attempts = 0;
     
@@ -108,8 +121,7 @@ const useJobApi = () => {
     getJob,
     submitJob,
     cancelJob,
-    pollJobStatus
+    pollJobStatus,
+    getJobLogs
   };
-};
-
-export default useJobApi;
+}
