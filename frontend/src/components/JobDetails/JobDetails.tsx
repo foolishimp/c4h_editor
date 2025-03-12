@@ -200,7 +200,7 @@ const JobDetails: React.FC = () => {
               sx={{ cursor: 'pointer', textDecoration: 'underline' }}
               onClick={() => navigate(`/workorders/${job.workOrderId}`)}
             >
-              {job.workOrder?.name || job.workOrderId}
+              {job.workOrder?.metadata?.description || job.workOrderId}
             </Typography>
           </Typography>
           

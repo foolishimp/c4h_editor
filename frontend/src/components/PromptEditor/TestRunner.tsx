@@ -22,17 +22,13 @@ import {
   TabPanels,
   Tab,
   TabPanel,
-  Code,
+
   Flex,
   Spacer,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
+
   Select,
   HStack,
-  VStack,
+
   useColorModeValue
 } from '@chakra-ui/react';
 import { usePromptApi } from '../../hooks/usePromptApi';

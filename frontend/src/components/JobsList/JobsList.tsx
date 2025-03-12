@@ -146,7 +146,7 @@ const JobsList: React.FC = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        {job.workOrder?.name || job.workOrderId}
+                          {job.workOrder?.metadata?.description || job.workOrderId}
                       </TableCell>
                       <TableCell>
                         <Chip 

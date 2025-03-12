@@ -25,14 +25,6 @@ const TimeAgo: React.FC<TimeAgoProps> = ({
     // Convert to date object if string
     const dateObj = typeof date === 'string' ? new Date(date) : date;
     
-    // Format for tooltip
-    const formattedDate = dateObj.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
     
     // Calculate time difference for relative time
     const updateTimeAgo = () => {

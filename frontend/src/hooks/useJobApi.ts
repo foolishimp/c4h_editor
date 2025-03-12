@@ -1,131 +1,115 @@
-import { useState, useCallback } from 'react';
-import axios from 'axios';
-import { Job, JobCreateRequest, JobStatus, JobUpdateRequest } from '../types/job';
-import { API_ENDPOINTS } from '../config/api';
+import { useState } from 'react';
+import { apiClient, API_ENDPOINTS } from '../config/api';
+import { Job } from '../types/job';
 
-export const useJobApi = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+const useJobApi = () => {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [job, setJob] = useState<Job | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get all jobs
-  const getJobs = useCallback(async (filters?: {
-    status?: JobStatus,
-    workOrderId?: string,
-    fromDate?: string,
-    toDate?: string,
-  }) => {
+  const getJobs = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const response = await axios.get(API_ENDPOINTS.JOBS, { params: filters });
-      setLoading(false);
-      return response.data;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch jobs'));
-      setLoading(false);
-      throw err;
-    }
-  }, []);
-
-  // Get a specific job by ID
-  const getJob = useCallback(async (jobId: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get(`${API_ENDPOINTS.JOB(jobId)}`);
-      setLoading(false);
-      return response.data;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch job'));
-      setLoading(false);
-      throw err;
-    }
-  }, []);
-
-  // Create a new job
-  const createJob = useCallback(async (jobData: JobCreateRequest) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axios.post(API_ENDPOINTS.JOBS, jobData);
-      setLoading(false);
-      return response.data;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to create job'));
-      setLoading(false);
-      throw err;
-    }
-  }, []);
-
-  // Update job status (e.g., cancel)
-  const updateJob = useCallback(async (jobId: string, updateData: JobUpdateRequest) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axios.patch(`${API_ENDPOINTS.JOB(jobId)}`, updateData);
-      setLoading(false);
-      return response.data;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to update job'));
-      setLoading(false);
-      throw err;
-    }
-  }, []);
-
-  // Cancel a job
-  const cancelJob = useCallback(async (jobId: string) => {
-    return updateJob(jobId, { status: JobStatus.CANCELED });
-  }, [updateJob]);
-
-  // Get job logs
-  const getJobLogs = useCallback(async (jobId: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get(`${API_ENDPOINTS.JOB_LOGS(jobId)}`);
-      setLoading(false);
-      return response.data;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch job logs'));
-      setLoading(false);
-      throw err;
-    }
-  }, []);
-
-  // Poll job status (for real-time updates)
-  const pollJobStatus = useCallback((jobId: string, intervalMs = 5000, callback: (job: Job) => void) => {
-    const intervalId = setInterval(async () => {
-      try {
-        const job = await getJob(jobId);
-        callback(job);
-
-        // Stop polling if job is in a terminal state
-        if ([
-          JobStatus.SUCCEEDED, 
-          JobStatus.FAILED, 
-          JobStatus.CANCELED, 
-          JobStatus.TIMED_OUT
-        ].includes(job.status)) {
-          clearInterval(intervalId);
-        }
-      } catch (err) {
-        console.error('Error polling job status:', err);
-      }
-    }, intervalMs);
     
-    // Return function to stop polling
-    return () => clearInterval(intervalId);
-  }, [getJob]);
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.JOBS);
+      setJobs(response.data);
+      return response.data;
+    } catch (err: any) {
+      setError(err.message || 'Failed to get jobs');
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getJob = async (id: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient.get(API_ENDPOINTS.JOB(id));
+      setJob(response.data);
+      return response.data;
+    } catch (err: any) {
+      setError(err.message || 'Failed to get job');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitJob = async (data: { workorder_id: string, parameters?: any }) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.JOB_SUBMIT, data);
+      return response.data;
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit job');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelJob = async (id: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.JOB_CANCEL(id));
+      return response.data;
+    } catch (err: any) {
+      setError(err.message || 'Failed to cancel job');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pollJobStatus = async (id: string, interval = 2000, maxAttempts = 30) => {
+    let attempts = 0;
+    
+    const poll = () => {
+      return new Promise<Job>((resolve, reject) => {
+        const checkStatus = async () => {
+          try {
+            const jobData = await getJob(id);
+            
+            if (jobData.status === 'completed' || jobData.status === 'failed') {
+              resolve(jobData);
+            } else if (attempts >= maxAttempts) {
+              reject(new Error('Polling timeout exceeded'));
+            } else {
+              attempts++;
+              setTimeout(checkStatus, interval);
+            }
+          } catch (err) {
+            reject(err);
+          }
+        };
+        
+        checkStatus();
+      });
+    };
+    
+    return poll();
+  };
 
   return {
+    jobs,
+    job,
     loading,
     error,
     getJobs,
     getJob,
-    createJob,
-    updateJob,
+    submitJob,
     cancelJob,
-    getJobLogs,
-    pollJobStatus,
+    pollJobStatus
   };
 };
+
+export default useJobApi;

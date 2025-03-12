@@ -1,3 +1,4 @@
+# File: backend/dependencies.py
 """
 Dependency injection functions for FastAPI endpoints.
 """
@@ -13,7 +14,7 @@ from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 
 # Singleton instances
-_prompt_repository = None
+_workorder_repository = None
 _lineage_tracker = None
 _llm_service = None
 _job_repository = None
@@ -21,12 +22,12 @@ _c4h_service = None
 
 def get_workorder_repository():
     """Get or create a workorder repository instance."""
-    global _prompt_repository
-    if _prompt_repository is None:
+    global _workorder_repository
+    if _workorder_repository is None:
         repo_path = Path("./data/workorder_repository")
         repo_path.parent.mkdir(exist_ok=True)
-        _prompt_repository = WorkOrderRepository(str(repo_path))
-    return _prompt_repository
+        _workorder_repository = WorkOrderRepository(str(repo_path))
+    return _workorder_repository
 
 def get_lineage_tracker():
     """Get or create a lineage tracker instance."""

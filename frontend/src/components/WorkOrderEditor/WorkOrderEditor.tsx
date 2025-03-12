@@ -1,328 +1,243 @@
-import React, { useState, useEffect } from 'react';
+// File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
+import { useState, useEffect } from 'react';
+import { Box, Grid, Typography, Button, CircularProgress, Tabs, Tab } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Tabs, Tab, TextField, FormControl, InputLabel, Select, MenuItem, Box, Paper, Typography, Chip, Grid, CircularProgress, Alert } from '@mui/material';
-import { WorkOrder, WorkOrderStatus, WorkOrderType, WorkOrderConfig } from '../../types/workorder';
-import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
-import { useJobApi } from '../../hooks/useJobApi';
-import MonacoEditor from '@monaco-editor/react';
-import yaml from 'js-yaml';
+import { WorkOrder } from '../../types/workorder';
+import { WorkOrderMetadataPanel } from './WorkOrderMetadataPanel';
+import { WorkOrderParameterPanel } from './WorkOrderParameterPanel';
+import { WorkOrderVersionControl } from './WorkOrderVersionControl';
+import { WorkOrderTestRunner } from './WorkOrderTestRunner';
+import Editor from '@monaco-editor/react';
+import useWorkOrderApi from '../../hooks/useWorkOrderApi';
 
-const defaultConfig: WorkOrderConfig = {
-  version: '1.0',
-  type: WorkOrderType.STANDARD,
-  resources: {
-    cpu: '1',
-    memory: '2Gi',
-  },
-  timeout: 3600,
-  parameters: [],
-};
-
-const WorkOrderEditor: React.FC = () => {
-  const { workOrderId } = useParams<{ workOrderId: string }>();
+export const WorkOrderEditor = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getWorkOrder, createWorkOrder, updateWorkOrder, loading, error } = useWorkOrderApi();
-  const { createJob } = useJobApi();
+  const [activeTab, setActiveTab] = useState(0);
+  
+  const {
+    workOrder,
+    loading,
+    error,
+    getWorkOrder,
+    updateWorkOrder,
+    createWorkOrderVersion,
+    getWorkOrderVersion,
+    getWorkOrderDiff
+  } = useWorkOrderApi();
 
-  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
-  const [yamlConfig, setYamlConfig] = useState<string>('');
-  const [yamlError, setYamlError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('general');
-  const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const [localWorkOrder, setLocalWorkOrder] = useState<WorkOrder | null>(null);
+  const [diffData, setDiffData] = useState<{ [versionId: string]: string }>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const loadWorkOrder = async () => {
-      if (workOrderId && workOrderId !== 'new') {
-        try {
-          const data = await getWorkOrder(workOrderId);
-          setWorkOrder(data);
-          // Convert config to YAML
-          try {
-            const yamlString = yaml.dump(data.config, { noRefs: true });
-            setYamlConfig(yamlString);
-          } catch (yamlErr) {
-            setYamlError('Error converting config to YAML');
-            console.error(yamlErr);
-          }
-        } catch (err) {
-          console.error('Failed to load work order:', err);
-        }
-      } else {
-        // Initialize new work order
-        setWorkOrder({
-          id: '',
-          name: 'New Work Order',
-          description: '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          createdBy: 'current-user', // This would be replaced with actual user info
-          status: WorkOrderStatus.DRAFT,
-          config: defaultConfig,
-        } as WorkOrder);
-        
-        // Convert default config to YAML
-        try {
-          const yamlString = yaml.dump(defaultConfig, { noRefs: true });
-          setYamlConfig(yamlString);
-        } catch (yamlErr) {
-          setYamlError('Error converting config to YAML');
-          console.error(yamlErr);
-        }
-      }
-    };
-
-    loadWorkOrder();
-  }, [workOrderId, getWorkOrder]);
-
-  const handleYamlChange = (value: string | undefined) => {
-    if (!value) return;
-
-    setYamlConfig(value);
-    setHasChanges(true);
-    
-    // Validate YAML syntax
-    try {
-      yaml.load(value);
-      setYamlError(null);
-    } catch (err) {
-      setYamlError(`YAML syntax error: ${(err as Error).message}`);
+    if (id) {
+      getWorkOrder(id);
     }
+  }, [id]);
+
+  useEffect(() => {
+    if (workOrder) {
+      setLocalWorkOrder(workOrder);
+    }
+  }, [workOrder]);
+
+  const handleContentChange = (value: string | undefined) => {
+    if (!localWorkOrder || !value) return;
+    
+    setLocalWorkOrder({
+      ...localWorkOrder,
+      content: value
+    });
   };
 
-  const handleGeneralFieldChange = (field: keyof WorkOrder, value: any) => {
-    if (!workOrder) return;
+  const handleMetadataChange = (metadata: any) => {
+    if (!localWorkOrder) return;
     
-    setWorkOrder({
-      ...workOrder,
-      [field]: value,
+    setLocalWorkOrder({
+      ...localWorkOrder,
+      metadata
     });
-    setHasChanges(true);
+  };
+
+  const handleParametersChange = (parameters: any) => {
+    if (!localWorkOrder) return;
+    
+    setLocalWorkOrder({
+      ...localWorkOrder,
+      parameters
+    });
   };
 
   const handleSave = async () => {
-    if (!workOrder) return;
-
+    if (!localWorkOrder) return;
+    
+    setIsSaving(true);
     try {
-      // Convert YAML to config object
-      let configObject: WorkOrderConfig;
-      try {
-        configObject = yaml.load(yamlConfig) as WorkOrderConfig;
-      } catch (err) {
-        setYamlError(`Cannot save: YAML syntax error: ${(err as Error).message}`);
-        return;
-      }
-
-      const workOrderData = {
-        name: workOrder.name,
-        description: workOrder.description,
-        promptId: workOrder.promptId,
-        config: configObject,
-        tags: workOrder.tags,
-        status: workOrder.status,
-      };
-
-      let savedWorkOrder;
-      if (workOrderId && workOrderId !== 'new') {
-        savedWorkOrder = await updateWorkOrder(workOrderId, workOrderData);
-      } else {
-        savedWorkOrder = await createWorkOrder(workOrderData);
-      }
-
-      setWorkOrder(savedWorkOrder);
-      setHasChanges(false);
-      
-      if (workOrderId === 'new') {
-        navigate(`/workorders/${savedWorkOrder.id}`, { replace: true });
-      }
-    } catch (err) {
-      console.error('Failed to save work order:', err);
+      await updateWorkOrder(localWorkOrder.id, localWorkOrder);
+      await getWorkOrder(localWorkOrder.id);
+    } catch (error) {
+      console.error("Error saving work order:", error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleSubmitJob = async () => {
-    if (!workOrder?.id) return;
-
+  const handleCreateVersion = async () => {
+    if (!localWorkOrder) return;
+    
+    setIsSaving(true);
     try {
-      const jobData = {
-        workOrderId: workOrder.id,
-        parameters: {}, // You could add parameters here
-      };
-      const job = await createJob(jobData);
-      navigate(`/jobs/${job.id}`);
-    } catch (err) {
-      console.error('Failed to submit job:', err);
+      await createWorkOrderVersion(localWorkOrder.id);
+      await getWorkOrder(localWorkOrder.id);
+    } catch (error) {
+      console.error("Error creating version:", error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleTabChange = (_: React.SyntheticEvent, newValue: string) => {
+  const handleVersionSelect = async (versionId: string) => {
+    if (!localWorkOrder) return;
+    
+    try {
+      const versionData = await getWorkOrderVersion(localWorkOrder.id, versionId);
+      setLocalWorkOrder(versionData);
+    } catch (error) {
+      console.error("Error loading version:", error);
+    }
+  };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
-  if (loading && !workOrder) {
+  const loadDiff = async (versionId: string) => {
+    if (!localWorkOrder) return;
+    
+    try {
+      const diff = await getWorkOrderDiff(localWorkOrder.id, versionId);
+      setDiffData(prev => ({
+        ...prev,
+        [versionId]: diff.content_diff
+      }));
+    } catch (error) {
+      console.error("Error loading diff:", error);
+    }
+  };
+
+  if (loading && !localWorkOrder) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="80vh">
+      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
         <CircularProgress />
       </Box>
     );
   }
 
-  if (error) {
+  if (error || !localWorkOrder) {
     return (
-      <Box m={2}>
-        <Alert severity="error">Error loading work order: {error.message}</Alert>
-      </Box>
-    );
-  }
-
-  if (!workOrder) {
-    return (
-      <Box m={2}>
-        <Alert severity="warning">No work order found</Alert>
+      <Box p={3}>
+        <Typography color="error">
+          Error loading work order: {error || "Work order not found"}
+        </Typography>
+        <Button 
+          variant="contained" 
+          onClick={() => navigate('/workorders')}
+          sx={{ mt: 2 }}
+        >
+          Return to Work Order List
+        </Button>
       </Box>
     );
   }
 
   return (
-    <Box m={2}>
-      <Paper sx={{ p: 2, mb: 2 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h5">
-            {workOrderId === 'new' ? 'Create Work Order' : `Edit: ${workOrder.name}`}
-          </Typography>
-          <Box>
-            <Button 
-              variant="outlined" 
-              sx={{ mr: 1 }} 
-              onClick={() => navigate('/workorders')}
-            >
-              Cancel
-            </Button>
-            <Button 
-              variant="contained" 
-              color="primary" 
-              onClick={handleSave} 
-              disabled={loading || !hasChanges || !!yamlError}
-            >
-              {loading ? <CircularProgress size={24} /> : 'Save'}
-            </Button>
-          </Box>
+    <Box p={3}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4">
+          {localWorkOrder.metadata?.title || 'Untitled Work Order'}
+        </Typography>
+        <Box>
+          <Button 
+            variant="contained" 
+            onClick={handleSave}
+            disabled={isSaving}
+            sx={{ mr: 1 }}
+          >
+            {isSaving ? <CircularProgress size={24} /> : 'Save Changes'}
+          </Button>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate('/workorders')}
+          >
+            Back to List
+          </Button>
         </Box>
-        
-        <Tabs value={activeTab} onChange={handleTabChange} aria-label="work order tabs">
-          <Tab label="General" value="general" />
-          <Tab label="Configuration (YAML)" value="yaml" />
-          <Tab label="Preview" value="preview" />
-        </Tabs>
-        
-        {/* General Tab */}
-        {activeTab === 'general' && (
-          <Box mt={2}>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Name"
-                  value={workOrder.name}
-                  onChange={(e) => handleGeneralFieldChange('name', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  multiline
-                  rows={3}
-                  value={workOrder.description || ''}
-                  onChange={(e) => handleGeneralFieldChange('description', e.target.value)}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select
-                    value={workOrder.status}
-                    label="Status"
-                    onChange={(e) => handleGeneralFieldChange('status', e.target.value)}
-                  >
-                    {Object.values(WorkOrderStatus).map((status) => (
-                      <MenuItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Tags (comma separated)"
-                  value={workOrder.tags?.join(', ') || ''}
-                  onChange={(e) => {
-                    const tagsInput = e.target.value;
-                    const tags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
-                    handleGeneralFieldChange('tags', tags);
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </Box>
-        )}
-        
-        {/* YAML Configuration Tab */}
-        {activeTab === 'yaml' && (
-          <Box mt={2} height="60vh">
-            {yamlError && (
-              <Alert severity="error" sx={{ mb: 2 }}>{yamlError}</Alert>
-            )}
-            <MonacoEditor
-              height="100%"
-              language="yaml"
-              value={yamlConfig}
-              onChange={handleYamlChange}
-              options={{
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                formatOnPaste: true,
-                formatOnType: true,
-              }}
+      </Box>
+
+      <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 3 }}>
+        <Tab label="Editor" />
+        <Tab label="Test" />
+        <Tab label="History" />
+      </Tabs>
+
+      {activeTab === 0 && (
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <Box sx={{ height: 'calc(100vh - 300px)', border: '1px solid #e0e0e0' }}>
+              <Editor
+                height="100%"
+                defaultLanguage="markdown"
+                value={localWorkOrder.content}
+                onChange={handleContentChange}
+                options={{
+                  minimap: { enabled: false },
+                  wordWrap: 'on'
+                }}
+              />
+            </Box>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <WorkOrderMetadataPanel
+                metadata={localWorkOrder.metadata}
+                onChange={handleMetadataChange}
+              />
+              <WorkOrderParameterPanel
+                parameters={localWorkOrder.parameters}
+                onChange={handleParametersChange}
+              />
+            </Box>
+          </Grid>
+        </Grid>
+      )}
+
+      {activeTab === 1 && (
+        <WorkOrderTestRunner workOrder={localWorkOrder} />
+      )}
+
+      {activeTab === 2 && (
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <WorkOrderVersionControl
+              workOrderId={localWorkOrder.id}
+              currentVersion="current"
+              versions={localWorkOrder.versions || []}
+              onVersionSelect={handleVersionSelect}
+              onCreateVersion={handleCreateVersion}
+              diffs={diffData}
             />
-          </Box>
-        )}
-        
-        {/* Preview Tab */}
-        {activeTab === 'preview' && (
-          <Box mt={2}>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <Typography variant="body2" component="pre" sx={{
-                whiteSpace: 'pre-wrap',
-                backgroundColor: '#f5f5f5',
-                p: 2,
-                borderRadius: 1,
-                overflow: 'auto',
-                maxHeight: '50vh'
-              }}>
-                {JSON.stringify(workOrder, null, 2)}
-              </Typography>
-            </Paper>
-            
-            {workOrder.status === WorkOrderStatus.READY && (
-              <Box mt={2} display="flex" justifyContent="center">
-                <Button 
-                  variant="contained" 
-                  color="success" 
-                  size="large"
-                  onClick={handleSubmitJob}
-                  disabled={loading}
-                >
-                  Submit Job
-                </Button>
-              </Box>
-            )}
-          </Box>
-        )}
-      </Paper>
+          </Grid>
+          <Grid item xs={12} md={8}>
+            <Typography variant="h6" gutterBottom>
+              Version Comparison
+            </Typography>
+            <Typography variant="body2" color="textSecondary" paragraph>
+              Select a version from the list to view differences with the current version.
+            </Typography>
+          </Grid>
+        </Grid>
+      )}
     </Box>
   );
 };
-
-export default WorkOrderEditor;

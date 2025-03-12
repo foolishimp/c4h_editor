@@ -141,3 +141,11 @@ class WorkOrderVersion(BaseModel):
     author: str
     message: str
     workorder: WorkOrder
+
+
+class WorkOrderTestCase(BaseModel):
+    """Test case for a workorder with inputs and expected outputs."""
+    name: str
+    parameters: Dict[str, Any]
+    expected_output: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)

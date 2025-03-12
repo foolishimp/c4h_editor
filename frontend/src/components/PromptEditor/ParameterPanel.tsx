@@ -19,13 +19,12 @@ import {
   CardHeader,
   CardBody,
   Flex,
-  Tooltip,
   FormHelperText,
   useColorModeValue,
   HStack,
   VStack
 } from '@chakra-ui/react';
-import { AddIcon, DeleteIcon, RepeatIcon } from '@chakra-ui/icons';
+import { AddIcon, DeleteIcon } from '@chakra-ui/icons';
 import { PromptParameter } from '../../types/prompt';
 
 type ParameterType = 'string' | 'number' | 'boolean' | 'array' | 'object';

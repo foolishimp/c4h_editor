@@ -23,9 +23,6 @@ const DiffViewer: React.FC<DiffViewerProps> = ({
   newContent,
   splitView = true,
   showLineNumbers = true,
-  // We'll keep highlightLines in the props but we're not using it currently
-  // This could be implemented with Monaco Editor decorations in a future update
-  highlightLines = [],
   title
 }) => {
   const { colorMode } = useColorMode();

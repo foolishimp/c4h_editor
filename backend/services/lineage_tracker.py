@@ -47,8 +47,8 @@ class LineageTracker:
         # Log using Python standard logging with format strings
         log_message = f"Lineage event logged: {event_type}"
         # Only include a few key fields in the log message
-        if "prompt_id" in data:
-            log_message += f", prompt_id: {data['prompt_id']}"
+        if "workorder_id" in data:
+            log_message += f", workorder_id: {data['workorder_id']}"
         if "version" in data:
             log_message += f", version: {data['version']}"
         

@@ -162,3 +162,197 @@ async def create_workorder(
         logger.error(f"Error creating workorder: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to create workorder: {str(e)}")
+
+# Add the missing GET endpoint
+@router.get("", response_model=List[WorkOrderListResponse])
+async def list_workorders(
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """List all workorders."""
+    try:
+        workorders = repo.list_workorders()
+        return workorders
+    except Exception as e:
+        logger.error(f"Error listing workorders: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to list workorders: {str(e)}")
+
+# Add update endpoint
+@router.put("/{workorder_id}", response_model=WorkOrderResponse)
+async def update_workorder(
+    workorder_id: str = Path(..., description="The ID of the workorder to update"),
+    request: WorkOrderUpdateRequest = Body(...),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Update an existing workorder."""
+    try:
+        # Log incoming request data for debugging
+        logger.info(f"Updating workorder with ID: {workorder_id}")
+        logger.info(f"Template data: {request.template}")
+        logger.info(f"Metadata: {request.metadata}")
+        
+        # Get existing workorder
+        existing_workorder = repo.get_workorder(workorder_id)
+        
+        # Process parameters if they exist in template data
+        parameters = []
+        if "parameters" in request.template:
+            for param in request.template.get("parameters", []):
+                try:
+                    parameters.append(WorkOrderParameter(**param))
+                except ValidationError as e:
+                    logger.error(f"Parameter validation error: {e}")
+                    raise ValueError(f"Invalid parameter data: {e}")
+        
+        # Create WorkOrderTemplate with proper structure
+        try:
+            # Extract config with default empty dict
+            config_data = request.template.get("config", {}) or {}
+            config = WorkOrderConfig(**config_data)
+            
+            template = WorkOrderTemplate(
+                text=request.template.get("text", ""),
+                parameters=parameters,
+                config=config
+            )
+        except ValidationError as e:
+            logger.error(f"Template validation error: {e}")
+            raise ValueError(f"Invalid template data: {e}")
+        
+        # Create WorkOrderMetadata
+        try:
+            metadata = WorkOrderMetadata(**request.metadata)
+        except ValidationError as e:
+            logger.error(f"Metadata validation error: {e}")
+            raise ValueError(f"Invalid metadata data: {e}")
+        
+        # Update workorder with new data
+        try:
+            updated_workorder = WorkOrder(
+                id=workorder_id,
+                template=template,
+                metadata=metadata,
+                parent_id=existing_workorder.parent_id,
+                lineage=existing_workorder.lineage
+            )
+        except ValidationError as e:
+            logger.error(f"WorkOrder validation error: {e}")
+            raise ValueError(f"Invalid workorder data: {e}")
+        
+        # Update in repository
+        commit = repo.update_workorder(
+            workorder=updated_workorder,
+            commit_message=request.commit_message,
+            author=request.author
+        )
+        
+        # Get the updated workorder
+        result = repo.get_workorder(workorder_id)
+        
+        # Log success
+        logger.info(f"Successfully updated workorder with ID: {workorder_id}")
+        
+        return WorkOrderResponse(
+            id=result.id,
+            version=result.metadata.version,
+            template=result.template.dict(),
+            metadata=result.metadata.dict(),
+            commit=commit,
+            updated_at=result.metadata.updated_at
+        )
+    except ValueError as e:
+        logger.error(f"Value error updating workorder: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error updating workorder: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to update workorder: {str(e)}")
+
+# Add other necessary endpoints (get, delete, history, etc.)
+@router.delete("/{workorder_id}")
+async def delete_workorder(
+    workorder_id: str = Path(..., description="The ID of the workorder to delete"),
+    commit_message: str = Query(..., description="Commit message"),
+    author: str = Query(..., description="Author of the commit"),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Delete a workorder."""
+    try:
+        repo.delete_workorder(
+            workorder_id=workorder_id,
+            commit_message=commit_message,
+            author=author
+        )
+        return {"message": f"WorkOrder {workorder_id} deleted successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error deleting workorder: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete workorder: {str(e)}")
+
+@router.get("/{workorder_id}", response_model=WorkOrderResponse)
+async def get_workorder(
+    workorder_id: str = Path(..., description="The ID of the workorder to retrieve"),
+    version: Optional[str] = Query(None, description="Optional version or commit reference"),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Get a workorder by ID and optional version."""
+    try:
+        workorder = repo.get_workorder(workorder_id, version)
+        
+        # Get commit info
+        if version:
+            commit = version
+        else:
+            # Get last commit for this workorder
+            workorder_path = repo._get_workorder_path(workorder_id)
+            last_commit = next(repo.repo.iter_commits(paths=str(workorder_path)))
+            commit = last_commit.hexsha
+        
+        return WorkOrderResponse(
+            id=workorder.id,
+            version=workorder.metadata.version,
+            template=workorder.template.dict(),
+            metadata=workorder.metadata.dict(),
+            commit=commit,
+            updated_at=workorder.metadata.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting workorder: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to get workorder: {str(e)}")
+
+@router.get("/{workorder_id}/history", response_model=WorkOrderHistoryResponse)
+async def get_workorder_history(
+    workorder_id: str = Path(..., description="The ID of the workorder"),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Get the version history of a workorder."""
+    try:
+        versions = repo.get_workorder_history(workorder_id)
+        
+        # Format version history
+        history = [
+            {
+                "version": v.version,
+                "commit_hash": v.commit_hash,
+                "created_at": v.created_at.isoformat(),
+                "author": v.author,
+                "message": v.message
+            }
+            for v in versions
+        ]
+        
+        return WorkOrderHistoryResponse(
+            workorder_id=workorder_id,
+            versions=history
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error getting workorder history: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to get workorder history: {str(e)}")
