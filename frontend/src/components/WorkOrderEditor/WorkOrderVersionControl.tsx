@@ -1,8 +1,8 @@
 // File: frontend/src/components/WorkOrderEditor/WorkOrderVersionControl.tsx
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
+import { Box, Typography, List, ListItem, ListItemText, ListItemSecondaryAction, IconButton, Button } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
-import { TimeAgo } from '../common/TimeAgo';
+import TimeAgo from '../common/TimeAgo'; // Fixed import
 
 interface VersionInfo {
   version: string;
@@ -15,13 +15,15 @@ interface VersionInfo {
 interface WorkOrderVersionControlProps {
   workOrderId: string;
   onLoadVersion: (versionId: string) => void;
-  onFetchHistory: () => Promise<VersionInfo[]>;
+  onFetchHistory: () => Promise<VersionInfo[]>; // Match this in WorkOrderEditor
+  currentVersion: string;
 }
 
 export const WorkOrderVersionControl: React.FC<WorkOrderVersionControlProps> = ({ 
   workOrderId, 
   onLoadVersion, 
-  onFetchHistory 
+  onFetchHistory,
+  currentVersion
 }) => {
   const [versions, setVersions] = useState<VersionInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -89,6 +91,7 @@ export const WorkOrderVersionControl: React.FC<WorkOrderVersionControlProps> = (
                   aria-label="restore" 
                   onClick={() => handleLoadVersion(version.commit_hash)}
                   size="small"
+                  disabled={version.commit_hash === currentVersion}
                 >
                   <RestoreIcon />
                 </IconButton>

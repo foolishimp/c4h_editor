@@ -5,10 +5,15 @@ import { WorkOrderMetadata } from '../../types/workorder';
 
 interface WorkOrderMetadataPanelProps {
   metadata: WorkOrderMetadata;
-  onChange: (metadata: WorkOrderMetadata) => void;
+  onChange: (metadata: WorkOrderMetadata) => void; // Match this in WorkOrderEditor.tsx
+  disabled?: boolean;
 }
 
-export const WorkOrderMetadataPanel: React.FC<WorkOrderMetadataPanelProps> = ({ metadata, onChange }) => {
+export const WorkOrderMetadataPanel: React.FC<WorkOrderMetadataPanelProps> = ({ 
+  metadata, 
+  onChange, 
+  disabled = false 
+}) => {
   const handleChange = (field: keyof WorkOrderMetadata, value: any) => {
     onChange({
       ...metadata,
@@ -27,6 +32,7 @@ export const WorkOrderMetadataPanel: React.FC<WorkOrderMetadataPanelProps> = ({ 
         onChange={(e) => handleChange('author', e.target.value)}
         margin="normal"
         size="small"
+        disabled={disabled}
       />
       
       <TextField
@@ -38,6 +44,7 @@ export const WorkOrderMetadataPanel: React.FC<WorkOrderMetadataPanelProps> = ({ 
         size="small"
         multiline
         rows={2}
+        disabled={disabled}
       />
       
       <TextField
@@ -47,6 +54,7 @@ export const WorkOrderMetadataPanel: React.FC<WorkOrderMetadataPanelProps> = ({ 
         onChange={(e) => handleChange('version', e.target.value)}
         margin="normal"
         size="small"
+        disabled={disabled}
       />
       
       <Box mt={2}>
@@ -56,7 +64,7 @@ export const WorkOrderMetadataPanel: React.FC<WorkOrderMetadataPanelProps> = ({ 
             <Chip 
               key={index} 
               label={tag} 
-              onDelete={() => {
+              onDelete={disabled ? undefined : () => {
                 const newTags = [...metadata.tags];
                 newTags.splice(index, 1);
                 handleChange('tags', newTags);

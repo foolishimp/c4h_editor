@@ -1,58 +1,31 @@
-import { WorkOrder } from './workorder';
-
+// File: frontend/src/types/job.ts
 export enum JobStatus {
-  PENDING = 'pending',
-  QUEUED = 'queued',
-  RUNNING = 'running',
-  SUCCEEDED = 'succeeded',
-  FAILED = 'failed',
-  CANCELED = 'canceled',
-  TIMED_OUT = 'timed_out',
-}
-
-export interface JobStats {
-  startTime?: string;
-  endTime?: string;
-  duration?: number;
-  progress?: number;
-  resourceUsage?: {
-    cpu?: number;
-    memory?: number;
-    gpu?: number;
-  };
-}
-
-export interface JobError {
-  code: string;
-  message: string;
-  details?: any;
-  timestamp: string;
+  CREATED = "created",
+  SUBMITTED = "submitted",
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  CANCELLED = "cancelled"
 }
 
 export interface JobResult {
-  metadata: Record<string, any>;
-  outputs: Record<string, any>;
-  artifacts?: string[]; // URLs to generated artifacts
+  output?: string;
+  artifacts?: any[];
+  metrics?: Record<string, any>;
+  error?: string;
 }
 
 export interface Job {
   id: string;
-  workOrderId: string;
-  workOrder?: WorkOrder;
+  workOrderId: string; // This is the correct property name in the type
+  workOrderVersion: string;
   status: JobStatus;
-  submitTime: string;
-  parameters?: Record<string, any>;
-  stats?: JobStats;
-  errors?: JobError[];
-  results?: JobResult;
-  logs?: string;
-}
-
-export interface JobCreateRequest {
-  workOrderId: string;
-  parameters?: Record<string, any>;
-}
-
-export interface JobUpdateRequest {
-  status?: JobStatus;
+  serviceJobId?: string;
+  createdAt: string;
+  updatedAt: string;
+  submittedAt?: string;
+  completedAt?: string;
+  userId?: string;
+  configuration: Record<string, any>;
+  results?: JobResult; // This is the correct property in the type
 }

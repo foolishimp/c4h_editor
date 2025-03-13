@@ -16,8 +16,10 @@ export const useWorkOrderApi = () => {
     try {
       const response = await api.get('/api/v1/workorders');
       setWorkOrders(response.data);
+      return response.data;
     } catch (err) {
       setError(err as Error);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -30,8 +32,10 @@ export const useWorkOrderApi = () => {
     try {
       const response = await api.get(`/api/v1/workorders/${id}`);
       setWorkOrder(response.data);
+      return response.data;
     } catch (err) {
       setError(err as Error);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -83,11 +87,41 @@ export const useWorkOrderApi = () => {
   }, []);
 
   // Get workorder history
-  const getWorkOrderHistory = useCallback(async (id: string, versionId: string) => {
+  const getWorkOrderHistory = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get(`/api/v1/workorders/${id}/history`);
+      return response.data;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Test a workorder
+  const testWorkOrder = useCallback(async (id: string, parameters: any) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post(`/api/v1/workorders/${id}/test`, { parameters });
+      return response.data;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Render a workorder
+  const renderWorkOrder = useCallback(async (id: string, parameters: any) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post(`/api/v1/workorders/${id}/render`, parameters);
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -107,6 +141,8 @@ export const useWorkOrderApi = () => {
     createWorkOrder,
     updateWorkOrder,
     deleteWorkOrder,
-    getWorkOrderHistory
+    getWorkOrderHistory,
+    testWorkOrder,      // Make sure this expects (id, parameters)
+    renderWorkOrder     // Make sure this expects (id, parameters)
   };
 };

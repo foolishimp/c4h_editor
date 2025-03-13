@@ -1,8 +1,8 @@
 // File: frontend/src/components/JobsList/JobsList.tsx
 import { useState } from 'react';
-import { Box, Typography, Button, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, CircularProgress, MenuItem, Select, FormControl, InputLabel } from '@mui/material';
+import { Box, Typography, Button, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { TimeAgo } from '../common/TimeAgo';
+import TimeAgo from '../common/TimeAgo'; // Fixed import
 import { Job, JobStatus } from '../../types/job';
 import { WorkOrder } from '../../types/workorder';
 
@@ -28,19 +28,19 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, workOrders, onSelect, 
   };
 
   // Get status chip color
-  const getStatusColor = (status: JobStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'created':
+      case JobStatus.CREATED:
         return 'default';
-      case 'submitted':
+      case JobStatus.SUBMITTED:
         return 'info';
-      case 'running':
+      case JobStatus.RUNNING:
         return 'primary';
-      case 'completed':
+      case JobStatus.COMPLETED:
         return 'success';
-      case 'failed':
+      case JobStatus.FAILED:
         return 'error';
-      case 'cancelled':
+      case JobStatus.CANCELLED:
         return 'warning';
       default:
         return 'default';
@@ -106,15 +106,15 @@ export const JobsList: React.FC<JobsListProps> = ({ jobs, workOrders, onSelect, 
               {jobs.map((job) => (
                 <TableRow key={job.id}>
                   <TableCell>{job.id}</TableCell>
-                  <TableCell>{job.work_order_id}</TableCell>
+                  <TableCell>{job.workOrderId}</TableCell>
                   <TableCell>
                     <Chip 
                       label={job.status} 
-                      color={getStatusColor(job.status as JobStatus)} 
+                      color={getStatusColor(job.status)} 
                     />
                   </TableCell>
                   <TableCell>
-                    <TimeAgo timestamp={job.created_at} />
+                    <TimeAgo timestamp={job.createdAt} />
                   </TableCell>
                   <TableCell>
                     <Button

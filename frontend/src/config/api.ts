@@ -18,3 +18,12 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const API_ENDPOINTS = {
+  PROMPTS: '/api/prompts',
+  PROMPT: (id: string) => `/api/prompts/${id}`,
+  PROMPT_HISTORY: (id: string) => `/api/prompts/${id}/history`,
+  PROMPT_DIFF: (id: string) => `/api/prompts/${id}/diff`,
+  PROMPT_RENDER: (id: string) => `/api/prompts/${id}/render`,
+  PROMPT_TEST: (id: string) => `/api/prompts/${id}/test`
+};

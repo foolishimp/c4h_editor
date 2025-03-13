@@ -1,5 +1,5 @@
 // File: frontend/src/App.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -9,11 +9,9 @@ import { WorkOrderEditor } from './components/WorkOrderEditor/WorkOrderEditor';
 import { JobsList } from './components/JobsList/JobsList';
 import { JobDetails } from './components/JobDetails/JobDetails';
 
-import { usePromptApi } from './hooks/usePromptApi';
+// Only import what we need
 import { useWorkOrderApi } from './hooks/useWorkOrderApi';
 import { useJobApi } from './hooks/useJobApi';
-import { Job } from './types/job';
-import { WorkOrder } from './types/workorder';
 
 const theme = createTheme({
   palette: {
@@ -69,7 +67,7 @@ function App() {
   };
 
   const handleSubmitJob = (workOrderId: string) => {
-    submitJob({ work_order_id: workOrderId }).then(() => {
+    submitJob({ workOrderId }).then(() => { // Fixed property name
       fetchJobs(); // Refresh the jobs list
     });
   };

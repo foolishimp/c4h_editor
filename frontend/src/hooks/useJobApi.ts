@@ -1,119 +1,138 @@
 // File: frontend/src/hooks/useJobApi.ts
-import { useState } from 'react';
-import { Job } from '../types/job';
+import { useState, useCallback } from 'react';
+import { Job, JobStatus } from '../types/job';
 import { api } from '../config/api';
 
-export function useJobApi() {
+export const useJobApi = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getJobs = async (): Promise<Job[]> => {
+  // Fetch all jobs - renamed to match expected function name in App.tsx
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get('/api/v1/jobs');
-      const data = response.data.items;
-      setJobs(data);
-      setLoading(false);
-      return data;
+      // Map backend response fields to our frontend model
+      const mappedJobs = response.data.items.map((item: any) => ({
+        id: item.id,
+        workOrderId: item.work_order_id,
+        workOrderVersion: item.work_order_version,
+        status: item.status,
+        serviceJobId: item.service_job_id,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+        submittedAt: item.submitted_at,
+        completedAt: item.completed_at,
+        userId: item.user_id,
+        configuration: item.configuration,
+        results: item.result
+      }));
+      setJobs(mappedJobs);
+      return mappedJobs;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setLoading(false);
+      setError((err as Error).message);
       return [];
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const getJob = async (id: string): Promise<Job | null> => {
+  // Fetch a single job - renamed to match expected function name in components
+  const fetchJob = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.get(`/api/v1/jobs/${id}`);
-      const data = response.data;
-      setJob(data);
-      setLoading(false);
-      return data;
+      // Map backend response fields to our frontend model
+      const mappedJob = {
+        id: response.data.id,
+        workOrderId: response.data.work_order_id,
+        workOrderVersion: response.data.work_order_version,
+        status: response.data.status,
+        serviceJobId: response.data.service_job_id,
+        createdAt: response.data.created_at,
+        updatedAt: response.data.updated_at,
+        submittedAt: response.data.submitted_at,
+        completedAt: response.data.completed_at,
+        userId: response.data.user_id,
+        configuration: response.data.configuration,
+        results: response.data.result
+      };
+      setJob(mappedJob);
+      return mappedJob;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setLoading(false);
+      setError((err as Error).message);
       return null;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const submitJob = async (data: { workorder_id: string; parameters?: any }): Promise<Job | null> => {
+  // Submit a job
+  const submitJob = useCallback(async (data: { workOrderId: string }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/api/v1/jobs', {
-        work_order_id: data.workorder_id
-      });
-      const responseData = response.data;
-      await getJobs();
-      setLoading(false);
-      return responseData;
+      // Convert frontend model properties to backend API expectations
+      const requestData = {
+        work_order_id: data.workOrderId
+      };
+      const response = await api.post('/api/v1/jobs', requestData);
+      return response.data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError((err as Error).message);
+      throw err;
+    } finally {
       setLoading(false);
-      return null;
     }
-  };
+  }, []);
 
-  const cancelJob = async (id: string): Promise<boolean> => {
+  // Other methods remain the same
+  const cancelJob = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
-      await api.post(`/api/v1/jobs/${id}/cancel`);
-      await getJobs();
-      if (job && job.id === id) {
-        await getJob(id);
-      }
-      setLoading(false);
-      return true;
+      const response = await api.post(`/api/v1/jobs/${id}/cancel`);
+      return response.data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError((err as Error).message);
+      throw err;
+    } finally {
       setLoading(false);
-      return false;
     }
-  };
+  }, []);
 
-  const pollJobStatus = async (id: string): Promise<Job | null> => {
+  const pollJobStatus = useCallback(async (id: string) => {
     try {
       const response = await api.get(`/api/v1/jobs/${id}`);
-      const data = response.data;
-      if (job && job.id === id) {
-        setJob(data);
-      }
-      return data;
+      return response.data;
     } catch (err) {
-      console.error("Error polling job status:", err);
-      return null;
+      throw err;
     }
-  };
+  }, []);
 
-  const getJobLogs = async (jobId: string): Promise<any> => {
-    setLoading(true);
+  const getJobLogs = useCallback(async (jobId: string) => {
     try {
       const response = await api.get(`/api/v1/jobs/${jobId}/logs`);
-      setLoading(false);
       return response.data;
-    } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
-      setLoading(false);
-      return null;
+    } catch (err) {
+      throw err;
     }
-  };
+  }, []);
 
   return {
     jobs,
     job,
     loading,
     error,
-    getJobs,
-    getJob,
+    fetchJobs,  // Changed from getJobs to fetchJobs
+    fetchJob,   // Changed from getJob to fetchJob
     submitJob,
     cancelJob,
     pollJobStatus,
     getJobLogs
   };
-}
+};

@@ -6,9 +6,14 @@ import { WorkOrder } from '../../types/workorder';
 interface WorkOrderTestRunnerProps {
   workOrder: WorkOrder;
   onTest: (parameters: Record<string, any>) => Promise<any>;
+  onRender?: () => Promise<string>; // Make optional to match usage
 }
 
-export const WorkOrderTestRunner: React.FC<WorkOrderTestRunnerProps> = ({ workOrder, onTest }) => {
+export const WorkOrderTestRunner: React.FC<WorkOrderTestRunnerProps> = ({ 
+  workOrder, 
+  onTest,
+  onRender
+}) => {
   const [parameters, setParameters] = useState<Record<string, any>>({});
   const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +34,21 @@ export const WorkOrderTestRunner: React.FC<WorkOrderTestRunnerProps> = ({ workOr
       setResult(response.model_response || JSON.stringify(response, null, 2));
     } catch (err) {
       setError((err as Error).message || 'An error occurred during testing');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRender = async () => {
+    if (!onRender) return;
+    
+    setLoading(true);
+    setError(null);
+    try {
+      const rendered = await onRender();
+      setResult(rendered);
+    } catch (err) {
+      setError((err as Error).message || 'An error occurred during rendering');
     } finally {
       setLoading(false);
     }
@@ -58,13 +78,25 @@ export const WorkOrderTestRunner: React.FC<WorkOrderTestRunnerProps> = ({ workOr
         </Box>
       )}
       
-      <Button 
-        variant="contained" 
-        onClick={handleTest}
-        disabled={loading}
-      >
-        {loading ? <CircularProgress size={24} /> : 'Run Test'}
-      </Button>
+      <Box display="flex" gap={2}>
+        <Button 
+          variant="contained" 
+          onClick={handleTest}
+          disabled={loading}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Run Test'}
+        </Button>
+        
+        {onRender && (
+          <Button 
+            variant="outlined" 
+            onClick={handleRender}
+            disabled={loading}
+          >
+            Render Template
+          </Button>
+        )}
+      </Box>
       
       {error && (
         <Box mt={2}>

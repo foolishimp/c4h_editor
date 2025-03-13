@@ -1,7 +1,7 @@
 // File: frontend/src/components/JobDetails/JobDetails.tsx
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Box, Card, CardContent, Typography, Button, CircularProgress, Chip } from '@mui/material';
-import { TimeAgo } from '../common/TimeAgo';
+import TimeAgo from '../common/TimeAgo'; // Fixed import
 import { useJobApi } from '../../hooks/useJobApi';
 import { JobStatus } from '../../types/job';
 
@@ -13,7 +13,7 @@ interface JobDetailsProps {
 }
 
 export const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose, onCancel }) => {
-  const { job, fetchJob, cancelJob, loading, error } = useJobApi();
+  const { job, fetchJob, loading, error } = useJobApi();
 
   useEffect(() => {
     if (jobId) {
@@ -29,19 +29,19 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose, onCancel
   };
 
   // Get status chip color
-  const getStatusColor = (status: JobStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'created':
+      case JobStatus.CREATED:
         return 'default';
-      case 'submitted':
+      case JobStatus.SUBMITTED:
         return 'info';
-      case 'running':
+      case JobStatus.RUNNING:
         return 'primary';
-      case 'completed':
+      case JobStatus.COMPLETED:
         return 'success';
-      case 'failed':
+      case JobStatus.FAILED:
         return 'error';
-      case 'cancelled':
+      case JobStatus.CANCELLED:
         return 'warning';
       default:
         return 'default';
@@ -80,48 +80,48 @@ export const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose, onCancel
 
         <Box sx={{ mb: 2 }}>
           <Typography variant="subtitle1">ID: {job.id}</Typography>
-          <Typography variant="subtitle2">Work Order: {job.work_order_id}</Typography>
+          <Typography variant="subtitle2">Work Order: {job.workOrderId}</Typography>
           <Box sx={{ mt: 1 }}>
             <Chip 
               label={job.status} 
-              color={getStatusColor(job.status as JobStatus)} 
+              color={getStatusColor(job.status)} 
               sx={{ mr: 1 }} 
             />
             <Typography variant="body2" component="span">
-              Created <TimeAgo timestamp={job.created_at} />
+              Created <TimeAgo timestamp={job.createdAt} />
             </Typography>
           </Box>
         </Box>
 
-        {job.submitted_at && (
+        {job.submittedAt && (
           <Typography variant="body2">
-            Submitted <TimeAgo timestamp={job.submitted_at} />
+            Submitted <TimeAgo timestamp={job.submittedAt} />
           </Typography>
         )}
 
-        {job.completed_at && (
+        {job.completedAt && (
           <Typography variant="body2">
-            Completed <TimeAgo timestamp={job.completed_at} />
+            Completed <TimeAgo timestamp={job.completedAt} />
           </Typography>
         )}
 
-        {job.result && (
+        {job.results && (
           <Box sx={{ mt: 2 }}>
             <Typography variant="h6">Results</Typography>
-            {job.result.output && (
+            {job.results.output && (
               <Typography variant="body2" component="pre" sx={{ mt: 1, p: 2, bgcolor: '#f5f5f5', borderRadius: 1, overflow: 'auto' }}>
-                {job.result.output}
+                {job.results.output}
               </Typography>
             )}
-            {job.result.error && (
+            {job.results.error && (
               <Typography variant="body2" color="error" sx={{ mt: 1 }}>
-                Error: {job.result.error}
+                Error: {job.results.error}
               </Typography>
             )}
           </Box>
         )}
 
-        {(job.status === 'submitted' || job.status === 'running') && (
+        {(job.status === JobStatus.SUBMITTED || job.status === JobStatus.RUNNING) && (
           <Button 
             variant="outlined" 
             color="warning" 
