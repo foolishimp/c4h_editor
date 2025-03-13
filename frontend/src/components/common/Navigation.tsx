@@ -1,133 +1,113 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  AppBar, Toolbar, Typography, Button, IconButton, Drawer, 
-  List, ListItem, ListItemIcon, ListItemText, Box, Divider,
-  useTheme, useMediaQuery
+/**
+ * File: frontend/src/components/common/Navigation.tsx
+ * Navigation sidebar component with links to different application sections
+ */
+
+import React from 'react';
+import { Link as RouterLink, useLocation } from 'react-router-dom';
+import {
+  Drawer,
+  AppBar,
+  Toolbar,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Typography,
+  Divider,
+  Box,
 } from '@mui/material';
 import {
-  Menu as MenuIcon, 
-  Dashboard as DashboardIcon, 
-  Description as DescriptionIcon, 
-  Work as WorkIcon, 
-  Schedule as ScheduleIcon, 
-  Settings as SettingsIcon, 
-  ChevronLeft as ChevronLeftIcon
+  Description as DescriptionIcon,
+  Work as WorkIcon,
+  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
 
-const drawerWidth = 240;
-
+/**
+ * Navigation component that displays the app bar and navigation drawer
+ */
 const Navigation: React.FC = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const navigate = useNavigate();
   const location = useLocation();
-  
-  const [drawerOpen, setDrawerOpen] = useState<boolean>(!isMobile);
-  
-  const handleNavigate = (path: string) => {
-    navigate(path);
-    if (isMobile) {
-      setDrawerOpen(false);
-    }
-  };
-  
-  const isActive = (path: string) => {
+  const drawerWidth = 240;
+
+  // Check if the current path matches the given path
+  const isActive = (path: string): boolean => {
     return location.pathname.startsWith(path);
   };
-  
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Work Orders', icon: <DescriptionIcon />, path: '/workorders' },
-    { text: 'Work Orders', icon: <WorkIcon />, path: '/workorders' },
-    { text: 'Jobs', icon: <ScheduleIcon />, path: '/jobs' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-  ];
-  
-  const drawer = (
-    <>
-      <Box 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="space-between"
-        p={2}
-      >
-        <Typography variant="h6" noWrap>
-          C4H Editor
-        </Typography>
-        {isMobile && (
-          <IconButton onClick={() => setDrawerOpen(false)}>
-            <ChevronLeftIcon />
-          </IconButton>
-        )}
-      </Box>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem 
-            button 
-            key={item.text}
-            onClick={() => handleNavigate(item.path)}
-            selected={isActive(item.path)}
-            sx={{
-              '&.Mui-selected': {
-                backgroundColor: 'rgba(25, 118, 210, 0.12)',
-                '&:hover': {
-                  backgroundColor: 'rgba(25, 118, 210, 0.18)',
-                },
-              },
-            }}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-      </List>
-    </>
-  );
-  
+
   return (
     <>
-      <AppBar 
+      {/* App Bar */}
+      <AppBar
         position="fixed"
-        sx={{ 
-          zIndex: theme.zIndex.drawer + 1,
-          width: '100%'
+        sx={{
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          ml: { sm: `${drawerWidth}px` },
         }}
       >
-        <Toolbar sx={{ paddingLeft: isMobile ? 2 : 3 }}>
-          {isMobile && (
-            <IconButton
-              color="inherit"
-              edge="start"
-              onClick={() => setDrawerOpen(true)}
-              sx={{ mr: 2 }}
-            >
-              <MenuIcon />
-            </IconButton>
-          )}
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            {menuItems.find(item => isActive(item.path))?.text || 'C4H Editor'}
+        <Toolbar>
+          <Typography variant="h6" noWrap component="div">
+            C4H WorkOrder Editor
           </Typography>
-          <Button color="inherit">Login</Button>
         </Toolbar>
       </AppBar>
-      
+
+      {/* Navigation Drawer */}
       <Drawer
-        variant={isMobile ? 'temporary' : 'permanent'}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        variant="permanent"
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          '& .MuiDrawer-paper': {
-            width: drawerWidth,
+          [`& .MuiDrawer-paper`]: { 
+            width: drawerWidth, 
             boxSizing: 'border-box',
+            marginTop: '64px' 
           },
         }}
-        PaperProps={{ style: { position: 'absolute' } }}
       >
-        {drawer}
+        <Box sx={{ overflow: 'auto' }}>
+          <List>
+            <ListItem
+              button
+              component={RouterLink}
+              to="/workorders"
+              selected={isActive('/workorders')}
+            >
+              <ListItemIcon>
+                <DescriptionIcon />
+              </ListItemIcon>
+              <ListItemText primary="WorkOrders" />
+            </ListItem>
+
+            <ListItem
+              button
+              component={RouterLink}
+              to="/jobs"
+              selected={isActive('/jobs')}
+            >
+              <ListItemIcon>
+                <WorkIcon />
+              </ListItemIcon>
+              <ListItemText primary="Jobs" />
+            </ListItem>
+          </List>
+          
+          <Divider />
+          
+          <List>
+            <ListItem
+              button
+              component={RouterLink}
+              to="/dashboard"
+              selected={isActive('/dashboard')}
+            >
+              <ListItemIcon>
+                <DashboardIcon />
+              </ListItemIcon>
+              <ListItemText primary="Dashboard" />
+            </ListItem>
+          </List>
+        </Box>
       </Drawer>
     </>
   );

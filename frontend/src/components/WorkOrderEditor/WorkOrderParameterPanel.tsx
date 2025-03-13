@@ -1,3 +1,4 @@
+// File: frontend/src/components/WorkOrderEditor/WorkOrderParameterPanel.tsx
 import { useState, useEffect } from 'react';
 import { 
   TextField, 
@@ -22,13 +23,17 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { WorkOrderParameter, ParameterType } from '../../types/workorder';
 
-interface WorkOrderParameterPanelProps {
+export interface WorkOrderParameterPanelProps {
   parameters: WorkOrderParameter[];
-  onChange: (parameters: WorkOrderParameter[]) => void;
-  readOnly?: boolean;
+  onUpdateParameters: (parameters: WorkOrderParameter[]) => void;
+  disabled?: boolean;
 }
 
-export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false }: WorkOrderParameterPanelProps) => {
+export const WorkOrderParameterPanel = ({ 
+  parameters,
+  onUpdateParameters,
+  disabled = false 
+}: WorkOrderParameterPanelProps) => {
   const [localParameters, setLocalParameters] = useState<WorkOrderParameter[]>(parameters);
   const [openDialog, setOpenDialog] = useState(false);
   const [currentParameter, setCurrentParameter] = useState<WorkOrderParameter | null>(null);
@@ -57,12 +62,12 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
   };
 
   const handleDelete = (index: number) => {
-    if (readOnly) return;
+    if (disabled) return;
     
     const updatedParameters = [...localParameters];
     updatedParameters.splice(index, 1);
     setLocalParameters(updatedParameters);
-    onChange(updatedParameters);
+    onUpdateParameters(updatedParameters);
   };
 
   const handleDialogClose = () => {
@@ -82,7 +87,7 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
   };
 
   const handleSaveParameter = () => {
-    if (!currentParameter || readOnly) return;
+    if (!currentParameter || disabled) return;
     
     const updatedParameters = [...localParameters];
     
@@ -93,7 +98,7 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
     }
     
     setLocalParameters(updatedParameters);
-    onChange(updatedParameters);
+    onUpdateParameters(updatedParameters);
     handleDialogClose();
   };
 
@@ -101,7 +106,7 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
     <Box className="parameter-panel">
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h6">Parameters</Typography>
-        {!readOnly && (
+        {!disabled && (
           <Button
             startIcon={<AddIcon />}
             onClick={handleOpenAdd}
@@ -119,7 +124,7 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
             key={index} 
             button 
             onClick={() => handleOpenEdit(index)}
-            disabled={readOnly}
+            disabled={disabled}
           >
             <ListItemText 
               primary={param.name} 
@@ -134,7 +139,7 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
                 </>
               } 
             />
-            {!readOnly && (
+            {!disabled && (
               <ListItemSecondaryAction>
                 <IconButton 
                   edge="end" 
@@ -194,16 +199,17 @@ export const WorkOrderParameterPanel = ({ parameters, onChange, readOnly = false
                 </Select>
               </FormControl>
               
+              {/* Converting boolean values to strings for MenuItem */}
               <FormControl fullWidth margin="normal">
                 <InputLabel id="parameter-required-label">Required</InputLabel>
                 <Select
                   labelId="parameter-required-label"
-                  value={currentParameter.required}
-                  onChange={(e) => handleParameterChange('required', e.target.value)}
+                  value={currentParameter.required ? 'true' : 'false'}
+                  onChange={(e) => handleParameterChange('required', e.target.value === 'true')}
                   label="Required"
                 >
-                  <MenuItem value={true}>Yes</MenuItem>
-                  <MenuItem value={false}>No</MenuItem>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
                 </Select>
               </FormControl>
               

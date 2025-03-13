@@ -1,132 +1,119 @@
+// File: frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { ChakraProvider, Box } from '@chakra-ui/react';
-import { } from 'react-router-dom';
+import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
 import Navigation from './components/common/Navigation';
-import PromptLibrary from './components/PromptLibrary/PromptLibrary';
-import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
-import JobsList from './components/JobsList/JobsList';
-import JobDetails from './components/JobDetails/JobDetails';
-import './index.css';
+import { PromptLibrary } from './components/PromptLibrary/PromptLibrary';
+import { WorkOrderEditor } from './components/WorkOrderEditor/WorkOrderEditor';
+import { JobsList } from './components/JobsList/JobsList';
+import { JobDetails } from './components/JobDetails/JobDetails';
+
 import { usePromptApi } from './hooks/usePromptApi';
 import { useWorkOrderApi } from './hooks/useWorkOrderApi';
 import { useJobApi } from './hooks/useJobApi';
-import { WorkOrder, WorkOrderStatus } from './types/workorder';
+import { Job } from './types/job';
+import { WorkOrder } from './types/workorder';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+    background: {
+      default: '#f5f7fa',
+    },
+  },
+  typography: {
+    fontFamily: [
+      '-apple-system',
+      'BlinkMacSystemFont',
+      'Segoe UI',
+      'Roboto',
+      'Oxygen',
+      'Ubuntu',
+      'Cantarell',
+      'Open Sans',
+      'Helvetica Neue',
+      'sans-serif',
+    ].join(','),
+  },
+});
 
 function App() {
-  // State
-  const [activeView, setActiveView] = useState<'workorders' | 'jobs'>('workorders');
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState<string | null>(null);
-  const [selectedJob, setSelectedJob] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const { jobs, fetchJobs, submitJob, cancelJob } = useJobApi();
+  const { workOrders, fetchWorkOrders } = useWorkOrderApi();
 
-  // API hooks
-  const {
-    workOrders,
-    error: workOrderError,
-    getWorkOrders,
-    updateWorkOrder,
-    deleteWorkOrder,
-    testWorkOrder,
-    renderWorkOrder,
-    getWorkOrderHistory,
-    getWorkOrderVersion
-  } = useWorkOrderApi();
-
-  const {
-    jobs,
-    error: jobError,
-    getJobs,
-    submitJob,
-    cancelJob
-  } = useJobApi();
-
-  // Effects
+  // Fetch jobs and workorders on load
   useEffect(() => {
-    getWorkOrders();
-    getJobs();
-  }, []);
+    fetchJobs();
+    fetchWorkOrders();
+  }, [fetchJobs, fetchWorkOrders]);
 
-  // Handlers
-  const handleNavigate = (view: 'workorders' | 'jobs') => {
-    setActiveView(view);
-    setSelectedWorkOrder(null);
-    setSelectedJob(null);
+  const handleJobSelect = (jobId: string) => {
+    setSelectedJobId(jobId);
   };
 
-  const handleSelectWorkOrder = (id: string) => {
-    setSelectedWorkOrder(id);
-    setSelectedJob(null);
+  const handleCloseJobDetails = () => {
+    setSelectedJobId(null);
   };
 
-  const handleSelectJob = (id: string) => {
-    setSelectedJob(id);
-    setSelectedWorkOrder(null);
+  const handleCancelJob = (jobId: string) => {
+    cancelJob(jobId).then(() => {
+      fetchJobs(); // Refresh the jobs list
+    });
   };
 
-  const handleRefresh = () => {
-    getWorkOrders();
-    getJobs();
+  const handleSubmitJob = (workOrderId: string) => {
+    submitJob({ work_order_id: workOrderId }).then(() => {
+      fetchJobs(); // Refresh the jobs list
+    });
   };
 
-  // Render function
+  const handleRefreshJobs = () => {
+    fetchJobs();
+  };
+
   return (
-    <ChakraProvider>
-      <Box display="flex" flexDirection="column" height="100vh">
-        <Navigation 
-          activeView={activeView} 
-          onNavigate={handleNavigate} 
-          onRefresh={handleRefresh}
-        />
-        
-        <Box flex="1" padding="4" overflow="auto">
-          {activeView === 'workorders' && selectedWorkOrder && (
-            <WorkOrderEditor
-              workOrderId={selectedWorkOrder}
-              onSave={async () => {}}
-              onUpdate={updateWorkOrder}
-              onDelete={() => {
-                deleteWorkOrder(selectedWorkOrder);
-                setSelectedWorkOrder(null);
-              }}
-              onTest={() => testWorkOrder(selectedWorkOrder)}
-              onRender={() => renderWorkOrder({ workorder_id: selectedWorkOrder })}
-              onGetHistory={(id) => getWorkOrderHistory(id)}
-              onGetVersion={(id, versionId) => getWorkOrderVersion(id, versionId)}
-            />
-          )}
-          
-          {activeView === 'workorders' && !selectedWorkOrder && (
-            <div>
-              <h2>Work Orders</h2>
-              <ul>
-                {workOrders.map(workOrder => (
-                  <li key={workOrder.id} onClick={() => handleSelectWorkOrder(workOrder.id)}>
-                    {workOrder.metadata.description || 'Untitled Work Order'}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          
-          {activeView === 'jobs' && selectedJob && (
-            <JobDetails 
-              jobId={selectedJob} 
-              onClose={() => setSelectedJob(null)} 
-              onCancel={cancelJob}
-            />
-          )}
-          
-          {activeView === 'jobs' && !selectedJob && (
-            <JobsList 
-              jobs={jobs} 
-              workOrders={workOrders}
-              onSelect={handleSelectJob} 
-              onSubmitJob={(workOrderId) => submitJob({ workorder_id: workOrderId })}
-              onRefresh={handleRefresh}
-            />
-          )}
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Box sx={{ display: 'flex' }}>
+          <Navigation />
+          <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/prompts" replace />} />
+              <Route path="/prompts" element={<PromptLibrary />} />
+              <Route path="/prompts/:id" element={<PromptLibrary />} />
+              <Route path="/workorders" element={<WorkOrderEditor />} />
+              <Route path="/workorders/:id" element={<WorkOrderEditor />} />
+              <Route path="/jobs" element={
+                <>
+                  <JobsList 
+                    jobs={jobs} 
+                    workOrders={workOrders} 
+                    onSelect={handleJobSelect} 
+                    onSubmitJob={handleSubmitJob} 
+                    onRefresh={handleRefreshJobs} 
+                  />
+                  {selectedJobId && (
+                    <JobDetails 
+                      jobId={selectedJobId} 
+                      onClose={handleCloseJobDetails} 
+                      onCancel={handleCancelJob} 
+                    />
+                  )}
+                </>
+              } />
+            </Routes>
+          </Box>
         </Box>
-      </Box>
-    </ChakraProvider>
+      </Router>
+    </ThemeProvider>
   );
 }
 
