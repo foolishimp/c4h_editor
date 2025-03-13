@@ -1,10 +1,13 @@
-// File: frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
 import { ChakraProvider, Box } from '@chakra-ui/react';
+import { } from 'react-router-dom';
 import Navigation from './components/common/Navigation';
+import PromptLibrary from './components/PromptLibrary/PromptLibrary';
 import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
 import JobsList from './components/JobsList/JobsList';
 import JobDetails from './components/JobDetails/JobDetails';
+import './index.css';
+import { usePromptApi } from './hooks/usePromptApi';
 import { useWorkOrderApi } from './hooks/useWorkOrderApi';
 import { useJobApi } from './hooks/useJobApi';
 import { WorkOrder, WorkOrderStatus } from './types/workorder';

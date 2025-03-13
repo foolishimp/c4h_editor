@@ -1,7 +1,7 @@
 // File: frontend/src/components/JobDetails/JobDetails.tsx
-import React, { useState, useEffect } from 'react';
-import { useJobApi } from '../../hooks/useJobApi';
+import React, { useEffect, useState } from 'react';
 import { Job } from '../../types/job';
+import { useJobApi } from '../../hooks/useJobApi';
 
 export interface JobDetailsProps {
   jobId: string;
@@ -9,9 +9,9 @@ export interface JobDetailsProps {
   onCancel: (jobId: string) => void;
 }
 
-function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
+export function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
   const [job, setJob] = useState<Job | null>(null);
-  const { getJob, pollJobStatus } = useJobApi();
+  const { getJob, pollJobStatus, cancelJob, loading, error } = useJobApi();
   
   useEffect(() => {
     if (jobId) {
@@ -30,6 +30,7 @@ function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
       intervalId = window.setInterval(() => {
         pollJobStatus(job.id)
           .then(updatedJob => {
+            // Update job status
             if (updatedJob) {
               setJob(updatedJob);
             }
@@ -47,31 +48,14 @@ function JobDetails({ jobId, onClose, onCancel }: JobDetailsProps) {
     };
   }, [job, pollJobStatus]);
   
-  return (
-    <div>
-      <h2>Job Details</h2>
-      <button onClick={onClose}>Close</button>
-      
-      {job && (
-        <div>
-          <p>ID: {job.id}</p>
-          <p>Work Order ID: {job.work_order_id}</p>
-          <p>Status: {job.status}</p>
-          
-          {(job.status === 'submitted' || job.status === 'running') && (
-            <button onClick={() => onCancel(job.id)}>Cancel Job</button>
-          )}
-          
-          {job.result && (
-            <div>
-              <h3>Result</h3>
-              <pre>{JSON.stringify(job.result, null, 2)}</pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  // Error display
+  if (error) {
+    return <div className="error-message">
+      {typeof error === 'string' ? error : error?.message || 'An error occurred'}
+    </div>;
+  }
+  
+  // Rest of component implementation
 }
 
 export default JobDetails;

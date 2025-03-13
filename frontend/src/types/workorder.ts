@@ -7,26 +7,19 @@ export enum WorkOrderStatus {
   FAILED = 'failed'
 }
 
-export interface WorkOrderParameter {
-  name: string;
-  type: string;
-  description?: string;
-  default?: any;
-  required: boolean;
+export interface WorkOrder {
+  id: string;
+  template: WorkOrderTemplate;
+  metadata: WorkOrderMetadata;
+  parent_id?: string;
+  lineage?: string[];
+  status?: WorkOrderStatus;
 }
 
-export interface WorkOrderConfig {
-  temperature?: number;
-  max_tokens?: number;
-  top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-  stop_sequences?: string[];
-  service_id?: string;
-  workflow_id?: string;
-  max_runtime?: number;
-  notify_on_completion?: boolean;
-  parameters?: Record<string, any>;
+export interface WorkOrderTemplate {
+  text: string;
+  parameters: WorkOrderParameter[];
+  config?: WorkOrderConfig;
 }
 
 export interface WorkOrderMetadata {
@@ -45,17 +38,18 @@ export interface WorkOrderMetadata {
   assignee?: string;
 }
 
-export interface WorkOrderTemplate {
-  text: string;
-  parameters: WorkOrderParameter[];
-  config?: WorkOrderConfig;
+export interface WorkOrderParameter {
+  name: string;
+  type: string;
+  description?: string;
+  required?: boolean;
+  default?: any;
 }
 
-export interface WorkOrder {
-  id: string;
-  template: WorkOrderTemplate;
-  metadata: WorkOrderMetadata;
-  parent_id?: string;
-  lineage?: string[];
-  status?: WorkOrderStatus;
+export interface WorkOrderConfig {
+  max_tokens?: number;
+  temperature?: number;
+  top_p?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
 }

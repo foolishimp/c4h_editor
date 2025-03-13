@@ -1,11 +1,10 @@
-// File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
 import React, { useState, useEffect } from 'react';
 import { WorkOrder } from '../../types/workorder';
 
 export interface WorkOrderEditorProps {
   workOrderId: string;
   onSave: () => Promise<any>;
-  onUpdate: (workOrder: WorkOrder) => Promise<any>;
+  onUpdate: () => Promise<any>;
   onDelete: () => void;
   onTest: () => void;
   onRender: () => Promise<string>;
@@ -13,7 +12,7 @@ export interface WorkOrderEditorProps {
   onGetVersion: (id: string, versionId: string) => Promise<any>;
 }
 
-function WorkOrderEditor({
+export function WorkOrderEditor({
   workOrderId,
   onSave,
   onUpdate,
@@ -46,21 +45,7 @@ function WorkOrderEditor({
     }
   }, [workOrderId]);
   
-  // Rest of the implementation
-  
-  return (
-    <div>
-      <h2>Work Order Editor</h2>
-      {workOrder && (
-        <div>
-          <p>ID: {workOrder.id}</p>
-          <p>Description: {workOrder.metadata.description}</p>
-          <p>Text: {workOrder.template.text}</p>
-          {/* Other editor UI elements */}
-        </div>
-      )}
-    </div>
-  );
-}
+  // Rest of component implementation
+} 
 
 export default WorkOrderEditor;
