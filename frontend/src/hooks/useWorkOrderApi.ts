@@ -1,7 +1,7 @@
 // File: frontend/src/hooks/useWorkOrderApi.ts
 import { useState, useCallback } from 'react';
 import { WorkOrder } from '../types/workorder';
-import { api } from '../config/api';
+import api from '../config/api'; // Fixed import
 
 export const useWorkOrderApi = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);

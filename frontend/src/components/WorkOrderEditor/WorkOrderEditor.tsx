@@ -168,7 +168,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
   }, [getWorkOrderHistory]);
 
-  const handleGetVersion = useCallback(async (id: string, versionId: string) => {
+  const handleGetVersion = useCallback(async (id: string, _versionId: string) => {
     try {
       // Using fetchWorkOrder as a workaround since getWorkOrderVersion doesn't exist
       return await fetchWorkOrder(id);

@@ -1,7 +1,7 @@
 // File: frontend/src/hooks/useJobApi.ts
 import { useState, useCallback } from 'react';
-import { Job, JobStatus } from '../types/job';
-import { api } from '../config/api';
+import { Job } from '../types/job';
+import api from '../config/api'; // Fixed import
 
 export const useJobApi = () => {
   const [jobs, setJobs] = useState<Job[]>([]);

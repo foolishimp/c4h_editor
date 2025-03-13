@@ -162,10 +162,10 @@ const VersionControl: React.FC<VersionControlProps> = ({
                         )}
                       </Td>
                       <Td>
-                        <TimeAgo 
-                          date={item.created_at} 
-                          tooltipFormat={true} 
-                          fontSize="xs"
+                      <TimeAgo 
+                          timestamp={item.created_at} 
+                          typography={true}
+                          variant="caption"
                         />
                       </Td>
                       <Td>{item.author}</Td>
