@@ -1,197 +1,159 @@
+// File: frontend/src/hooks/useWorkOrderApi.ts
 import { useState } from 'react';
-import { apiClient, API_ENDPOINTS } from '../config/api';
-import { WorkOrder, WorkOrderDiff } from '../types/workorder';
+import { WorkOrder } from '../types/workorder';
+import { api } from '../config/api';
 
 export function useWorkOrderApi() {
-  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getWorkOrders = async () => {
+  const getWorkOrders = async (): Promise<WorkOrder[]> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.WORKORDERS);
-      setWorkOrders(response.data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get work orders');
+      const response = await api.get('/api/v1/workorders');
+      const data = response.data;
+      setWorkOrders(data);
+      setLoading(false);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
       return [];
-    } finally {
-      setLoading(false);
     }
   };
 
-  const getWorkOrder = async (id: string) => {
+  const getWorkOrder = async (id: string): Promise<WorkOrder | null> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.WORKORDER(id));
-      setWorkOrder(response.data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get work order');
+      const response = await api.get(`/api/v1/workorders/${id}`);
+      const data = response.data;
+      setWorkOrder(data);
+      setLoading(false);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
       return null;
-    } finally {
-      setLoading(false);
     }
   };
 
-  const createWorkOrder = async (data: Partial<WorkOrder>) => {
+  const updateWorkOrder = async (workOrder: WorkOrder): Promise<WorkOrder | null> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKORDERS, data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to create work order');
-      throw err;
-    } finally {
+      const response = await api.put(`/api/v1/workorders/${workOrder.id}`, {
+        template: workOrder.template,
+        metadata: workOrder.metadata,
+        commit_message: "Updated work order",
+        author: workOrder.metadata.author
+      });
+      const data = response.data;
+      await getWorkOrders();
       setLoading(false);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return null;
     }
   };
 
-  const updateWorkOrder = async (id: string, data: Partial<WorkOrder>) => {
+  const deleteWorkOrder = async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.put(API_ENDPOINTS.WORKORDER(id), data);
-      setWorkOrder(response.data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to update work order');
-      throw err;
-    } finally {
+      await api.delete(`/api/v1/workorders/${id}`, {
+        params: {
+          commit_message: "Deleted work order",
+          author: "user" // Would ideally come from user context
+        }
+      });
+      await getWorkOrders();
       setLoading(false);
-    }
-  };
-
-  const deleteWorkOrder = async (id: string) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      await apiClient.delete(API_ENDPOINTS.WORKORDER(id));
-      setWorkOrders(workOrders.filter(p => p.id !== id));
       return true;
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete work order');
-      throw err;
-    } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
+      return false;
     }
   };
 
-  const getWorkOrderHistory = async (id: string) => {
+  const testWorkOrder = async (id: string, parameters?: Record<string, any>): Promise<any> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.WORKORDER_HISTORY(id));
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get work order history');
-      throw err;
-    } finally {
+      const response = await api.post(`/api/v1/workorders/${id}/test`, {
+        parameters: parameters || {}
+      });
       setLoading(false);
+      return response.data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return null;
     }
   };
 
-  const getWorkOrderVersion = async (id: string, versionId: string) => {
+  const renderWorkOrder = async (data: { workorder_id: string; parameters?: any }): Promise<string> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.WORKORDER_VERSION(id, versionId));
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get work order version');
-      throw err;
-    } finally {
+      const response = await api.post(`/api/v1/workorders/${data.workorder_id}/render`, data.parameters || {});
       setLoading(false);
+      return response.data.rendered_workorder;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return '';
     }
   };
 
-  const createWorkOrderVersion = async (id: string) => {
+  const getWorkOrderHistory = async (id: string): Promise<any> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKORDER_HISTORY(id));
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to create work order version');
-      throw err;
-    } finally {
+      const response = await api.get(`/api/v1/workorders/${id}/history`);
       setLoading(false);
+      return response.data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return null;
     }
   };
 
-  const getWorkOrderDiff = async (id: string, versionId: string): Promise<WorkOrderDiff> => {
+  const getWorkOrderVersion = async (id: string, versionId: string): Promise<WorkOrder | null> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.WORKORDER_DIFF(id, versionId));
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get work order diff');
-      throw err;
-    } finally {
+      const response = await api.get(`/api/v1/workorders/${id}`, {
+        params: { version: versionId }
+      });
       setLoading(false);
-    }
-  };
-
-  const renderWorkOrder = async (id: string, parameters?: any) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKORDER_RENDER(id), { parameters });
       return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to render work order');
-      throw err;
-    } finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
       setLoading(false);
-    }
-  };
-
-  const testWorkOrder = async (id: string, parameters?: any) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await apiClient.post(API_ENDPOINTS.WORKORDER_TEST(id), { parameters });
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to test work order');
-      throw err;
-    } finally {
-      setLoading(false);
+      return null;
     }
   };
 
   return {
-    workOrder,
     workOrders,
+    workOrder,
     loading,
     error,
     getWorkOrders,
     getWorkOrder,
-    createWorkOrder,
     updateWorkOrder,
     deleteWorkOrder,
-    getWorkOrderHistory,
-    getWorkOrderVersion,
-    createWorkOrderVersion,
-    getWorkOrderDiff,
+    testWorkOrder,
     renderWorkOrder,
-    testWorkOrder
+    getWorkOrderHistory,
+    getWorkOrderVersion
   };
 }

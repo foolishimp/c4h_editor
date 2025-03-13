@@ -1,10 +1,5 @@
-import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
-import JobsList from './components/JobsList/JobsList';
-import JobDetails from './components/JobDetails/JobDetails';
-import { useWorkOrderApi } from './hooks/useWorkOrderApi';
-import { useJobApi } from './hooks/useJobApi';
+// File: frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ChakraProvider, Box } from '@chakra-ui/react';
 import Navigation from './components/common/Navigation';
 import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
@@ -12,102 +7,124 @@ import JobsList from './components/JobsList/JobsList';
 import JobDetails from './components/JobDetails/JobDetails';
 import { useWorkOrderApi } from './hooks/useWorkOrderApi';
 import { useJobApi } from './hooks/useJobApi';
-// other imports...
-import { WorkOrder } from './types/workorder';
+import { WorkOrder, WorkOrderStatus } from './types/workorder';
 
-const App: React.FC = () => {
-  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
+function App() {
+  // State
+  const [activeView, setActiveView] = useState<'workorders' | 'jobs'>('workorders');
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<string | null>(null);
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
-  
-  const { 
-    workOrders, 
-    loading, 
-    getWorkOrders, 
-    getWorkOrder,
-    getWorkOrderHistory,
-    getWorkOrderVersion,
-    createWorkOrder, 
-    updateWorkOrder, 
+
+  // API hooks
+  const {
+    workOrders,
+    error: workOrderError,
+    getWorkOrders,
+    updateWorkOrder,
     deleteWorkOrder,
     testWorkOrder,
-    renderWorkOrder
+    renderWorkOrder,
+    getWorkOrderHistory,
+    getWorkOrderVersion
   } = useWorkOrderApi();
-  
-  const { jobs, getJobs, getJob, submitJob, cancelJob } = useJobApi();
 
-  const handleJobSelect = (jobId: string) => setSelectedJob(jobId);
-  const handleSubmitJob = submitJob;
-  const handleRefresh = getJobs;
-  const handleCancelJob = cancelJob;
+  const {
+    jobs,
+    error: jobError,
+    getJobs,
+    submitJob,
+    cancelJob
+  } = useJobApi();
 
+  // Effects
   useEffect(() => {
     getWorkOrders();
     getJobs();
   }, []);
 
+  // Handlers
+  const handleNavigate = (view: 'workorders' | 'jobs') => {
+    setActiveView(view);
+    setSelectedWorkOrder(null);
+    setSelectedJob(null);
+  };
+
+  const handleSelectWorkOrder = (id: string) => {
+    setSelectedWorkOrder(id);
+    setSelectedJob(null);
+  };
+
+  const handleSelectJob = (id: string) => {
+    setSelectedJob(id);
+    setSelectedWorkOrder(null);
+  };
+
+  const handleRefresh = () => {
+    getWorkOrders();
+    getJobs();
+  };
+
+  // Render function
   return (
     <ChakraProvider>
-      <Router>
-        <Box className="app">
-          <Navigation />
-          <Box className="content">
-            <Routes>
-              <Route path="/" element={<Navigate to="/workorders" />} />
-              <Route path="/workorders" element={
-                selectedWorkOrderId ? (
-                  <WorkOrderEditor 
-                    workOrderId={selectedWorkOrderId}
-                    onSave={() => getWorkOrders()}
-                    onUpdate={() => getWorkOrders()}
-                    onDelete={() => {
-                      setSelectedWorkOrderId(null);
-                      getWorkOrders();
-                    }}
-                    onTest={() => {}}
-                    onRender={async () => ""}
-                    onGetHistory={getWorkOrderHistory}
-                    onGetVersion={getWorkOrderVersion}
-                  />
-                ) : (
-                  <div>
-                    <h2>Work Orders</h2>
-                    <button onClick={() => setSelectedWorkOrderId('new')}>Create New</button>
-                    <ul>
-                      {workOrders.map(wo => (
-                        <li key={wo.id}>
-                          <a href="#" onClick={() => setSelectedWorkOrderId(wo.id)}>
-                            {wo.title || wo.id}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )
-              } />
-              <Route path="/jobs" element={
-                <div>
-                  <JobsList 
-                    jobs={jobs}
-                    workOrders={workOrders}
-                    onSelect={handleJobSelect}
-                    onSubmitJob={handleSubmitJob}
-                    onRefresh={handleRefresh}
-                  />
-                  {selectedJob && (
-                    <JobDetails 
-                      jobId={selectedJob}
-                      onClose={() => setSelectedJob(null)}
-                      onCancel={handleCancelJob}
-                    />
-                  )}
-                </div>
-              } />
-            </Routes>
-          </Box>
+      <Box display="flex" flexDirection="column" height="100vh">
+        <Navigation 
+          activeView={activeView} 
+          onNavigate={handleNavigate} 
+          onRefresh={handleRefresh}
+        />
+        
+        <Box flex="1" padding="4" overflow="auto">
+          {activeView === 'workorders' && selectedWorkOrder && (
+            <WorkOrderEditor
+              workOrderId={selectedWorkOrder}
+              onSave={async () => {}}
+              onUpdate={updateWorkOrder}
+              onDelete={() => {
+                deleteWorkOrder(selectedWorkOrder);
+                setSelectedWorkOrder(null);
+              }}
+              onTest={() => testWorkOrder(selectedWorkOrder)}
+              onRender={() => renderWorkOrder({ workorder_id: selectedWorkOrder })}
+              onGetHistory={(id) => getWorkOrderHistory(id)}
+              onGetVersion={(id, versionId) => getWorkOrderVersion(id, versionId)}
+            />
+          )}
+          
+          {activeView === 'workorders' && !selectedWorkOrder && (
+            <div>
+              <h2>Work Orders</h2>
+              <ul>
+                {workOrders.map(workOrder => (
+                  <li key={workOrder.id} onClick={() => handleSelectWorkOrder(workOrder.id)}>
+                    {workOrder.metadata.description || 'Untitled Work Order'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {activeView === 'jobs' && selectedJob && (
+            <JobDetails 
+              jobId={selectedJob} 
+              onClose={() => setSelectedJob(null)} 
+              onCancel={cancelJob}
+            />
+          )}
+          
+          {activeView === 'jobs' && !selectedJob && (
+            <JobsList 
+              jobs={jobs} 
+              workOrders={workOrders}
+              onSelect={handleSelectJob} 
+              onSubmitJob={(workOrderId) => submitJob({ workorder_id: workOrderId })}
+              onRefresh={handleRefresh}
+            />
+          )}
         </Box>
-      </Router>
+      </Box>
     </ChakraProvider>
   );
-};
+}
 
 export default App;

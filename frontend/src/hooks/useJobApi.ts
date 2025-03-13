@@ -1,6 +1,7 @@
+// File: frontend/src/hooks/useJobApi.ts
 import { useState } from 'react';
-import { apiClient, API_ENDPOINTS } from '../config/api';
 import { Job } from '../types/job';
+import { api } from '../config/api';
 
 export function useJobApi() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -8,65 +9,85 @@ export function useJobApi() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getJobs = async () => {
+  const getJobs = async (): Promise<Job[]> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.JOBS);
-      setJobs(response.data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get jobs');
+      const response = await api.get('/api/v1/jobs');
+      const data = response.data.items;
+      setJobs(data);
+      setLoading(false);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
       return [];
-    } finally {
-      setLoading(false);
     }
   };
 
-  const getJob = async (id: string) => {
+  const getJob = async (id: string): Promise<Job | null> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.get(API_ENDPOINTS.JOB(id));
-      setJob(response.data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to get job');
-      throw err;
-    } finally {
+      const response = await api.get(`/api/v1/jobs/${id}`);
+      const data = response.data;
+      setJob(data);
       setLoading(false);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return null;
     }
   };
 
-  const submitJob = async (data: { workorder_id: string, parameters?: any }) => {
+  const submitJob = async (data: { workorder_id: string; parameters?: any }): Promise<Job | null> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.post(API_ENDPOINTS.JOB_SUBMIT, data);
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit job');
-      throw err;
-    } finally {
+      const response = await api.post('/api/v1/jobs', {
+        work_order_id: data.workorder_id
+      });
+      const responseData = response.data;
+      await getJobs();
       setLoading(false);
+      return responseData;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return null;
     }
   };
 
-  const cancelJob = async (id: string) => {
+  const cancelJob = async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
-    
     try {
-      const response = await apiClient.post(API_ENDPOINTS.JOB_CANCEL(id));
-      return response.data;
-    } catch (err: any) {
-      setError(err.message || 'Failed to cancel job');
-      throw err;
-    } finally {
+      await api.post(`/api/v1/jobs/${id}/cancel`);
+      await getJobs();
+      if (job && job.id === id) {
+        await getJob(id);
+      }
       setLoading(false);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setLoading(false);
+      return false;
+    }
+  };
+
+  const pollJobStatus = async (id: string): Promise<Job | null> => {
+    try {
+      const response = await api.get(`/api/v1/jobs/${id}`);
+      const data = response.data;
+      if (job && job.id === id) {
+        setJob(data);
+      }
+      return data;
+    } catch (err) {
+      console.error("Error polling job status:", err);
+      return null;
     }
   };
 
@@ -81,35 +102,6 @@ export function useJobApi() {
       setLoading(false);
       return null;
     }
-  };
-
-  const pollJobStatus = async (id: string, interval = 2000, maxAttempts = 30) => {
-    let attempts = 0;
-    
-    const poll = () => {
-      return new Promise<Job>((resolve, reject) => {
-        const checkStatus = async () => {
-          try {
-            const jobData = await getJob(id);
-            
-            if (jobData.status === 'completed' || jobData.status === 'failed') {
-              resolve(jobData);
-            } else if (attempts >= maxAttempts) {
-              reject(new Error('Polling timeout exceeded'));
-            } else {
-              attempts++;
-              setTimeout(checkStatus, interval);
-            }
-          } catch (err) {
-            reject(err);
-          }
-        };
-        
-        checkStatus();
-      });
-    };
-    
-    return poll();
   };
 
   return {
