@@ -7,14 +7,63 @@ import {
   Snackbar, Alert, Paper
 } from '@mui/material';
 
-import { WorkOrder, WorkOrderMetadata, WorkOrderParameter } from '../../types/workorder';
+import { WorkOrder, WorkOrderMetadata } from '../../types/workorder';
 import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
-import { ConfigurationPanel } from './ConfigurationPanel';
-import { WorkOrderParameterPanel } from './WorkOrderParameterPanel';
 import { WorkOrderMetadataPanel } from './WorkOrderMetadataPanel';
 import { WorkOrderTestRunner } from './WorkOrderTestRunner';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YAMLEditor } from './YAMLEditor';
+
+// Define schemas and default values for YAML editors
+const INTENT_SCHEMA = {
+  description: '',
+  goal: '',
+  priority: 'medium',
+  due_date: '',
+  assignee: '',
+  parameters: []
+};
+
+const SYSTEM_SCHEMA = {
+  llm_config: {
+    providers: {
+      anthropic: {
+        api_base: "https://api.anthropic.com",
+        env_var: "ANTHROPIC_API_KEY",
+        default_model: "claude-3-5-sonnet-20241022"
+      }
+    },
+    default_provider: "anthropic",
+    agents: {
+      discovery: {
+        provider: "anthropic",
+        model: "claude-3-5-sonnet-20241022",
+        temperature: 0
+      },
+      solution_designer: {
+        provider: "anthropic",
+        model: "claude-3-5-sonnet-20241022",
+        temperature: 0
+      },
+      coder: {
+        provider: "anthropic",
+        model: "claude-3-5-sonnet-20241022",
+        temperature: 0
+      }
+    }
+  },
+  orchestration: {
+    enabled: true,
+    entry_team: "discovery"
+  },
+  runtime: {
+    workflow: {
+      storage: {
+        enabled: true
+      }
+    }
+  }
+};
 
 export interface WorkOrderEditorProps {
   workOrderId?: string;
@@ -43,6 +92,10 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const [saved, setSaved] = useState<boolean>(false);
   const [confirmDiscard, setConfirmDiscard] = useState<boolean>(false);
   
+  // YAML editor states
+  const [intentYaml, setIntentYaml] = useState<string>('');
+  const [systemYaml, setSystemYaml] = useState<string>('');
+  
   // Access API hooks with required methods
   const {
     fetchWorkOrder,
@@ -62,6 +115,49 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       createNewWorkOrder();
     }
   }, [id]);
+
+  // Update YAML content when workOrder changes
+  useEffect(() => {
+    if (workOrder) {
+      // Extract intent configuration
+      const intentConfig = {
+        description: workOrder.metadata.description || '',
+        goal: workOrder.metadata.goal || '',
+        priority: workOrder.metadata.priority || 'medium',
+        due_date: workOrder.metadata.due_date || '',
+        assignee: workOrder.metadata.assignee || '',
+        parameters: workOrder.template.parameters || []
+      };
+      
+      // Extract system configuration (everything else)
+      const systemConfig = {
+        llm_config: workOrder.template.config,
+        project: {
+          asset: workOrder.metadata.asset || '',
+          tags: workOrder.metadata.tags || []
+        },
+        // Add other system configuration properties as needed
+        orchestration: workOrder.template.config.workflow_id ? {
+          service_id: workOrder.template.config.service_id,
+          workflow_id: workOrder.template.config.workflow_id
+        } : undefined,
+        runtime: {
+          max_runtime: workOrder.template.config.max_runtime,
+          notify_on_completion: workOrder.template.config.notify_on_completion
+        }
+      };
+      
+      // Convert to YAML
+      try {
+        // Use js-yaml but handle it safely
+        const jsYaml = require('js-yaml');
+        setIntentYaml(jsYaml.dump(intentConfig, { indent: 2 }));
+        setSystemYaml(jsYaml.dump(systemConfig, { indent: 2 }));
+      } catch (e) {
+        console.error('Error converting to YAML:', e);
+      }
+    }
+  }, [workOrder]);
 
   const loadWorkOrder = async (id: string): Promise<void> => {
     setLoading(true);
@@ -106,38 +202,63 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     setOriginalWorkOrder(JSON.parse(JSON.stringify(newWorkOrder))); // Deep clone
   };
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+  const handleUpdateIntentYaml = (yaml: string): void => {
+    setIntentYaml(yaml);
+  };
+
+  const handleUpdateSystemYaml = (yaml: string): void => {
+    setSystemYaml(yaml);
+  };
+
+  const handleApplyIntentChanges = (parsedIntent: any): void => {
     if (!workOrder) return;
     
     setWorkOrder({
       ...workOrder,
+      metadata: {
+        ...workOrder.metadata,
+        description: parsedIntent.description || '',
+        goal: parsedIntent.goal || '',
+        priority: parsedIntent.priority || 'medium',
+        due_date: parsedIntent.due_date || '',
+        assignee: parsedIntent.assignee || ''
+      },
       template: {
         ...workOrder.template,
-        text: e.target.value
+        parameters: parsedIntent.parameters || []
       }
     });
   };
 
-  const handleUpdateParameters = useCallback((updatedParameters: WorkOrderParameter[]): void => {
+  const handleApplySystemChanges = (parsedSystem: any): void => {
     if (!workOrder) return;
+    
+    // Extract configuration from system YAML
+    const llmConfig = parsedSystem.llm_config || {};
+    const projectConfig = parsedSystem.project || {};
+    const orchestrationConfig = parsedSystem.orchestration || {};
+    const runtimeConfig = parsedSystem.runtime || {};
     
     setWorkOrder({
       ...workOrder,
+      metadata: {
+        ...workOrder.metadata,
+        asset: projectConfig.asset || '',
+        tags: projectConfig.tags || []
+      },
       template: {
         ...workOrder.template,
-        parameters: updatedParameters
+        config: {
+          ...workOrder.template.config,
+          ...llmConfig,
+          service_id: orchestrationConfig.service_id,
+          workflow_id: orchestrationConfig.workflow_id,
+          max_runtime: runtimeConfig.max_runtime,
+          notify_on_completion: runtimeConfig.notify_on_completion
+        }
       }
     });
-  }, [workOrder]);
-
-  const handleUpdateMetadata = useCallback((updatedMetadata: WorkOrderMetadata): void => {
-    if (!workOrder) return;
-    
-    setWorkOrder({
-      ...workOrder,
-      metadata: updatedMetadata
-    });
-  }, [workOrder]);
+  };
 
   const handleArchiveToggle = async (): Promise<void> => {
     if (!workOrder || !id) return;
@@ -239,7 +360,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
     
     try {
-      // In a real implementation, you might have a dedicated API method for this
       const result = await fetchWorkOrder(id);
       return result;
     } catch (err) {
@@ -346,214 +466,64 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tab label="Basic" />
-          <Tab label="Intent" />
-          <Tab label="Project" />
-          <Tab label="LLM" />
-          <Tab label="Orchestration" />
-          <Tab label="Runtime" />
-          <Tab label="Parameters" />
+          <Tab label="Intent Configuration" />
+          <Tab label="System Configuration" />
           <Tab label="Test Runner" />
           <Tab label="Versions" />
-          <Tab label="YAML Editor" />
         </Tabs>
       </Box>
 
-      {/* Basic Tab */}
+      {/* Intent Configuration Tab */}
       <Box role="tabpanel" hidden={activeTab !== 0} sx={{ mt: 3 }}>
         {activeTab === 0 && (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Work Order Content
+              Intent Configuration
             </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={15}
-              value={workOrder.template.text}
-              onChange={handleTextChange}
-              placeholder="Enter the work order text here..."
-              variant="outlined"
-            />
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                Define what you want to accomplish with this work order. This includes the goal, description, priority, and other intent-related information.
+              </Typography>
+              <YAMLEditor
+                workOrder={workOrder}
+                initialYaml={intentYaml}
+                onChange={handleUpdateIntentYaml}
+                onApplyChanges={handleApplyIntentChanges}
+                schemaExample={INTENT_SCHEMA}
+                title="Intent Configuration"
+              />
+            </Paper>
           </Box>
         )}
       </Box>
 
-      {/* Intent Configuration Tab */}
+      {/* System Configuration Tab */}
       <Box role="tabpanel" hidden={activeTab !== 1} sx={{ mt: 3 }}>
         {activeTab === 1 && (
           <Box>
             <Typography variant="h6" gutterBottom>
-              Intent Configuration
+              System Configuration
             </Typography>
-            <ConfigurationPanel
-              title="Intent"
-              description="Define the purpose and goals of this work order"
-              config={{
-                description: workOrder.metadata.description || '',
-                goal: workOrder.metadata.goal || '',
-                priority: workOrder.metadata.priority || 'medium',
-                due_date: workOrder.metadata.due_date || '',
-                assignee: workOrder.metadata.assignee || ''
-              }}
-              onChange={(config) => handleUpdateMetadata({
-                ...workOrder.metadata,
-                description: config.description,
-                goal: config.goal,
-                priority: config.priority,
-                due_date: config.due_date,
-                assignee: config.assignee
-              })}
-            />
-          </Box>
-        )}
-      </Box>
-
-      {/* Project Configuration Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
-        {activeTab === 2 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Project Configuration
-            </Typography>
-            <ConfigurationPanel
-              title="Project Settings"
-              description="Configure project-specific settings"
-              config={{
-                asset: workOrder.metadata.asset || '',
-                tags: workOrder.metadata.tags || []
-              }}
-              onChange={(config) => handleUpdateMetadata({
-                ...workOrder.metadata,
-                asset: config.asset,
-                tags: config.tags
-              })}
-            />
-          </Box>
-        )}
-      </Box>
-
-      {/* LLM Configuration Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 3} sx={{ mt: 3 }}>
-        {activeTab === 3 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              LLM Configuration
-            </Typography>
-            <ConfigurationPanel
-              title="Language Model Settings"
-              description="Configure the language model parameters"
-              config={{
-                target_model: workOrder.metadata.target_model || '',
-                temperature: workOrder.template.config.temperature || 0.7,
-                max_tokens: workOrder.template.config.max_tokens || 1000
-              }}
-              onChange={(config) => {
-                handleUpdateMetadata({
-                  ...workOrder.metadata,
-                  target_model: config.target_model
-                });
-                
-                setWorkOrder({
-                  ...workOrder,
-                  template: {
-                    ...workOrder.template,
-                    config: {
-                      ...workOrder.template.config,
-                      temperature: config.temperature,
-                      max_tokens: config.max_tokens
-                    }
-                  }
-                });
-              }}
-            />
-          </Box>
-        )}
-      </Box>
-
-      {/* Orchestration Configuration Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 4} sx={{ mt: 3 }}>
-        {activeTab === 4 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Orchestration Configuration
-            </Typography>
-            <ConfigurationPanel
-              title="Workflow Orchestration"
-              description="Configure the execution workflow"
-              config={{
-                service_id: workOrder.template.config.service_id || '',
-                workflow_id: workOrder.template.config.workflow_id || ''
-              }}
-              onChange={(config) => {
-                setWorkOrder({
-                  ...workOrder,
-                  template: {
-                    ...workOrder.template,
-                    config: {
-                      ...workOrder.template.config,
-                      service_id: config.service_id,
-                      workflow_id: config.workflow_id
-                    }
-                  }
-                });
-              }}
-            />
-          </Box>
-        )}
-      </Box>
-
-      {/* Runtime Configuration Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 5} sx={{ mt: 3 }}>
-        {activeTab === 5 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Runtime Configuration
-            </Typography>
-            <ConfigurationPanel
-              title="Runtime Settings"
-              description="Configure runtime behavior"
-              config={{
-                max_runtime: workOrder.template.config.max_runtime || 3600,
-                notify_on_completion: workOrder.template.config.notify_on_completion || false
-              }}
-              onChange={(config) => {
-                setWorkOrder({
-                  ...workOrder,
-                  template: {
-                    ...workOrder.template,
-                    config: {
-                      ...workOrder.template.config,
-                      max_runtime: config.max_runtime,
-                      notify_on_completion: config.notify_on_completion
-                    }
-                  }
-                });
-              }}
-            />
-          </Box>
-        )}
-      </Box>
-
-      {/* Parameters Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 6} sx={{ mt: 3 }}>
-        {activeTab === 6 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Parameters
-            </Typography>
-            <WorkOrderParameterPanel
-              parameters={workOrder.template.parameters}
-              onUpdateParameters={handleUpdateParameters}
-              disabled={false}
-            />
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                Configure the technical details of how the work order will be executed, including LLM settings, orchestration, and runtime configuration.
+              </Typography>
+              <YAMLEditor
+                workOrder={workOrder}
+                initialYaml={systemYaml}
+                onChange={handleUpdateSystemYaml}
+                onApplyChanges={handleApplySystemChanges}
+                schemaExample={SYSTEM_SCHEMA}
+                title="System Configuration"
+              />
+            </Paper>
           </Box>
         )}
       </Box>
 
       {/* Test Runner Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 7} sx={{ mt: 3 }}>
-        {activeTab === 7 && (
+      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
+        {activeTab === 2 && (
           <Box>
             <Typography variant="h6" gutterBottom>
               Test Work Order
@@ -570,8 +540,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       </Box>
 
       {/* Versions Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 8} sx={{ mt: 3 }}>
-        {activeTab === 8 && id && (
+      <Box role="tabpanel" hidden={activeTab !== 3} sx={{ mt: 3 }}>
+        {activeTab === 3 && id && (
           <Box>
             <Typography variant="h6" gutterBottom>
               Version History
@@ -582,23 +552,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
                 onFetchHistory={handleGetHistory}
                 onLoadVersion={(versionId) => handleGetVersion(versionId)}
                 currentVersion={workOrder.metadata.version}
-              />
-            </Paper>
-          </Box>
-        )}
-      </Box>
-
-      {/* YAML Editor Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 9} sx={{ mt: 3 }}>
-        {activeTab === 9 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              YAML Editor
-            </Typography>
-            <Paper sx={{ p: 3 }}>
-              <YAMLEditor
-                workOrder={workOrder}
-                onChange={(updatedWorkOrder) => setWorkOrder(updatedWorkOrder)}
               />
             </Paper>
           </Box>

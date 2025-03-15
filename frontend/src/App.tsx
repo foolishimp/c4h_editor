@@ -6,6 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 import Navigation from './components/common/Navigation';
 import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
+import WorkOrderList from './components/WorkOrderList/WorkOrderList'; // Import the new component
 import { JobsList } from './components/JobsList/JobsList';
 import { JobDetails } from './components/JobDetails/JobDetails';
 
@@ -53,14 +54,17 @@ const AppContent = () => {
 
   const handleCancelJob = (jobId: string) => {
     // Implementation will use hooks within Router context
+    console.log('Cancel job:', jobId);
   };
 
   const handleSubmitJob = (workOrderId: string) => {
     // Implementation will use hooks within Router context
+    console.log('Submit job for work order:', workOrderId);
   };
 
   const handleRefreshJobs = () => {
     // Implementation will use hooks within Router context
+    console.log('Refresh jobs');
   };
 
   return (
@@ -69,8 +73,13 @@ const AppContent = () => {
       <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
         <Routes>
           <Route path="/" element={<Navigate to="/workorders" replace />} />
-          <Route path="/workorders" element={<WorkOrderEditor />} />
+          
+          {/* WorkOrder routes */}
+          <Route path="/workorders" element={<WorkOrderList />} />
+          <Route path="/workorders/new" element={<WorkOrderEditor />} />
           <Route path="/workorders/:id" element={<WorkOrderEditor />} />
+          
+          {/* Job routes */}
           <Route
             path="/jobs"
             element={
