@@ -19,6 +19,7 @@ export interface WorkOrderParameter {
 
 export interface WorkOrderMetadata {
   author: string;
+  archived?: boolean;
   created_at: string;
   updated_at: string;
   description?: string;
@@ -26,9 +27,23 @@ export interface WorkOrderMetadata {
   version: string;
 }
 
+// Add these fields to match your model enhancements
+// Optional for backward compatibility
+export interface WorkOrderExtendedMetadata extends WorkOrderMetadata {
+  goal?: string;
+  priority?: string;
+  due_date?: string;
+  assignee?: string;
+  asset?: string;
+}
+
 export interface WorkOrderConfig {
   temperature: number;
   max_tokens?: number;
+  service_id?: string;
+  workflow_id?: string;
+  max_runtime?: number;
+  notify_on_completion?: boolean;
 }
 
 export interface WorkOrderTemplate {

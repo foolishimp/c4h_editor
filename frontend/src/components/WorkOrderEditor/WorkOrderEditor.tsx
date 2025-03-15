@@ -6,6 +6,8 @@ import {
   Snackbar, Alert
 } from '@mui/material';
 import { WorkOrder, WorkOrderMetadata, WorkOrderParameter } from '../../types/workorder';
+import { YAMLEditor } from './YAMLEditor';
+import { ConfigurationPanel } from './ConfigurationPanel';
 import { WorkOrderParameterPanel } from './WorkOrderParameterPanel';
 import { WorkOrderMetadataPanel } from './WorkOrderMetadataPanel';
 import { WorkOrderTestRunner } from './WorkOrderTestRunner';
@@ -36,6 +38,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const {
     fetchWorkOrder,  // Changed from getWorkOrder
     updateWorkOrder,
+    archiveWorkOrder,
+    unarchiveWorkOrder,
     testWorkOrder,
     getWorkOrderHistory
   } = useWorkOrderApi();
@@ -120,6 +124,23 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       metadata: updatedMetadata
     });
   }, [workOrder]);
+
+  const handleArchiveToggle = async (): Promise<void> => {
+    if (!workOrder) return;
+    
+    setLoading(true);
+    try {
+      const isArchived = workOrder.metadata.archived || false;
+      const result = isArchived 
+        ? await unarchiveWorkOrder(workOrder.id)
+        : await archiveWorkOrder(workOrder.id);
+      await loadWorkOrder(workOrder.id);
+    } catch (err) {
+      setError(`Failed to ${workOrder.metadata.archived ? 'unarchive' : 'archive'} work order: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSave = async (): Promise<void> => {
     if (!workOrder) return;
@@ -234,9 +255,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h5">
-          {workOrderId ? `Edit Work Order: ${workOrder.id}` : 'Create New Work Order'}
-        </Typography>
+        {workOrderId ? `Edit Work Order: ${workOrder.id}` : 'Create New Work Order'}
         <Box>
           <Button variant="contained" onClick={handleSave} disabled={loading}>
             {loading ? <CircularProgress size={24} /> : 'Save'}
@@ -244,6 +263,11 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
           <Button variant="outlined" onClick={handleCloseClick} sx={{ ml: 2 }}>
             Close
           </Button>
+          {workOrderId && (
+            <Button variant="outlined" color="secondary" onClick={handleArchiveToggle} sx={{ ml: 2 }}>
+              {workOrder.metadata.archived ? 'Unarchive' : 'Archive'}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -262,15 +286,20 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 3 }}>
         <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tab label="Content" />
+          <Tab label="Basic" />
+          <Tab label="Intent" />
+          <Tab label="Project" />
+          <Tab label="LLM" />
+          <Tab label="Orchestration" />
+          <Tab label="Runtime" />
           <Tab label="Parameters" />
-          <Tab label="Metadata" />
-          <Tab label="Test" />
+          <Tab label="Test Runner" />
           <Tab label="Versions" />
+          <Tab label="YAML Editor" />
         </Tabs>
       </Box>
 
-      {/* Content Tab */}
+      {/* Basic Tab */}
       <Box role="tabpanel" hidden={activeTab !== 0} sx={{ mt: 3 }}>
         {activeTab === 0 && (
           <Box>
@@ -290,9 +319,160 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         )}
       </Box>
 
-      {/* Parameters Tab */}
+      {/* Intent Configuration Tab */}
       <Box role="tabpanel" hidden={activeTab !== 1} sx={{ mt: 3 }}>
         {activeTab === 1 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Intent Configuration
+            </Typography>
+            <ConfigurationPanel
+              title="Intent"
+              description="Define the purpose and goals of this work order"
+              config={{
+                description: workOrder.metadata.description || '',
+                goal: workOrder.metadata.goal || '',
+                priority: workOrder.metadata.priority || 'medium',
+                due_date: workOrder.metadata.due_date || '',
+                assignee: workOrder.metadata.assignee || ''
+              }}
+              onChange={(config) => handleUpdateMetadata({
+                ...workOrder.metadata,
+                ...config
+              })}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* Project Configuration Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
+        {activeTab === 2 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Project Configuration
+            </Typography>
+            <ConfigurationPanel
+              title="Project Settings"
+              description="Configure project-specific settings"
+              config={{
+                asset: workOrder.metadata.asset || '',
+                tags: workOrder.metadata.tags || []
+              }}
+              onChange={(config) => handleUpdateMetadata({
+                ...workOrder.metadata,
+                ...config
+              })}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* LLM Configuration Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 3} sx={{ mt: 3 }}>
+        {activeTab === 3 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              LLM Configuration
+            </Typography>
+            <ConfigurationPanel
+              title="Language Model Settings"
+              description="Configure the language model parameters"
+              config={{
+                target_model: workOrder.metadata.target_model || '',
+                temperature: workOrder.template.config.temperature || 0.7,
+                max_tokens: workOrder.template.config.max_tokens || 1000
+              }}
+              onChange={(config) => {
+                handleUpdateMetadata({
+                  ...workOrder.metadata,
+                  target_model: config.target_model
+                });
+                
+                setWorkOrder({
+                  ...workOrder,
+                  template: {
+                    ...workOrder.template,
+                    config: {
+                      ...workOrder.template.config,
+                      temperature: config.temperature,
+                      max_tokens: config.max_tokens
+                    }
+                  }
+                });
+              }}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* Orchestration Configuration Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 4} sx={{ mt: 3 }}>
+        {activeTab === 4 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Orchestration Configuration
+            </Typography>
+            <ConfigurationPanel
+              title="Workflow Orchestration"
+              description="Configure the execution workflow"
+              config={{
+                service_id: workOrder.template.config.service_id || '',
+                workflow_id: workOrder.template.config.workflow_id || ''
+              }}
+              onChange={(config) => {
+                setWorkOrder({
+                  ...workOrder,
+                  template: {
+                    ...workOrder.template,
+                    config: {
+                      ...workOrder.template.config,
+                      service_id: config.service_id,
+                      workflow_id: config.workflow_id
+                    }
+                  }
+                });
+              }}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* Runtime Configuration Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 5} sx={{ mt: 3 }}>
+        {activeTab === 5 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Runtime Configuration
+            </Typography>
+            <ConfigurationPanel
+              title="Runtime Settings"
+              description="Configure runtime behavior"
+              config={{
+                max_runtime: workOrder.template.config.max_runtime || 3600,
+                notify_on_completion: workOrder.template.config.notify_on_completion || false
+              }}
+              onChange={(config) => {
+                setWorkOrder({
+                  ...workOrder,
+                  template: {
+                    ...workOrder.template,
+                    config: {
+                      ...workOrder.template.config,
+                      max_runtime: config.max_runtime,
+                      notify_on_completion: config.notify_on_completion
+                    }
+                  }
+                });
+              }}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* Parameters Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 6} sx={{ mt: 3 }}>
+        {activeTab === 6 && (
           <Box>
             <Typography variant="h6" gutterBottom>
               Parameters
@@ -307,30 +487,13 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         )}
       </Box>
 
-      {/* Metadata Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
-        {activeTab === 2 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Metadata
-            </Typography>
-            <WorkOrderMetadataPanel
-              metadata={workOrder.metadata}
-              onChange={handleUpdateMetadata}
-              disabled={false}
-            />
-          </Box>
-        )}
-      </Box>
-
-      {/* Test Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 3} sx={{ mt: 3 }}>
-        {activeTab === 3 && (
+      {/* Test Runner Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 7} sx={{ mt: 3 }}>
+        {activeTab === 7 && (
           <Box>
             <Typography variant="h6" gutterBottom>
               Test Work Order
             </Typography>
-            {/* Changed this to WorkOrderTestRunner with correct props */}
             <WorkOrderTestRunner
               workOrder={workOrder}
               onTest={handleTest}
@@ -340,18 +503,48 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       </Box>
 
       {/* Versions Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 4} sx={{ mt: 3 }}>
-        {activeTab === 4 && workOrderId && (
+      <Box role="tabpanel" hidden={activeTab !== 8} sx={{ mt: 3 }}>
+        {activeTab === 8 && workOrderId && (
           <Box>
             <Typography variant="h6" gutterBottom>
               Version History
             </Typography>
-            {/* Fixed prop names to match the component interface */}
             <WorkOrderVersionControl
               workOrderId={workOrderId || ""}
               onFetchHistory={() => handleGetHistory(workOrderId || "")}
               onLoadVersion={(versionId) => handleGetVersion(workOrderId || "", versionId)}
               currentVersion={workOrder.metadata.version}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* YAML Editor Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 9} sx={{ mt: 3 }}>
+        {activeTab === 9 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              YAML Editor
+            </Typography>
+            <YAMLEditor
+              workOrder={workOrder}
+              onChange={(updatedWorkOrder) => setWorkOrder(updatedWorkOrder)}
+            />
+          </Box>
+        )}
+      </Box>
+
+      {/* Metadata Tab */}
+      <Box role="tabpanel" hidden={activeTab !== 10} sx={{ mt: 3 }}>
+        {activeTab === 10 && (
+          <Box>
+            <Typography variant="h6" gutterBottom>
+              Metadata
+            </Typography>
+            <WorkOrderMetadataPanel
+              metadata={workOrder.metadata}
+              onChange={handleUpdateMetadata}
+              disabled={false}
             />
           </Box>
         )}

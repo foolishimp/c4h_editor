@@ -1,4 +1,3 @@
-// File: frontend/src/types/job.ts
 export enum JobStatus {
   CREATED = "created",
   SUBMITTED = "submitted",

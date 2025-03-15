@@ -4,7 +4,8 @@ import { Tooltip, Typography } from '@mui/material';
 import { formatDistanceToNow } from 'date-fns';
 
 interface TimeAgoProps {
-  timestamp: string;
+  timestamp?: string;
+  date?: string; // Support both prop names for backward compatibility
   typography?: boolean;
   variant?: 'body1' | 'body2' | 'caption';
 }
@@ -12,28 +13,43 @@ interface TimeAgoProps {
 // Use default export instead of named export
 const TimeAgo: React.FC<TimeAgoProps> = ({ 
   timestamp, 
+  date, // Support both prop names
   typography = true, 
   variant = 'body2' 
 }) => {
-  if (!timestamp) {
+  // Use either timestamp or date prop
+  const dateString = timestamp || date;
+  
+  if (!dateString) {
     return null;
   }
 
-  const date = new Date(timestamp);
-  const timeAgo = formatDistanceToNow(date, { addSuffix: true });
-  const formattedDate = date.toLocaleString();
-
-  const content = (
-    <Tooltip title={formattedDate}>
-      <span>{timeAgo}</span>
-    </Tooltip>
-  );
-
-  if (typography) {
-    return <Typography variant={variant}>{content}</Typography>;
+  try {
+    const dateObj = new Date(dateString);
+    
+    if (isNaN(dateObj.getTime())) {
+      console.error(`Invalid date: ${dateString}`);
+      return null;
+    }
+    
+    const timeAgo = formatDistanceToNow(dateObj, { addSuffix: true });
+    const formattedDate = dateObj.toLocaleString();
+    
+    const content = (
+      <Tooltip title={formattedDate}>
+        <span>{timeAgo}</span>
+      </Tooltip>
+    );
+    
+    if (typography) {
+      return <Typography variant={variant}>{content}</Typography>;
+    }
+    
+    return content;
+  } catch (error) {
+    console.error(`Error parsing date: ${dateString}`, error);
+    return null;
   }
-
-  return content;
 };
 
 export default TimeAgo;

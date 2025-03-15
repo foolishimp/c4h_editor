@@ -1,4 +1,3 @@
-# File: backend/api/routes/workorders.py
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import time
@@ -163,7 +162,6 @@ async def create_workorder(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to create workorder: {str(e)}")
 
-# Add the missing GET endpoint
 @router.get("", response_model=List[WorkOrderListResponse])
 async def list_workorders(
     repo: WorkOrderRepository = Depends(get_workorder_repository)
@@ -177,7 +175,6 @@ async def list_workorders(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to list workorders: {str(e)}")
 
-# Add update endpoint
 @router.put("/{workorder_id}", response_model=WorkOrderResponse)
 async def update_workorder(
     workorder_id: str = Path(..., description="The ID of the workorder to update"),
@@ -268,7 +265,6 @@ async def update_workorder(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to update workorder: {str(e)}")
 
-# Add other necessary endpoints (get, delete, history, etc.)
 @router.delete("/{workorder_id}")
 async def delete_workorder(
     workorder_id: str = Path(..., description="The ID of the workorder to delete"),
@@ -356,3 +352,116 @@ async def get_workorder_history(
         logger.error(f"Error getting workorder history: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to get workorder history: {str(e)}")
+
+@router.post("/{workorder_id}/archive")
+async def archive_workorder(
+    workorder_id: str = Path(..., description="The ID of the workorder to archive"),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Archive a workorder."""
+    try:
+        # Get existing workorder
+        workorder = repo.get_workorder(workorder_id)
+        
+        # Update archived status
+        workorder.metadata.archived = True
+        
+        # Update in repository
+        commit = repo.update_workorder(
+            workorder=workorder,
+            commit_message="Archived workorder",
+            author="system"
+        )
+        
+        return {"message": f"WorkOrder {workorder_id} archived successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error archiving workorder: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to archive workorder: {str(e)}")
+
+@router.post("/{workorder_id}/unarchive")
+async def unarchive_workorder(
+    workorder_id: str = Path(..., description="The ID of the workorder to unarchive"),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Unarchive a workorder."""
+    try:
+        # Get existing workorder
+        workorder = repo.get_workorder(workorder_id)
+        
+        # Update archived status
+        workorder.metadata.archived = False
+        
+        # Update in repository
+        commit = repo.update_workorder(
+            workorder=workorder,
+            commit_message="Unarchived workorder",
+            author="system"
+        )
+        
+        return {"message": f"WorkOrder {workorder_id} unarchived successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error unarchiving workorder: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to unarchive workorder: {str(e)}")
+
+@router.post("/{workorder_id}/clone")
+async def clone_workorder(
+    workorder_id: str = Path(..., description="The ID of the workorder to clone"),
+    new_id: Optional[str] = Body(None, description="Optional new ID for the cloned workorder"),
+    repo: WorkOrderRepository = Depends(get_workorder_repository)
+):
+    """Clone a workorder to create a new one based on it."""
+    try:
+        # Get source workorder
+        source_workorder = repo.get_workorder(workorder_id)
+        
+        # Generate new ID if not provided
+        if not new_id:
+            import uuid
+            new_id = f"{workorder_id}-clone-{uuid.uuid4().hex[:8]}"
+        
+        # Create a new workorder based on the source
+        new_workorder = WorkOrder(
+            id=new_id,
+            template=source_workorder.template,
+            metadata={
+                **source_workorder.metadata.dict(),
+                "author": "system",  # This could be replaced with the actual user
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+                "version": "1.0.0",
+                "description": f"Clone of {workorder_id}: {source_workorder.metadata.description or ''}"
+            },
+            parent_id=workorder_id,
+            lineage=[*source_workorder.lineage, workorder_id] if source_workorder.lineage else [workorder_id]
+        )
+        
+        # Create in repository
+        commit = repo.create_workorder(
+            workorder=new_workorder,
+            commit_message=f"Cloned from {workorder_id}",
+            author="system"
+        )
+        
+        # Get the created workorder
+        created_workorder = repo.get_workorder(new_id)
+        
+        return WorkOrderResponse(
+            id=created_workorder.id,
+            version=created_workorder.metadata.version,
+            template=created_workorder.template.dict(),
+            metadata=created_workorder.metadata.dict(),
+            commit=commit,
+            updated_at=created_workorder.metadata.updated_at
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error cloning workorder: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to clone workorder: {str(e)}")

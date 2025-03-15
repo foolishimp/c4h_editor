@@ -26,7 +26,12 @@ export const API_ENDPOINTS = {
   WORKORDERS: '/api/v1/workorders',
   WORKORDER: (id: string) => `/api/v1/workorders/${id}`,
   WORKORDER_HISTORY: (id: string) => `/api/v1/workorders/${id}/history`,
-  
+  WORKORDER_CLONE: (id: string) => `/api/v1/workorders/${id}/clone`,
+  WORKORDER_ARCHIVE: (id: string) => `/api/v1/workorders/${id}/archive`,
+  WORKORDER_UNARCHIVE: (id: string) => `/api/v1/workorders/${id}/unarchive`, 
+  WORKORDER_RENDER: (id: string) => `/api/v1/workorders/${id}/render`,
+  WORKORDER_TEST: (id: string) => `/api/v1/workorders/${id}/test`,
+   
   // Job endpoints
   JOBS: '/api/v1/jobs',
   JOB: (id: string) => `/api/v1/jobs/${id}`,

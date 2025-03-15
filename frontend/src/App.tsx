@@ -1,4 +1,3 @@
-// File: frontend/src/App.tsx
 import { useState, useEffect } from 'react';
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';

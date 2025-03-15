@@ -28,6 +28,7 @@ class WorkOrderParameter(BaseModel):
 class WorkOrderMetadata(BaseModel):
     """Metadata associated with a workorder."""
     author: str = Field(..., description="Author of the workorder")
+    archived: bool = Field(False, description="Whether the workorder is archived")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     description: Optional[str] = Field(None, description="Description of the workorder")

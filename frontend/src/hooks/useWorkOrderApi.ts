@@ -1,5 +1,6 @@
 // File: frontend/src/hooks/useWorkOrderApi.ts
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { WorkOrder } from '../types/workorder';
 import api from '../config/api'; // Fixed import
 
@@ -8,6 +9,7 @@ export const useWorkOrderApi = () => {
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
+  const navigate = useNavigate();
 
   // Fetch all workorders
   const fetchWorkOrders = useCallback(async () => {
@@ -86,6 +88,54 @@ export const useWorkOrderApi = () => {
     }
   }, []);
 
+  // Archive a workorder
+  const archiveWorkOrder = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post(`/api/v1/workorders/${id}/archive`);
+      return response.data;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Unarchive a workorder
+  const unarchiveWorkOrder = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post(`/api/v1/workorders/${id}/unarchive`);
+      return response.data;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Clone a workorder
+  const cloneWorkOrder = useCallback(async (id: string, newId?: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post(`/api/v1/workorders/${id}/clone`, { new_id: newId });
+      const clonedId = response.data.id;
+      // Navigate to the new cloned workorder
+      navigate(`/workorders/${clonedId}`);
+      return response.data;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
   // Get workorder history
   const getWorkOrderHistory = useCallback(async (id: string) => {
     setLoading(true);
@@ -131,6 +181,7 @@ export const useWorkOrderApi = () => {
     }
   }, []);
 
+  // Return all the API functions
   return {
     workOrders,
     workOrder,
@@ -138,11 +189,11 @@ export const useWorkOrderApi = () => {
     error,
     fetchWorkOrders,
     fetchWorkOrder,
+    archiveWorkOrder,
+    unarchiveWorkOrder,
+    cloneWorkOrder,
     createWorkOrder,
     updateWorkOrder,
-    deleteWorkOrder,
-    getWorkOrderHistory,
-    testWorkOrder,      // Make sure this expects (id, parameters)
-    renderWorkOrder     // Make sure this expects (id, parameters)
+    deleteWorkOrder
   };
 };
