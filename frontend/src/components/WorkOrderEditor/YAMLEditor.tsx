@@ -1,3 +1,4 @@
+// File: frontend/src/components/WorkOrderEditor/YAMLEditor.tsx
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Alert } from '@mui/material';
 import { WorkOrder } from '../../types/workorder';
@@ -110,3 +111,5 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({ workOrder, onChange }) =
     </Box>
   );
 };
+
+export default YAMLEditor;

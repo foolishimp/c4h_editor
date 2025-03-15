@@ -1,5 +1,5 @@
 // File: frontend/src/components/WorkOrderEditor/WorkOrderParameterPanel.tsx
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TextField, 
   Button, 
@@ -29,7 +29,7 @@ export interface WorkOrderParameterPanelProps {
   disabled?: boolean;
 }
 
-export const WorkOrderParameterPanel = ({ 
+export const WorkOrderParameterPanel: React.FC<WorkOrderParameterPanelProps> = ({ 
   parameters,
   onUpdateParameters,
   disabled = false 
@@ -233,3 +233,5 @@ export const WorkOrderParameterPanel = ({
     </Box>
   );
 };
+
+export default WorkOrderParameterPanel;

@@ -1,4 +1,5 @@
-// File: frontend/src/types/workorder.ts (Partial file - add this if missing)
+// File: frontend/src/types/workorder.ts
+// Updated to include extended metadata properties
 
 // Add the ParameterType enum that's referenced but missing
 export enum ParameterType {
@@ -25,16 +26,13 @@ export interface WorkOrderMetadata {
   description?: string;
   tags: string[];
   version: string;
-}
-
-// Add these fields to match your model enhancements
-// Optional for backward compatibility
-export interface WorkOrderExtendedMetadata extends WorkOrderMetadata {
+  // Added missing properties to support new UI requirements
   goal?: string;
   priority?: string;
   due_date?: string;
   assignee?: string;
   asset?: string;
+  target_model?: string;
 }
 
 export interface WorkOrderConfig {
@@ -44,6 +42,7 @@ export interface WorkOrderConfig {
   workflow_id?: string;
   max_runtime?: number;
   notify_on_completion?: boolean;
+  parameters?: Record<string, any>;
 }
 
 export interface WorkOrderTemplate {
@@ -58,4 +57,17 @@ export interface WorkOrder {
   metadata: WorkOrderMetadata;
   parent_id?: string;
   lineage: string[];
+}
+
+export interface WorkOrderVersionInfo {
+  version: string;
+  commit_hash: string;
+  created_at: string;
+  author: string;
+  message: string;
+}
+
+export interface WorkOrderHistoryResponse {
+  workorder_id: string;
+  versions: WorkOrderVersionInfo[];
 }

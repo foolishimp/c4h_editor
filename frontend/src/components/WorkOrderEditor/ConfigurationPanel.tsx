@@ -1,3 +1,4 @@
+// File: frontend/src/components/WorkOrderEditor/ConfigurationPanel.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -12,9 +13,8 @@ import {
   FormControl,
   InputLabel,
   Chip,
-  OutlinedInput,
-  Autocomplete,
-  Grid
+  Grid,
+  Autocomplete
 } from '@mui/material';
 
 interface ConfigurationPanelProps {
@@ -139,3 +139,5 @@ export const ConfigurationPanel: React.FC<ConfigurationPanelProps> = ({
     </Card>
   );
 };
+
+export default ConfigurationPanel;

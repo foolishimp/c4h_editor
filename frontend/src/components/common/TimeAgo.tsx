@@ -10,10 +10,10 @@ interface TimeAgoProps {
   variant?: 'body1' | 'body2' | 'caption';
 }
 
-// Use default export instead of named export
+// TimeAgo component that shows relative time with full timestamp on hover
 const TimeAgo: React.FC<TimeAgoProps> = ({ 
   timestamp, 
-  date, // Support both prop names
+  date, // Support both prop names for backward compatibility
   typography = true, 
   variant = 'body2' 
 }) => {
@@ -27,6 +27,7 @@ const TimeAgo: React.FC<TimeAgoProps> = ({
   try {
     const dateObj = new Date(dateString);
     
+    // Check if date is valid
     if (isNaN(dateObj.getTime())) {
       console.error(`Invalid date: ${dateString}`);
       return null;

@@ -6,7 +6,7 @@ import { WorkOrder } from '../../types/workorder';
 interface WorkOrderTestRunnerProps {
   workOrder: WorkOrder;
   onTest: (parameters: Record<string, any>) => Promise<any>;
-  onRender?: () => Promise<string>; // Make optional to match usage
+  onRender?: () => Promise<string>; // Optional render function
 }
 
 export const WorkOrderTestRunner: React.FC<WorkOrderTestRunnerProps> = ({ 
@@ -115,3 +115,5 @@ export const WorkOrderTestRunner: React.FC<WorkOrderTestRunnerProps> = ({
     </Box>
   );
 };
+
+export default WorkOrderTestRunner;

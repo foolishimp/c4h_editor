@@ -1,7 +1,7 @@
 // File: frontend/src/hooks/useJobApi.ts
 import { useState, useCallback } from 'react';
 import { Job } from '../types/job';
-import api from '../config/api'; // Fixed import
+import api from '../config/api';
 
 export const useJobApi = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -9,7 +9,7 @@ export const useJobApi = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch all jobs - renamed to match expected function name in App.tsx
+  // Fetch all jobs
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -40,7 +40,7 @@ export const useJobApi = () => {
     }
   }, []);
 
-  // Fetch a single job - renamed to match expected function name in components
+  // Fetch a single job
   const fetchJob = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -90,7 +90,7 @@ export const useJobApi = () => {
     }
   }, []);
 
-  // Other methods remain the same
+  // Cancel a job
   const cancelJob = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
@@ -128,8 +128,8 @@ export const useJobApi = () => {
     job,
     loading,
     error,
-    fetchJobs,  // Changed from getJobs to fetchJobs
-    fetchJob,   // Changed from getJob to fetchJob
+    fetchJobs,
+    fetchJob,
     submitJob,
     cancelJob,
     pollJobStatus,

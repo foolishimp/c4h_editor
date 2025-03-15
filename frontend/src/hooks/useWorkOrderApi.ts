@@ -2,14 +2,25 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WorkOrder } from '../types/workorder';
-import api from '../config/api'; // Fixed import
+import api from '../config/api';
 
 export const useWorkOrderApi = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
-  const navigate = useNavigate();
+  
+  // Use navigate safely - if we're not in a Router context, this will be undefined
+  // but we'll handle that case gracefully
+  let navigate;
+  try {
+    navigate = useNavigate();
+  } catch (e) {
+    // If we're not in a Router context, just use a no-op function
+    navigate = (path: string) => {
+      console.warn(`Navigation to ${path} was attempted outside of Router context`);
+    };
+  }
 
   // Fetch all workorders
   const fetchWorkOrders = useCallback(async () => {
@@ -125,8 +136,12 @@ export const useWorkOrderApi = () => {
     try {
       const response = await api.post(`/api/v1/workorders/${id}/clone`, { new_id: newId });
       const clonedId = response.data.id;
-      // Navigate to the new cloned workorder
-      navigate(`/workorders/${clonedId}`);
+      
+      // Only navigate if we have a valid navigate function (inside Router context)
+      if (navigate && typeof navigate === 'function') {
+        navigate(`/workorders/${clonedId}`);
+      }
+      
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -189,11 +204,14 @@ export const useWorkOrderApi = () => {
     error,
     fetchWorkOrders,
     fetchWorkOrder,
+    createWorkOrder,
+    updateWorkOrder,
+    deleteWorkOrder,
     archiveWorkOrder,
     unarchiveWorkOrder,
     cloneWorkOrder,
-    createWorkOrder,
-    updateWorkOrder,
-    deleteWorkOrder
+    getWorkOrderHistory,
+    testWorkOrder,
+    renderWorkOrder
   };
 };
