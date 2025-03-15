@@ -19,7 +19,6 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
   initialYaml = '', 
   onChange, 
   onApplyChanges,
-  schemaExample,
   title = 'YAML Editor'
 }) => {
   const [yamlContent, setYamlContent] = useState<string>(initialYaml);
@@ -59,19 +58,6 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       console.error('Error parsing YAML:', err);
     }
   };
-
-  // Show schema example
-  const handleShowExample = () => {
-    if (schemaExample) {
-      try {
-        const exampleYaml = yaml.dump(schemaExample, { indent: 2, lineWidth: -1 });
-        setYamlContent(exampleYaml);
-        onChange(exampleYaml);
-      } catch (err) {
-        console.error('Error generating example:', err);
-      }
-    }
-  };
   
   return (
     <Box sx={{ height: '500px', display: 'flex', flexDirection: 'column' }}>
@@ -83,15 +69,6 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="subtitle1">{title}</Typography>
-        {schemaExample && (
-          <Button 
-            variant="outlined" 
-            size="small"
-            onClick={handleShowExample}
-          >
-            Show Example
-          </Button>
-        )}
       </Box>
       
       <Box sx={{ flexGrow: 1, border: 1, borderColor: 'grey.300', borderRadius: 1, mb: 2 }}>

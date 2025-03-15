@@ -6,8 +6,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 import Navigation from './components/common/Navigation';
 import WorkOrderEditor from './components/WorkOrderEditor/WorkOrderEditor';
-import WorkOrderList from './components/WorkOrderList/WorkOrderList'; // Import the new component
-import { JobsList } from './components/JobsList/JobsList';
+import WorkOrderList from './components/WorkOrderList/WorkOrderList';
+import JobsList from './components/JobsList/JobsList';
 import { JobDetails } from './components/JobDetails/JobDetails';
 
 // Create theme using createTheme from @mui/material/styles
@@ -57,11 +57,6 @@ const AppContent = () => {
     console.log('Cancel job:', jobId);
   };
 
-  const handleSubmitJob = (workOrderId: string) => {
-    // Implementation will use hooks within Router context
-    console.log('Submit job for work order:', workOrderId);
-  };
-
   const handleRefreshJobs = () => {
     // Implementation will use hooks within Router context
     console.log('Refresh jobs');
@@ -85,10 +80,7 @@ const AppContent = () => {
             element={
               <>
                 <JobsList 
-                  jobs={[]} // You would fetch this data in the JobsList component
-                  workOrders={[]} // You would fetch this data in the JobsList component
                   onSelect={handleJobSelect} 
-                  onSubmitJob={handleSubmitJob} 
                   onRefresh={handleRefreshJobs} 
                 />
                 {selectedJobId && (

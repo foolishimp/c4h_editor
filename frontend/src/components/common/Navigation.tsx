@@ -20,7 +20,6 @@ import {
 import {
   Description as DescriptionIcon,
   Work as WorkIcon,
-  Dashboard as DashboardIcon,
 } from '@mui/icons-material';
 
 /**
@@ -89,22 +88,6 @@ const Navigation: React.FC = () => {
                 <WorkIcon />
               </ListItemIcon>
               <ListItemText primary="Jobs" />
-            </ListItem>
-          </List>
-          
-          <Divider />
-          
-          <List>
-            <ListItem
-              button
-              component={RouterLink}
-              to="/dashboard"
-              selected={isActive('/dashboard')}
-            >
-              <ListItemIcon>
-                <DashboardIcon />
-              </ListItemIcon>
-              <ListItemText primary="Dashboard" />
             </ListItem>
           </List>
         </Box>

@@ -9,12 +9,12 @@ import {
 
 import { WorkOrder, WorkOrderMetadata } from '../../types/workorder';
 import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
+import { useJobApi } from '../../hooks/useJobApi';
 import { WorkOrderMetadataPanel } from './WorkOrderMetadataPanel';
-import { WorkOrderTestRunner } from './WorkOrderTestRunner';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YAMLEditor } from './YAMLEditor';
 
-// Define schemas and default values for YAML editors
+// Define schemas for YAML editors
 const INTENT_SCHEMA = {
   description: '',
   goal: '',
@@ -88,6 +88,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [originalWorkOrder, setOriginalWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<boolean>(false);
   const [confirmDiscard, setConfirmDiscard] = useState<boolean>(false);
@@ -102,10 +103,10 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     updateWorkOrder,
     archiveWorkOrder,
     unarchiveWorkOrder,
-    testWorkOrder,
-    getWorkOrderHistory,
-    renderWorkOrder
+    getWorkOrderHistory
   } = useWorkOrderApi();
+
+  const { submitJob } = useJobApi();
 
   // Load work order on component mount or workOrderId change
   useEffect(() => {
@@ -317,30 +318,34 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
   };
 
-  const handleTest = useCallback(async (params: Record<string, any>): Promise<any> => {
-    if (!workOrder || !id) {
-      throw new Error("Work order not found or not saved");
+  const handleSubmitJob = async (): Promise<void> => {
+    if (!workOrder || !workOrder.id) {
+      setError("Please save the work order before submitting");
+      return;
     }
-    
-    try {
-      return await testWorkOrder(id, params);
-    } catch (err) {
-      throw new Error(`Failed to test work order: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [workOrder, id, testWorkOrder]);
 
-  const handleRender = useCallback(async (): Promise<string> => {
-    if (!workOrder || !id) {
-      throw new Error("Work order not found or not saved");
-    }
-    
+    setSubmitting(true);
     try {
-      const response = await renderWorkOrder(id, {});
-      return response.rendered_prompt || response.toString();
+      // Make sure the work order is saved first
+      await handleSave();
+      
+      // Then submit the job
+      const result = await submitJob({ workOrderId: workOrder.id });
+      
+      if (result) {
+        // Show success notification
+        setSaved(true);
+        // Navigate to jobs list to see the submitted job
+        navigate('/jobs');
+      } else {
+        throw new Error("Failed to submit job");
+      }
     } catch (err) {
-      throw new Error(`Failed to render work order: ${err instanceof Error ? err.message : String(err)}`);
+      setError(`Failed to submit job: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSubmitting(false);
     }
-  }, [workOrder, id, renderWorkOrder]);
+  };
 
   const handleGetHistory = useCallback(async () => {
     if (!id) {
@@ -431,10 +436,24 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
           {id ? `Edit Work Order: ${workOrder.id}` : 'Create New Work Order'}
         </Typography>
         <Box>
-          <Button variant="contained" onClick={handleSave} disabled={loading}>
+          <Button 
+            variant="contained" 
+            color="primary"
+            onClick={handleSubmitJob} 
+            disabled={loading || submitting || !workOrder.id}
+            sx={{ mr: 2 }}
+          >
+            {submitting ? <CircularProgress size={24} /> : 'Submit Work Order'}
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleSave} 
+            disabled={loading}
+            sx={{ mr: 2 }}
+          >
             {loading ? <CircularProgress size={24} /> : 'Save'}
           </Button>
-          <Button variant="outlined" onClick={handleCloseClick} sx={{ ml: 2 }}>
+          <Button variant="outlined" onClick={handleCloseClick} sx={{ mr: 2 }}>
             Close
           </Button>
           {id && (
@@ -442,7 +461,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
               variant="outlined" 
               color="secondary" 
               onClick={handleArchiveToggle} 
-              sx={{ ml: 2 }}
               disabled={loading}
             >
               {workOrder.metadata.archived ? 'Unarchive' : 'Archive'}
@@ -468,7 +486,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         <Tabs value={activeTab} onChange={handleTabChange}>
           <Tab label="Intent Configuration" />
           <Tab label="System Configuration" />
-          <Tab label="Test Runner" />
           <Tab label="Versions" />
         </Tabs>
       </Box>
@@ -521,27 +538,9 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         )}
       </Box>
 
-      {/* Test Runner Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
-        {activeTab === 2 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Test Work Order
-            </Typography>
-            <Paper sx={{ p: 3 }}>
-              <WorkOrderTestRunner
-                workOrder={workOrder}
-                onTest={handleTest}
-                onRender={id ? handleRender : undefined}
-              />
-            </Paper>
-          </Box>
-        )}
-      </Box>
-
       {/* Versions Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 3} sx={{ mt: 3 }}>
-        {activeTab === 3 && id && (
+      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
+        {activeTab === 2 && id && (
           <Box>
             <Typography variant="h6" gutterBottom>
               Version History
