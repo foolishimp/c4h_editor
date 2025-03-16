@@ -1,4 +1,9 @@
 // File: frontend/src/hooks/useWorkOrderApi.ts
+/**
+ * Custom hook for interacting with the WorkOrder API
+ * Provides methods for CRUD operations on work orders
+ */
+
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WorkOrder } from '../types/workorder';
@@ -55,11 +60,26 @@ export const useWorkOrderApi = () => {
   }, []);
 
   // Create a new workorder
-  const createWorkOrder = useCallback(async (params: any) => {
+  const createWorkOrder = useCallback(async (workOrder: WorkOrder) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/api/v1/workorders', params);
+      // Format the request data according to backend expectations
+      const requestData = {
+        id: workOrder.id,
+        template: workOrder.template,
+        metadata: workOrder.metadata,
+        commit_message: "Initial creation",
+        author: workOrder.metadata.author || "system"
+      };
+      
+      const response = await api.post('/api/v1/workorders', requestData);
+      
+      // Update the local state with the response
+      if (response.data) {
+        setWorkOrder(response.data);
+      }
+      
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -70,12 +90,41 @@ export const useWorkOrderApi = () => {
   }, []);
 
   // Update a workorder
-  const updateWorkOrder = useCallback(async (params: any) => {
+  const updateWorkOrder = useCallback(async (workOrder: WorkOrder) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.put(`/api/v1/workorders/${params.id}`, params);
-      return response.data;
+      // Process metadata for valid date format before sending
+      const metadata = { ...workOrder.metadata };
+      
+      // Set empty dates to null to avoid validation errors
+      if (metadata.due_date === '') {
+        metadata.due_date = null;
+      }
+      
+      // Format the request data according to backend expectations
+      const requestData = {
+        template: workOrder.template,
+        metadata: metadata,
+        commit_message: "Updated via editor",
+        author: workOrder.metadata.author || "system"
+      };
+      
+      console.log("Sending update request:", JSON.stringify(requestData));
+      
+      try {
+        const response = await api.put(`/api/v1/workorders/${workOrder.id}`, requestData);
+        
+        // Update the local state with the response
+        if (response.data) {
+          setWorkOrder(response.data);
+        }
+        
+        return response.data;
+      } catch (apiErr: any) {
+        console.error("API Error details:", apiErr.response?.data || apiErr.message);
+        throw apiErr;
+      }
     } catch (err) {
       setError(err as Error);
       throw err;
@@ -89,7 +138,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      await api.delete(`/api/v1/workorders/${id}`);
+      await api.delete(`/api/v1/workorders/${id}?commit_message=Deleted&author=system`);
       return true;
     } catch (err) {
       setError(err as Error);
@@ -215,3 +264,5 @@ export const useWorkOrderApi = () => {
     renderWorkOrder
   };
 };
+
+export default useWorkOrderApi;

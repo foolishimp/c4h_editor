@@ -1,4 +1,10 @@
 // File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
+/**
+ * WorkOrderEditor component for creating and editing work orders
+ * This component handles the main editing interface with multiple tabs for different
+ * configuration sections, YAML editing, and version history.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -6,11 +12,11 @@ import {
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
   Snackbar, Alert, Paper
 } from '@mui/material';
+import { load as yamlLoad, dump as yamlDump } from 'js-yaml'; // ES Module import for js-yaml
 
-import { WorkOrder, WorkOrderMetadata } from '../../types/workorder';
+import { WorkOrder } from '../../types/workorder';
 import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
 import { useJobApi } from '../../hooks/useJobApi';
-import { WorkOrderMetadataPanel } from './WorkOrderMetadataPanel';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YAMLEditor } from './YAMLEditor';
 
@@ -96,11 +102,13 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   // YAML editor states
   const [intentYaml, setIntentYaml] = useState<string>('');
   const [systemYaml, setSystemYaml] = useState<string>('');
+  const [yamlChanged, setYamlChanged] = useState<boolean>(false);
   
   // Access API hooks with required methods
   const {
     fetchWorkOrder,
     updateWorkOrder,
+    createWorkOrder,
     archiveWorkOrder,
     unarchiveWorkOrder,
     getWorkOrderHistory
@@ -120,40 +128,39 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   // Update YAML content when workOrder changes
   useEffect(() => {
     if (workOrder) {
-      // Extract intent configuration
-      const intentConfig = {
-        description: workOrder.metadata.description || '',
-        goal: workOrder.metadata.goal || '',
-        priority: workOrder.metadata.priority || 'medium',
-        due_date: workOrder.metadata.due_date || '',
-        assignee: workOrder.metadata.assignee || '',
-        parameters: workOrder.template.parameters || []
-      };
-      
-      // Extract system configuration (everything else)
-      const systemConfig = {
-        llm_config: workOrder.template.config,
-        project: {
-          asset: workOrder.metadata.asset || '',
-          tags: workOrder.metadata.tags || []
-        },
-        // Add other system configuration properties as needed
-        orchestration: workOrder.template.config.workflow_id ? {
-          service_id: workOrder.template.config.service_id,
-          workflow_id: workOrder.template.config.workflow_id
-        } : undefined,
-        runtime: {
-          max_runtime: workOrder.template.config.max_runtime,
-          notify_on_completion: workOrder.template.config.notify_on_completion
-        }
-      };
-      
-      // Convert to YAML
       try {
-        // Use js-yaml but handle it safely
-        const jsYaml = require('js-yaml');
-        setIntentYaml(jsYaml.dump(intentConfig, { indent: 2 }));
-        setSystemYaml(jsYaml.dump(systemConfig, { indent: 2 }));
+        // Extract intent configuration
+        const intentConfig = {
+          description: workOrder.metadata.description || '',
+          goal: workOrder.metadata.goal || '',
+          priority: workOrder.metadata.priority || 'medium',
+          due_date: workOrder.metadata.due_date || null, // Use null instead of empty string
+          assignee: workOrder.metadata.assignee || '',
+          parameters: workOrder.template.parameters || []
+        };
+        
+        // Extract system configuration (everything else)
+        const systemConfig = {
+          llm_config: workOrder.template.config,
+          project: {
+            asset: workOrder.metadata.asset || '',
+            tags: workOrder.metadata.tags || []
+          },
+          // Add other system configuration properties as needed
+          orchestration: workOrder.template.config.workflow_id ? {
+            service_id: workOrder.template.config.service_id,
+            workflow_id: workOrder.template.config.workflow_id
+          } : undefined,
+          runtime: {
+            max_runtime: workOrder.template.config.max_runtime,
+            notify_on_completion: workOrder.template.config.notify_on_completion
+          }
+        };
+        
+        // Convert to YAML using imported function
+        setIntentYaml(yamlDump(intentConfig, { indent: 2 }));
+        setSystemYaml(yamlDump(systemConfig, { indent: 2 }));
+        setYamlChanged(false);
       } catch (e) {
         console.error('Error converting to YAML:', e);
       }
@@ -185,7 +192,16 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         parameters: [],
         config: {
           temperature: 0.7,
-          max_tokens: 1000
+          max_tokens: 1000,
+          stop_sequences: [], // Add the required stop_sequences property
+          top_p: null,
+          frequency_penalty: null,
+          presence_penalty: null,
+          service_id: null,
+          workflow_id: null,
+          max_runtime: null,
+          notify_on_completion: false,
+          parameters: {}
         }
       },
       metadata: {
@@ -194,7 +210,14 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         updated_at: new Date().toISOString(),
         description: '',
         tags: [],
-        version: '1.0.0'
+        version: '1.0.0',
+        due_date: null, // Initialize with null to avoid validation errors
+        intent: null,
+        goal: '',
+        priority: 'medium',
+        assignee: '',
+        asset: '',
+        target_model: ''
       },
       lineage: []
     };
@@ -205,10 +228,12 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
 
   const handleUpdateIntentYaml = (yaml: string): void => {
     setIntentYaml(yaml);
+    setYamlChanged(true);
   };
 
   const handleUpdateSystemYaml = (yaml: string): void => {
     setSystemYaml(yaml);
+    setYamlChanged(true);
   };
 
   const handleApplyIntentChanges = (parsedIntent: any): void => {
@@ -221,7 +246,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         description: parsedIntent.description || '',
         goal: parsedIntent.goal || '',
         priority: parsedIntent.priority || 'medium',
-        due_date: parsedIntent.due_date || '',
+        // Handle due_date properly - convert empty string to null
+        due_date: parsedIntent.due_date ? parsedIntent.due_date : null,
         assignee: parsedIntent.assignee || ''
       },
       template: {
@@ -229,6 +255,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         parameters: parsedIntent.parameters || []
       }
     });
+    
+    setYamlChanged(false); // Mark as applied
   };
 
   const handleApplySystemChanges = (parsedSystem: any): void => {
@@ -259,6 +287,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         }
       }
     });
+    
+    setYamlChanged(false); // Mark as applied
   };
 
   const handleArchiveToggle = async (): Promise<void> => {
@@ -282,18 +312,80 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
   };
 
+  const validateWorkOrder = (): boolean => {
+    if (!workOrder) {
+      setError("No work order to save");
+      return false;
+    }
+
+    if (!workOrder.id.trim()) {
+      setError("Work order ID is required");
+      return false;
+    }
+
+    if (!workOrder.metadata.author.trim()) {
+      setError("Author is required");
+      return false;
+    }
+
+    // Ensure due_date is either null or a valid date
+    if (workOrder.metadata.due_date === '') {
+      // Set due_date to null if it's an empty string to avoid validation errors
+      workOrder.metadata.due_date = null;
+    }
+    
+    return true;
+  };
+
+  // Check if we need to apply YAML changes first
+  const applyYamlChangesIfNeeded = (): boolean => {
+    if (!yamlChanged) return true;
+    
+    try {
+      // Try to parse both YAMLs
+      let parseSuccess = true;
+      
+      if (activeTab === 0) {
+        // Apply intent changes
+        const parsedIntent = yamlLoad(intentYaml);
+        handleApplyIntentChanges(parsedIntent);
+      } else if (activeTab === 1) {
+        // Apply system changes
+        const parsedSystem = yamlLoad(systemYaml);
+        handleApplySystemChanges(parsedSystem);
+      }
+      
+      return parseSuccess;
+    } catch (err) {
+      setError(`Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`);
+      return false;
+    }
+  };
+
   const handleSave = async (): Promise<void> => {
     if (!workOrder) return;
     
+    // First apply any pending YAML changes
+    if (!applyYamlChangesIfNeeded()) {
+      return;
+    }
+    
+    if (!validateWorkOrder()) {
+      return;
+    }
+    
     setLoading(true);
     try {
-      // Since we're updating, ensure we have an ID
-      // For new work orders, this might be generated by the API
-      if (!workOrder.id && !id) {
-        throw new Error("Work order ID is required");
-      }
+      let result;
       
-      const result = await updateWorkOrder(workOrder);
+      // Check if this is a new work order or an update
+      if (!id) {
+        // Creating a new work order
+        result = await createWorkOrder(workOrder);
+      } else {
+        // Updating an existing work order
+        result = await updateWorkOrder(workOrder);
+      }
       
       if (result) {
         setWorkOrder(result);
@@ -321,6 +413,11 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const handleSubmitJob = async (): Promise<void> => {
     if (!workOrder || !workOrder.id) {
       setError("Please save the work order before submitting");
+      return;
+    }
+
+    // First apply any pending YAML changes and save
+    if (!applyYamlChangesIfNeeded()) {
       return;
     }
 
@@ -359,12 +456,13 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
   }, [id, getWorkOrderHistory]);
 
-  const handleGetVersion = useCallback(async (versionId: string) => {
+  const handleGetVersion = useCallback(async (versionHash: string) => {
     if (!id) {
       throw new Error("Work order ID is required");
     }
     
     try {
+      // Use the version hash to fetch the specific version
       const result = await fetchWorkOrder(id);
       return result;
     } catch (err) {
@@ -373,12 +471,30 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   }, [id, fetchWorkOrder]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number): void => {
+    // If there are yaml changes in the current tab, ask to apply them before switching tabs
+    if (yamlChanged) {
+      try {
+        if (activeTab === 0) {
+          // Apply intent changes
+          const parsedIntent = yamlLoad(intentYaml);
+          handleApplyIntentChanges(parsedIntent);
+        } else if (activeTab === 1) {
+          // Apply system changes
+          const parsedSystem = yamlLoad(systemYaml);
+          handleApplySystemChanges(parsedSystem);
+        }
+      } catch (err) {
+        setError(`Failed to apply changes before tab switch: ${err instanceof Error ? err.message : String(err)}`);
+        // We'll still switch tabs but warn the user
+      }
+    }
+    
     setActiveTab(newValue);
   };
 
   const handleCloseClick = (): void => {
     // Check if changes were made
-    if (JSON.stringify(workOrder) !== JSON.stringify(originalWorkOrder)) {
+    if (JSON.stringify(workOrder) !== JSON.stringify(originalWorkOrder) || yamlChanged) {
       setConfirmDiscard(true);
     } else if (onClose) {
       onClose();
@@ -549,7 +665,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
               <WorkOrderVersionControl
                 workOrderId={id}
                 onFetchHistory={handleGetHistory}
-                onLoadVersion={(versionId) => handleGetVersion(versionId)}
+                onLoadVersion={handleGetVersion}
                 currentVersion={workOrder.metadata.version}
               />
             </Paper>

@@ -1,6 +1,6 @@
+// File: frontend/src/components/common/Navigation.tsx
 /**
- * File: frontend/src/components/common/Navigation.tsx
- * Navigation sidebar component with links to different application sections
+ * Navigation component for the application
  */
 
 import React from 'react';
@@ -14,7 +14,6 @@ import {
   ListItemIcon,
   ListItemText,
   Typography,
-  Divider,
   Box,
 } from '@mui/material';
 import {

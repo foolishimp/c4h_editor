@@ -1,7 +1,12 @@
 // File: frontend/src/hooks/useJobApi.ts
+/**
+ * Custom hook for interacting with the Job API
+ * Provides methods for job management including submission, polling, and cancellation
+ */
+
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Job, JobStatus } from '../types/job';
+import { Job } from '../types/job';
 import api, { API_ENDPOINTS } from '../config/api';
 
 export interface JobSubmitRequest {

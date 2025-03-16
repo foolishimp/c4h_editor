@@ -1,19 +1,18 @@
 // File: frontend/src/components/WorkOrderEditor/ConfigurationPanel.tsx
+/**
+ * Configuration panel for displaying and editing work order configuration
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Card,
   CardContent,
   Typography,
   TextField,
   Switch,
   FormControlLabel,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
   Grid,
+  Chip,
   Autocomplete
 } from '@mui/material';
 

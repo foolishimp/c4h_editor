@@ -1,5 +1,7 @@
 // File: frontend/src/types/workorder.ts
-// Updated to include extended metadata properties
+/**
+ * Type definitions for WorkOrder and related interfaces
+ */
 
 // Add the ParameterType enum that's referenced but missing
 export enum ParameterType {
@@ -29,18 +31,23 @@ export interface WorkOrderMetadata {
   // Added missing properties to support new UI requirements
   goal?: string;
   priority?: string;
-  due_date?: string;
+  due_date?: string | null; // Allow null for empty dates
   assignee?: string;
   asset?: string;
   target_model?: string;
+  intent?: string | null;
 }
 
 export interface WorkOrderConfig {
   temperature: number;
   max_tokens?: number;
-  service_id?: string;
-  workflow_id?: string;
-  max_runtime?: number;
+  top_p?: number | null;
+  frequency_penalty?: number | null;
+  presence_penalty?: number | null;
+  stop_sequences: string[];
+  service_id?: string | null;
+  workflow_id?: string | null;
+  max_runtime?: number | null;
   notify_on_completion?: boolean;
   parameters?: Record<string, any>;
 }
