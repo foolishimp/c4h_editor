@@ -10,15 +10,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Tabs, Tab, Button, TextField, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
-  Snackbar, Alert, Paper
+  Snackbar, Alert
 } from '@mui/material';
-import { load as yamlLoad, dump as yamlDump } from 'js-yaml'; // ES Module import for js-yaml
+import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
 
 import { WorkOrder } from '../../types/workorder';
 import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
 import { useJobApi } from '../../hooks/useJobApi';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
-import { YAMLEditor } from './YAMLEditor';
+import { ConfigurationEditor, ConfigSection } from './ConfigurationEditor';
 
 // Define schemas for YAML editors
 const INTENT_SCHEMA = {
@@ -102,8 +102,20 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   // YAML editor states
   const [intentYaml, setIntentYaml] = useState<string>('');
   const [systemYaml, setSystemYaml] = useState<string>('');
-  const [yamlChanged, setYamlChanged] = useState<boolean>(false);
-  const [pendingYaml, setPendingYaml] = useState<string | null>(null);
+  const [yamlChanged, setYamlChanged] = useState<{
+    [ConfigSection.INTENT]: boolean;
+    [ConfigSection.SYSTEM]: boolean;
+  }>({
+    [ConfigSection.INTENT]: false,
+    [ConfigSection.SYSTEM]: false
+  });
+  const [pendingYaml, setPendingYaml] = useState<{
+    [ConfigSection.INTENT]: string | null;
+    [ConfigSection.SYSTEM]: string | null;
+  }>({
+    [ConfigSection.INTENT]: null,
+    [ConfigSection.SYSTEM]: null
+  });
   
   // Access API hooks with required methods
   const {
@@ -130,8 +142,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   useEffect(() => {
     if (workOrder) {
       try {
-        // If we have pending YAML that hasn't been applied yet, don't overwrite it
-        if (pendingYaml) {
+        // Skip if we have pending YAML
+        if (pendingYaml[ConfigSection.INTENT] || pendingYaml[ConfigSection.SYSTEM]) {
           console.log("Keeping pending YAML instead of regenerating from workOrder");
           return;
         }
@@ -141,12 +153,12 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
           description: workOrder.metadata.description || '',
           goal: workOrder.metadata.goal || '',
           priority: workOrder.metadata.priority || 'medium',
-          due_date: workOrder.metadata.due_date || null, // Use null instead of empty string
+          due_date: workOrder.metadata.due_date || null,
           assignee: workOrder.metadata.assignee || '',
           parameters: workOrder.template.parameters || []
         };
         
-        // Extract system configuration (everything else)
+        // Extract system configuration
         const systemConfig = {
           llm_config: workOrder.template.config,
           project: {
@@ -166,7 +178,12 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         // Convert to YAML using imported function
         setIntentYaml(yamlDump(intentConfig, { indent: 2 }));
         setSystemYaml(yamlDump(systemConfig, { indent: 2 }));
-        setYamlChanged(false);
+        
+        // Reset changed flags
+        setYamlChanged({
+          [ConfigSection.INTENT]: false,
+          [ConfigSection.SYSTEM]: false
+        });
       } catch (e) {
         console.error('Error converting to YAML:', e);
       }
@@ -179,7 +196,10 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       const result = await fetchWorkOrder(id);
       if (result) {
         // Clear any pending YAML when loading a work order
-        setPendingYaml(null);
+        setPendingYaml({
+          [ConfigSection.INTENT]: null,
+          [ConfigSection.SYSTEM]: null
+        });
         
         setWorkOrder(result);
         setOriginalWorkOrder(JSON.parse(JSON.stringify(result))); // Deep clone
@@ -202,7 +222,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         config: {
           temperature: 0.7,
           max_tokens: 1000,
-          stop_sequences: [], // Add the required stop_sequences property
+          stop_sequences: [], 
           top_p: null,
           frequency_penalty: null,
           presence_penalty: null,
@@ -220,7 +240,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         description: '',
         tags: [],
         version: '1.0.0',
-        due_date: null, // Initialize with null to avoid validation errors
+        due_date: null,
         intent: null,
         goal: '',
         priority: 'medium',
@@ -233,172 +253,108 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     
     setWorkOrder(newWorkOrder);
     setOriginalWorkOrder(JSON.parse(JSON.stringify(newWorkOrder))); // Deep clone
-    setPendingYaml(null); // Clear any pending YAML when creating a new work order
+    
+    // Clear any pending YAML when creating a new work order
+    setPendingYaml({
+      [ConfigSection.INTENT]: null,
+      [ConfigSection.SYSTEM]: null
+    });
   };
 
-  // These functions are called when the editor content changes
-  const handleUpdateIntentYaml = (yaml: string): void => {
-    console.log("Intent YAML updated");
-    setIntentYaml(yaml);
-    setPendingYaml(yaml); // Store the pending YAML to prevent it from being overwritten
-    setYamlChanged(true);
+  // Handler for when YAML is edited in the editor
+  const handleUpdateYaml = (section: ConfigSection, yaml: string): void => {
+    console.log(`${section} YAML updated`);
+    
+    if (section === ConfigSection.INTENT) {
+      setIntentYaml(yaml);
+      setPendingYaml(prev => ({ ...prev, [ConfigSection.INTENT]: yaml }));
+    } else {
+      setSystemYaml(yaml);
+      setPendingYaml(prev => ({ ...prev, [ConfigSection.SYSTEM]: yaml }));
+    }
+    
+    setYamlChanged(prev => ({ ...prev, [section]: true }));
   };
 
-  const handleUpdateSystemYaml = (yaml: string): void => {
-    console.log("System YAML updated");
-    setSystemYaml(yaml);
-    setPendingYaml(yaml); // Store the pending YAML to prevent it from being overwritten
-    setYamlChanged(true);
-  };
-
-  const handleApplyIntentChanges = (parsedIntent: any): void => {
+  // Handler for applying changes from the editors
+  const handleApplyChanges = (section: ConfigSection, parsedData: any): void => {
     if (!workOrder) return;
     
-    console.log("Applying intent changes to work order:", parsedIntent);
+    console.log(`Applying ${section} changes to work order:`, parsedData);
     
     // Special case for when the user pastes a complete config
     // Look for common top-level keys to detect if this is a full config
-    const isFullConfig = parsedIntent.project || 
-                        parsedIntent.intent || 
-                        parsedIntent.llm_config || 
-                        parsedIntent.orchestration;
+    const isFullConfig = parsedData.project || 
+                      parsedData.intent || 
+                      parsedData.llm_config || 
+                      parsedData.orchestration;
+    
+    let updatedWorkOrder: WorkOrder;
     
     if (isFullConfig) {
       // This is a complete pasted configuration
-      console.log("Detected full configuration paste, handling specially");
+      console.log(`Detected full configuration paste in ${section} tab, handling specially`);
       
-      // Create an updated work order with the full config
-      // We'll need to map the pasted structure to our work order structure
-      const updatedWorkOrder = {
+      updatedWorkOrder = {
         ...workOrder,
-        // Map metadata from various possible locations
         metadata: {
           ...workOrder.metadata,
-          description: parsedIntent.intent?.description || parsedIntent.description || '',
-          goal: parsedIntent.intent?.goal || parsedIntent.goal || '',
-          priority: parsedIntent.intent?.priority || parsedIntent.priority || 'medium',
-          due_date: parsedIntent.intent?.due_date || parsedIntent.due_date || null,
-          assignee: parsedIntent.intent?.assignee || parsedIntent.assignee || '',
-          asset: parsedIntent.project?.asset || parsedIntent.asset || '',
-          // Keep existing tags if none in the pasted config
-          tags: parsedIntent.project?.tags || parsedIntent.tags || workOrder.metadata.tags
+          description: parsedData.intent?.description || parsedData.description || workOrder.metadata.description || '',
+          goal: parsedData.intent?.goal || parsedData.goal || workOrder.metadata.goal || '',
+          priority: parsedData.intent?.priority || parsedData.priority || workOrder.metadata.priority || 'medium',
+          due_date: parsedData.intent?.due_date || parsedData.due_date || workOrder.metadata.due_date,
+          assignee: parsedData.intent?.assignee || parsedData.assignee || workOrder.metadata.assignee || '',
+          asset: parsedData.project?.asset || parsedData.asset || workOrder.metadata.asset || '',
+          tags: parsedData.project?.tags || parsedData.tags || workOrder.metadata.tags || []
         },
         template: {
           ...workOrder.template,
-          // Extract parameters from various possible locations
-          parameters: parsedIntent.intent?.parameters || 
-                      parsedIntent.parameters || 
+          parameters: parsedData.intent?.parameters || 
+                      parsedData.parameters || 
                       workOrder.template.parameters || [],
-          // Map all the config settings
           config: {
             ...workOrder.template.config,
-            // Handle the case where llm_config might be at the top level or nested
-            ...(parsedIntent.llm_config || {}),
-            // Extract service-specific settings
-            service_id: parsedIntent.orchestration?.service_id || 
-                        parsedIntent.service_id || 
-                        workOrder.template.config.service_id,
-            workflow_id: parsedIntent.orchestration?.workflow_id || 
-                         parsedIntent.workflow_id || 
-                         workOrder.template.config.workflow_id,
-            // Extract runtime settings
-            max_runtime: parsedIntent.runtime?.max_runtime || 
-                         parsedIntent.max_runtime || 
-                         workOrder.template.config.max_runtime,
-            notify_on_completion: parsedIntent.runtime?.notify_on_completion || 
-                                  parsedIntent.notify_on_completion || 
-                                  workOrder.template.config.notify_on_completion
+            ...(parsedData.llm_config || {}),
+            service_id: parsedData.orchestration?.service_id || 
+                      parsedData.service_id || 
+                      workOrder.template.config.service_id,
+            workflow_id: parsedData.orchestration?.workflow_id || 
+                       parsedData.workflow_id || 
+                       workOrder.template.config.workflow_id,
+            max_runtime: parsedData.runtime?.max_runtime || 
+                       parsedData.max_runtime || 
+                       workOrder.template.config.max_runtime,
+            notify_on_completion: parsedData.runtime?.notify_on_completion || 
+                                parsedData.notify_on_completion || 
+                                workOrder.template.config.notify_on_completion
           }
         }
       };
-      
-      setWorkOrder(updatedWorkOrder);
-    } else {
-      // This is a standard intent-only YAML
-      const updatedWorkOrder = {
+    } else if (section === ConfigSection.INTENT) {
+      // Standard intent tab update
+      updatedWorkOrder = {
         ...workOrder,
         metadata: {
           ...workOrder.metadata,
-          description: parsedIntent.description || '',
-          goal: parsedIntent.goal || '',
-          priority: parsedIntent.priority || 'medium',
-          // Handle due_date properly - convert empty string to null
-          due_date: parsedIntent.due_date ? parsedIntent.due_date : null,
-          assignee: parsedIntent.assignee || ''
+          description: parsedData.description || '',
+          goal: parsedData.goal || '',
+          priority: parsedData.priority || 'medium',
+          due_date: parsedData.due_date ? parsedData.due_date : null,
+          assignee: parsedData.assignee || ''
         },
         template: {
           ...workOrder.template,
-          parameters: parsedIntent.parameters || []
+          parameters: parsedData.parameters || []
         }
       };
-      
-      setWorkOrder(updatedWorkOrder);
-    }
-    
-    setYamlChanged(false); // Mark as applied
-    setPendingYaml(null); // Clear pending YAML since we've applied it
-  };
-
-  const handleApplySystemChanges = (parsedSystem: any): void => {
-    if (!workOrder) return;
-    
-    console.log("Applying system changes to work order:", parsedSystem);
-    
-    // Special case for when the user pastes a complete config
-    // Look for common top-level keys to detect if this is a full config
-    const isFullConfig = parsedSystem.project || 
-                        parsedSystem.intent || 
-                        parsedSystem.llm_config || 
-                        parsedSystem.orchestration;
-    
-    if (isFullConfig) {
-      // This is a complete pasted configuration, similar to above
-      console.log("Detected full configuration paste in system tab, handling specially");
-      
-      const updatedWorkOrder = {
-        ...workOrder,
-        metadata: {
-          ...workOrder.metadata,
-          description: parsedSystem.intent?.description || workOrder.metadata.description,
-          goal: parsedSystem.intent?.goal || workOrder.metadata.goal,
-          priority: parsedSystem.intent?.priority || workOrder.metadata.priority,
-          due_date: parsedSystem.intent?.due_date || workOrder.metadata.due_date,
-          assignee: parsedSystem.intent?.assignee || workOrder.metadata.assignee,
-          asset: parsedSystem.project?.asset || parsedSystem.asset || workOrder.metadata.asset,
-          tags: parsedSystem.project?.tags || parsedSystem.tags || workOrder.metadata.tags
-        },
-        template: {
-          ...workOrder.template,
-          parameters: parsedSystem.intent?.parameters || workOrder.template.parameters,
-          config: {
-            ...workOrder.template.config,
-            ...(parsedSystem.llm_config || {}),
-            service_id: parsedSystem.orchestration?.service_id || 
-                        parsedSystem.service_id || 
-                        workOrder.template.config.service_id,
-            workflow_id: parsedSystem.orchestration?.workflow_id || 
-                         parsedSystem.workflow_id || 
-                         workOrder.template.config.workflow_id,
-            max_runtime: parsedSystem.runtime?.max_runtime || 
-                         parsedSystem.max_runtime || 
-                         workOrder.template.config.max_runtime,
-            notify_on_completion: parsedSystem.runtime?.notify_on_completion || 
-                                  parsedSystem.notify_on_completion || 
-                                  workOrder.template.config.notify_on_completion
-          }
-        }
-      };
-      
-      setWorkOrder(updatedWorkOrder);
     } else {
-      // Standard system tab update with expected structure
-      // Extract configuration from system YAML
-      const llmConfig = parsedSystem.llm_config || {};
-      const projectConfig = parsedSystem.project || {};
-      const orchestrationConfig = parsedSystem.orchestration || {};
-      const runtimeConfig = parsedSystem.runtime || {};
+      // Standard system tab update
+      const llmConfig = parsedData.llm_config || {};
+      const projectConfig = parsedData.project || {};
+      const orchestrationConfig = parsedData.orchestration || {};
+      const runtimeConfig = parsedData.runtime || {};
       
-      const updatedWorkOrder = {
+      updatedWorkOrder = {
         ...workOrder,
         metadata: {
           ...workOrder.metadata,
@@ -417,12 +373,11 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
           }
         }
       };
-      
-      setWorkOrder(updatedWorkOrder);
     }
     
-    setYamlChanged(false); // Mark as applied
-    setPendingYaml(null); // Clear pending YAML since we've applied it
+    setWorkOrder(updatedWorkOrder);
+    setYamlChanged(prev => ({ ...prev, [section]: false }));
+    setPendingYaml(prev => ({ ...prev, [section]: null }));
   };
 
   const handleArchiveToggle = async (): Promise<void> => {
@@ -473,33 +428,51 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
 
   // Check if we need to apply YAML changes first before saving
   const applyYamlChangesIfNeeded = (): boolean => {
-    if (!yamlChanged) return true;
+    // Check active tab first
+    const currentSection = activeTab === 0 ? ConfigSection.INTENT : ConfigSection.SYSTEM;
     
-    try {
-      console.log("Applying YAML changes before save");
-      // Try to parse the YAML based on current tab
-      
-      if (activeTab === 0 && intentYaml) {
-        // Apply intent changes
-        const parsedIntent = yamlLoad(intentYaml);
-        handleApplyIntentChanges(parsedIntent);
-        console.log("Applied intent YAML changes before save");
-      } else if (activeTab === 1 && systemYaml) {
-        // Apply system changes
-        const parsedSystem = yamlLoad(systemYaml);
-        handleApplySystemChanges(parsedSystem);
-        console.log("Applied system YAML changes before save");
+    if (activeTab < 2 && yamlChanged[currentSection]) {
+      try {
+        console.log(`Applying ${currentSection} YAML changes before save`);
+        
+        // Try to parse the YAML based on current tab
+        const yaml = currentSection === ConfigSection.INTENT ? intentYaml : systemYaml;
+        const parsedData = yamlLoad(yaml);
+        
+        handleApplyChanges(currentSection, parsedData);
+        console.log(`Applied ${currentSection} YAML changes before save`);
+        
+        return true;
+      } catch (err) {
+        setError(`Failed to parse ${currentSection} YAML: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`Failed to apply ${currentSection} YAML changes:`, err);
+        return false;
       }
-      
-      // Reset the changed flag since we've applied the changes
-      setYamlChanged(false);
-      
-      return true;
-    } catch (err) {
-      setError(`Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`);
-      console.error("Failed to apply YAML changes:", err);
-      return false;
     }
+    
+    // Check other tabs for pending changes
+    const otherSection = currentSection === ConfigSection.INTENT ? ConfigSection.SYSTEM : ConfigSection.INTENT;
+    
+    if (yamlChanged[otherSection]) {
+      try {
+        console.log(`Applying ${otherSection} YAML changes before save (from non-active tab)`);
+        
+        // Try to parse the YAML from the other tab
+        const yaml = otherSection === ConfigSection.INTENT ? intentYaml : systemYaml;
+        const parsedData = yamlLoad(yaml);
+        
+        handleApplyChanges(otherSection, parsedData);
+        console.log(`Applied ${otherSection} YAML changes before save`);
+        
+        return true;
+      } catch (err) {
+        setError(`Failed to parse ${otherSection} YAML: ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`Failed to apply ${otherSection} YAML changes:`, err);
+        return false;
+      }
+    }
+    
+    return true;
   };
 
   const handleSave = async (): Promise<void> => {
@@ -508,7 +481,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     console.log("Saving work order. YAML changed:", yamlChanged);
     
     // First apply any pending YAML changes
-    if (yamlChanged && !applyYamlChangesIfNeeded()) {
+    if (!applyYamlChangesIfNeeded()) {
       console.error("Failed to apply YAML changes before saving");
       return;
     }
@@ -540,10 +513,16 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         setOriginalWorkOrder(JSON.parse(JSON.stringify(result))); // Deep clone
         
         // Clear pending YAML since we've saved successfully
-        setPendingYaml(null);
+        setPendingYaml({
+          [ConfigSection.INTENT]: null,
+          [ConfigSection.SYSTEM]: null
+        });
         
         setSaved(true);
-        setYamlChanged(false);
+        setYamlChanged({
+          [ConfigSection.INTENT]: false,
+          [ConfigSection.SYSTEM]: false
+        });
         
         // If this is a new work order, navigate to its edit page
         if (!id && result.id) {
@@ -570,7 +549,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
 
     // First apply any pending YAML changes and save
-    if (yamlChanged && !applyYamlChangesIfNeeded()) {
+    if (!applyYamlChangesIfNeeded()) {
       return;
     }
 
@@ -624,21 +603,20 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   }, [id, fetchWorkOrder]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number): void => {
-    // If there are yaml changes in the current tab, ask to apply them before switching tabs
-    if (yamlChanged) {
+    // If there are yaml changes in the current tab, apply them before switching tabs
+    if (activeTab === 0 && yamlChanged[ConfigSection.INTENT]) {
       try {
-        if (activeTab === 0) {
-          // Apply intent changes
-          const parsedIntent = yamlLoad(intentYaml);
-          handleApplyIntentChanges(parsedIntent);
-        } else if (activeTab === 1) {
-          // Apply system changes
-          const parsedSystem = yamlLoad(systemYaml);
-          handleApplySystemChanges(parsedSystem);
-        }
+        const parsedIntent = yamlLoad(intentYaml);
+        handleApplyChanges(ConfigSection.INTENT, parsedIntent);
       } catch (err) {
-        setError(`Failed to apply changes before tab switch: ${err instanceof Error ? err.message : String(err)}`);
-        // We'll still switch tabs but warn the user
+        setError(`Failed to apply intent changes before tab switch: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else if (activeTab === 1 && yamlChanged[ConfigSection.SYSTEM]) {
+      try {
+        const parsedSystem = yamlLoad(systemYaml);
+        handleApplyChanges(ConfigSection.SYSTEM, parsedSystem);
+      } catch (err) {
+        setError(`Failed to apply system changes before tab switch: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
     
@@ -647,7 +625,11 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
 
   const handleCloseClick = (): void => {
     // Check if changes were made
-    if (JSON.stringify(workOrder) !== JSON.stringify(originalWorkOrder) || yamlChanged) {
+    const hasChanges = JSON.stringify(workOrder) !== JSON.stringify(originalWorkOrder) || 
+                      yamlChanged[ConfigSection.INTENT] || 
+                      yamlChanged[ConfigSection.SYSTEM];
+                      
+    if (hasChanges) {
       setConfirmDiscard(true);
     } else if (onClose) {
       onClose();
@@ -762,48 +744,34 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       {/* Intent Configuration Tab */}
       <Box role="tabpanel" hidden={activeTab !== 0} sx={{ mt: 3 }}>
         {activeTab === 0 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Intent Configuration
-            </Typography>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="body2" color="textSecondary" paragraph>
-                Define what you want to accomplish with this work order. This includes the goal, description, priority, and other intent-related information.
-              </Typography>
-              <YAMLEditor
-                workOrder={workOrder}
-                initialYaml={intentYaml}
-                onChange={handleUpdateIntentYaml}
-                onApplyChanges={handleApplyIntentChanges}
-                schemaExample={INTENT_SCHEMA}
-                title="Intent Configuration"
-              />
-            </Paper>
-          </Box>
+          <ConfigurationEditor
+            workOrder={workOrder}
+            section={ConfigSection.INTENT}
+            initialYaml={intentYaml}
+            onChange={(yaml) => handleUpdateYaml(ConfigSection.INTENT, yaml)}
+            onApplyChanges={(data) => handleApplyChanges(ConfigSection.INTENT, data)}
+            onSave={handleSave}
+            schemaExample={INTENT_SCHEMA}
+            title="Intent Configuration"
+            description="Define what you want to accomplish with this work order. This includes the goal, description, priority, and other intent-related information."
+          />
         )}
       </Box>
 
       {/* System Configuration Tab */}
       <Box role="tabpanel" hidden={activeTab !== 1} sx={{ mt: 3 }}>
         {activeTab === 1 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              System Configuration
-            </Typography>
-            <Paper sx={{ p: 3 }}>
-              <Typography variant="body2" color="textSecondary" paragraph>
-                Configure the technical details of how the work order will be executed, including LLM settings, orchestration, and runtime configuration.
-              </Typography>
-              <YAMLEditor
-                workOrder={workOrder}
-                initialYaml={systemYaml}
-                onChange={handleUpdateSystemYaml}
-                onApplyChanges={handleApplySystemChanges}
-                schemaExample={SYSTEM_SCHEMA}
-                title="System Configuration"
-              />
-            </Paper>
-          </Box>
+          <ConfigurationEditor
+            workOrder={workOrder}
+            section={ConfigSection.SYSTEM}
+            initialYaml={systemYaml}
+            onChange={(yaml) => handleUpdateYaml(ConfigSection.SYSTEM, yaml)}
+            onApplyChanges={(data) => handleApplyChanges(ConfigSection.SYSTEM, data)}
+            onSave={handleSave}
+            schemaExample={SYSTEM_SCHEMA}
+            title="System Configuration"
+            description="Configure the technical details of how the work order will be executed, including LLM settings, orchestration, and runtime configuration."
+          />
         )}
       </Box>
 
@@ -814,14 +782,14 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
             <Typography variant="h6" gutterBottom>
               Version History
             </Typography>
-            <Paper sx={{ p: 3 }}>
+            <Box sx={{ border: 1, borderColor: 'grey.300', borderRadius: 1, p: 3 }}>
               <WorkOrderVersionControl
                 workOrderId={id}
                 onFetchHistory={handleGetHistory}
                 onLoadVersion={handleGetVersion}
                 currentVersion={workOrder.metadata.version}
               />
-            </Paper>
+            </Box>
           </Box>
         )}
       </Box>

@@ -15,6 +15,7 @@ interface YAMLEditorProps {
   initialYaml?: string;
   onChange: (yamlContent: string) => void;
   onApplyChanges: (parsedData: any) => void;
+  onSave?: () => void;  // Added prop for parent save function
   schemaExample?: any;
   title?: string;
 }
@@ -24,6 +25,7 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
   initialYaml = '', 
   onChange, 
   onApplyChanges,
+  onSave,
   schemaExample,
   title = 'YAML Editor'
 }) => {
@@ -75,6 +77,11 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       // Apply the changes to the parent component
       onApplyChanges(parsed);
       setError(null);
+      
+      // If parent provided a save function, call it to save to backend
+      if (onSave) {
+        onSave();
+      }
     } catch (err) {
       setError(`Error parsing YAML: ${err instanceof Error ? err.message : String(err)}`);
       console.error('Error parsing YAML:', err);
@@ -113,14 +120,14 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
         <Typography variant="caption" color="text.secondary">
-          Edit the YAML configuration above, then click Save Changes to update the work order.
+          Edit the YAML configuration above, then click Save to update the work order.
         </Typography>
         <Button 
           variant="contained" 
           onClick={handleSaveChanges}
           disabled={!yamlContent}
         >
-          Save Changes
+          Save
         </Button>
       </Box>
     </Box>
