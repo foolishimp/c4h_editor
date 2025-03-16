@@ -4,7 +4,7 @@
  * Provides a Monaco editor with YAML syntax highlighting and validation
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, Alert, Typography } from '@mui/material';
 import { WorkOrder } from '../../types/workorder';
 import Editor from '@monaco-editor/react';
@@ -29,49 +29,43 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
 }) => {
   const [yamlContent, setYamlContent] = useState<string>(initialYaml);
   const [error, setError] = useState<string | null>(null);
-  const [parsedData, setParsedData] = useState<any>(null);
+  const lastSavedContent = useRef<string>(initialYaml);
+  const editorRef = useRef<any>(null);
   
-  // Initialize YAML content when the initialYaml changes
+  // Function to handle editor mount
+  const handleEditorDidMount = (editor: any) => {
+    editorRef.current = editor;
+  };
+  
+  // Initialize YAML content when the initialYaml changes from parent
   useEffect(() => {
-    if (initialYaml) {
+    if (initialYaml && initialYaml !== yamlContent && initialYaml !== lastSavedContent.current) {
+      console.log('Initializing editor with new YAML content');
       setYamlContent(initialYaml);
+      lastSavedContent.current = initialYaml;
       setError(null);
-      
-      // Try to parse initially to ensure we have valid data
-      try {
-        const parsed = yamlLoad(initialYaml) as any;
-        setParsedData(parsed);
-      } catch (err) {
-        // We won't set an error here since we just initialized
-        console.warn("Initial YAML parse failed:", err);
-      }
     }
   }, [initialYaml]);
   
-  // Handle YAML content changes
+  // Handle YAML content changes in the editor
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
       setYamlContent(value);
       setError(null);
       onChange(value);
-      
-      // Try to parse on each change to provide immediate feedback
-      try {
-        const parsed = yamlLoad(value) as any;
-        setParsedData(parsed);
-        // We won't set error here even if parse fails to avoid interrupting typing
-      } catch (err) {
-        // Don't show error during typing, but clear parsedData
-        setParsedData(null);
-      }
     }
   };
   
-  // Apply YAML changes to the WorkOrder
-  const handleApplyChanges = () => {
+  // Handle saving the YAML changes to the WorkOrder
+  const handleSaveChanges = () => {
+    if (!yamlContent) {
+      setError("No content to save");
+      return;
+    }
+    
     try {
-      // Only attempt to parse if we haven't already done so
-      const parsed = parsedData || yamlLoad(yamlContent) as any;
+      // Parse the YAML
+      const parsed = yamlLoad(yamlContent) as any;
       
       // Validate that we have proper structure based on schema
       if (!parsed) {
@@ -83,6 +77,9 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
         parsed.due_date = null;
       }
       
+      // Update the last saved content reference
+      lastSavedContent.current = yamlContent;
+      
       // Apply the changes to the parent component
       onApplyChanges(parsed);
       setError(null);
@@ -92,26 +89,9 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
     }
   };
 
-  // Auto-apply changes when leaving tab or saving
-  const handleAutoApply = () => {
-    try {
-      if (parsedData) {
-        // We already have valid parsed data
-        onApplyChanges(parsedData);
-        return true;
-      } else {
-        // Try to parse and apply
-        const parsed = yamlLoad(yamlContent) as any;
-        if (parsed) {
-          onApplyChanges(parsed);
-          return true;
-        }
-      }
-      return false;
-    } catch (err) {
-      setError(`Error auto-applying YAML changes: ${err instanceof Error ? err.message : String(err)}`);
-      return false;
-    }
+  // Get the current editor content - useful for parent component to access
+  const getCurrentContent = (): string => {
+    return yamlContent;
   };
   
   return (
@@ -132,6 +112,7 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
           defaultLanguage="yaml"
           value={yamlContent}
           onChange={handleEditorChange}
+          onMount={handleEditorDidMount}
           options={{
             minimap: { enabled: false },
             lineNumbers: 'on',
@@ -145,14 +126,14 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
         <Typography variant="caption" color="text.secondary">
-          Edit the YAML configuration above, then click Apply Changes to update the work order.
+          Edit the YAML configuration above, then click Save Changes to update the work order.
         </Typography>
         <Button 
           variant="contained" 
-          onClick={handleApplyChanges}
-          disabled={!yamlContent}
+          onClick={handleSaveChanges}
+          disabled={!yamlContent || yamlContent === lastSavedContent.current}
         >
-          Apply Changes
+          Save Changes
         </Button>
       </Box>
     </Box>

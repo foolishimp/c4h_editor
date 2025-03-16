@@ -226,6 +226,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     setOriginalWorkOrder(JSON.parse(JSON.stringify(newWorkOrder))); // Deep clone
   };
 
+  // These functions are called when the editor content changes
+  // but don't automatically apply the changes to the work order
   const handleUpdateIntentYaml = (yaml: string): void => {
     setIntentYaml(yaml);
     setYamlChanged(true);
@@ -239,7 +241,9 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const handleApplyIntentChanges = (parsedIntent: any): void => {
     if (!workOrder) return;
     
-    setWorkOrder({
+    console.log("Applying intent changes to work order:", parsedIntent);
+    
+    const updatedWorkOrder = {
       ...workOrder,
       metadata: {
         ...workOrder.metadata,
@@ -254,13 +258,16 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         ...workOrder.template,
         parameters: parsedIntent.parameters || []
       }
-    });
+    };
     
+    setWorkOrder(updatedWorkOrder);
     setYamlChanged(false); // Mark as applied
   };
 
   const handleApplySystemChanges = (parsedSystem: any): void => {
     if (!workOrder) return;
+    
+    console.log("Applying system changes to work order:", parsedSystem);
     
     // Extract configuration from system YAML
     const llmConfig = parsedSystem.llm_config || {};
@@ -268,7 +275,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     const orchestrationConfig = parsedSystem.orchestration || {};
     const runtimeConfig = parsedSystem.runtime || {};
     
-    setWorkOrder({
+    const updatedWorkOrder = {
       ...workOrder,
       metadata: {
         ...workOrder.metadata,
@@ -286,8 +293,9 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
           notify_on_completion: runtimeConfig.notify_on_completion
         }
       }
-    });
+    };
     
+    setWorkOrder(updatedWorkOrder);
     setYamlChanged(false); // Mark as applied
   };
 
@@ -337,7 +345,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     return true;
   };
 
-  // Check if we need to apply YAML changes first
+  // Check if we need to apply YAML changes first before saving
   const applyYamlChangesIfNeeded = (): boolean => {
     if (!yamlChanged) return true;
     
@@ -349,15 +357,21 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         // Apply intent changes
         const parsedIntent = yamlLoad(intentYaml);
         handleApplyIntentChanges(parsedIntent);
+        console.log("Applied intent YAML changes before save");
       } else if (activeTab === 1) {
         // Apply system changes
         const parsedSystem = yamlLoad(systemYaml);
         handleApplySystemChanges(parsedSystem);
+        console.log("Applied system YAML changes before save");
       }
+      
+      // Reset the changed flag since we've applied the changes
+      setYamlChanged(false);
       
       return parseSuccess;
     } catch (err) {
       setError(`Failed to parse YAML: ${err instanceof Error ? err.message : String(err)}`);
+      console.error("Failed to apply YAML changes:", err);
       return false;
     }
   };
@@ -365,8 +379,11 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const handleSave = async (): Promise<void> => {
     if (!workOrder) return;
     
+    console.log("Saving work order. YAML changed:", yamlChanged);
+    
     // First apply any pending YAML changes
-    if (!applyYamlChangesIfNeeded()) {
+    if (yamlChanged && !applyYamlChangesIfNeeded()) {
+      console.error("Failed to apply YAML changes before saving");
       return;
     }
     
@@ -376,6 +393,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     
     setLoading(true);
     try {
+      console.log("Saving work order to backend:", workOrder);
+      
       let result;
       
       // Check if this is a new work order or an update
@@ -388,9 +407,54 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       }
       
       if (result) {
+        console.log("Work order saved successfully:", result);
+        
+        // Update both local state references
         setWorkOrder(result);
         setOriginalWorkOrder(JSON.parse(JSON.stringify(result))); // Deep clone
+        
+        // Since we saved successfully, we should update the YAML representations
+        // This ensures our editor shows the canonical state
+        try {
+          // Extract intent configuration
+          const intentConfig = {
+            description: result.metadata.description || '',
+            goal: result.metadata.goal || '',
+            priority: result.metadata.priority || 'medium',
+            due_date: result.metadata.due_date || null,
+            assignee: result.metadata.assignee || '',
+            parameters: result.template.parameters || []
+          };
+          
+          // Extract system configuration
+          const systemConfig = {
+            llm_config: result.template.config,
+            project: {
+              asset: result.metadata.asset || '',
+              tags: result.metadata.tags || []
+            },
+            orchestration: result.template.config.workflow_id ? {
+              service_id: result.template.config.service_id,
+              workflow_id: result.template.config.workflow_id
+            } : undefined,
+            runtime: {
+              max_runtime: result.template.config.max_runtime,
+              notify_on_completion: result.template.config.notify_on_completion
+            }
+          };
+          
+          // Update YAML representation with new state (but only if we're on this tab)
+          if (activeTab === 0) {
+            setIntentYaml(yamlDump(intentConfig, { indent: 2 }));
+          } else if (activeTab === 1) {
+            setSystemYaml(yamlDump(systemConfig, { indent: 2 }));
+          }
+        } catch (e) {
+          console.error('Error updating YAML representation after save:', e);
+        }
+        
         setSaved(true);
+        setYamlChanged(false);
         
         // If this is a new work order, navigate to its edit page
         if (!id && result.id) {
