@@ -109,13 +109,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     [ConfigSection.INTENT]: false,
     [ConfigSection.SYSTEM]: false
   });
-  const [pendingYaml, setPendingYaml] = useState<{
-    [ConfigSection.INTENT]: string | null;
-    [ConfigSection.SYSTEM]: string | null;
-  }>({
-    [ConfigSection.INTENT]: null,
-    [ConfigSection.SYSTEM]: null
-  });
   
   // Access API hooks with required methods
   const {
@@ -142,9 +135,9 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   useEffect(() => {
     if (workOrder) {
       try {
-        // Skip if we have pending YAML
-        if (pendingYaml[ConfigSection.INTENT] || pendingYaml[ConfigSection.SYSTEM]) {
-          console.log("Keeping pending YAML instead of regenerating from workOrder");
+        // Skip if we already have YAML that's been changed
+        if (yamlChanged[ConfigSection.INTENT] || yamlChanged[ConfigSection.SYSTEM]) {
+          console.log("Not regenerating YAML from workOrder because there are pending changes");
           return;
         }
 
@@ -178,27 +171,21 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         // Convert to YAML using imported function
         setIntentYaml(yamlDump(intentConfig, { indent: 2 }));
         setSystemYaml(yamlDump(systemConfig, { indent: 2 }));
-        
-        // Reset changed flags
-        setYamlChanged({
-          [ConfigSection.INTENT]: false,
-          [ConfigSection.SYSTEM]: false
-        });
       } catch (e) {
         console.error('Error converting to YAML:', e);
       }
     }
-  }, [workOrder, pendingYaml]);
+  }, [workOrder, yamlChanged]);
 
   const loadWorkOrder = async (id: string): Promise<void> => {
     setLoading(true);
     try {
       const result = await fetchWorkOrder(id);
       if (result) {
-        // Clear any pending YAML when loading a work order
-        setPendingYaml({
-          [ConfigSection.INTENT]: null,
-          [ConfigSection.SYSTEM]: null
+        // Reset YAML change tracking when loading a new work order
+        setYamlChanged({
+          [ConfigSection.INTENT]: false,
+          [ConfigSection.SYSTEM]: false
         });
         
         setWorkOrder(result);
@@ -254,10 +241,10 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     setWorkOrder(newWorkOrder);
     setOriginalWorkOrder(JSON.parse(JSON.stringify(newWorkOrder))); // Deep clone
     
-    // Clear any pending YAML when creating a new work order
-    setPendingYaml({
-      [ConfigSection.INTENT]: null,
-      [ConfigSection.SYSTEM]: null
+    // Reset YAML change tracking when creating a new work order
+    setYamlChanged({
+      [ConfigSection.INTENT]: false,
+      [ConfigSection.SYSTEM]: false
     });
   };
 
@@ -267,10 +254,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     
     if (section === ConfigSection.INTENT) {
       setIntentYaml(yaml);
-      setPendingYaml(prev => ({ ...prev, [ConfigSection.INTENT]: yaml }));
     } else {
       setSystemYaml(yaml);
-      setPendingYaml(prev => ({ ...prev, [ConfigSection.SYSTEM]: yaml }));
     }
     
     setYamlChanged(prev => ({ ...prev, [section]: true }));
@@ -377,7 +362,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     
     setWorkOrder(updatedWorkOrder);
     setYamlChanged(prev => ({ ...prev, [section]: false }));
-    setPendingYaml(prev => ({ ...prev, [section]: null }));
   };
 
   const handleArchiveToggle = async (): Promise<void> => {
@@ -419,57 +403,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
 
     // Ensure due_date is either null or a valid date
     if (workOrder.metadata.due_date === '') {
-      // Set due_date to null if it's an empty string to avoid validation errors
       workOrder.metadata.due_date = null;
-    }
-    
-    return true;
-  };
-
-  // Check if we need to apply YAML changes first before saving
-  const applyYamlChangesIfNeeded = (): boolean => {
-    // Check active tab first
-    const currentSection = activeTab === 0 ? ConfigSection.INTENT : ConfigSection.SYSTEM;
-    
-    if (activeTab < 2 && yamlChanged[currentSection]) {
-      try {
-        console.log(`Applying ${currentSection} YAML changes before save`);
-        
-        // Try to parse the YAML based on current tab
-        const yaml = currentSection === ConfigSection.INTENT ? intentYaml : systemYaml;
-        const parsedData = yamlLoad(yaml);
-        
-        handleApplyChanges(currentSection, parsedData);
-        console.log(`Applied ${currentSection} YAML changes before save`);
-        
-        return true;
-      } catch (err) {
-        setError(`Failed to parse ${currentSection} YAML: ${err instanceof Error ? err.message : String(err)}`);
-        console.error(`Failed to apply ${currentSection} YAML changes:`, err);
-        return false;
-      }
-    }
-    
-    // Check other tabs for pending changes
-    const otherSection = currentSection === ConfigSection.INTENT ? ConfigSection.SYSTEM : ConfigSection.INTENT;
-    
-    if (yamlChanged[otherSection]) {
-      try {
-        console.log(`Applying ${otherSection} YAML changes before save (from non-active tab)`);
-        
-        // Try to parse the YAML from the other tab
-        const yaml = otherSection === ConfigSection.INTENT ? intentYaml : systemYaml;
-        const parsedData = yamlLoad(yaml);
-        
-        handleApplyChanges(otherSection, parsedData);
-        console.log(`Applied ${otherSection} YAML changes before save`);
-        
-        return true;
-      } catch (err) {
-        setError(`Failed to parse ${otherSection} YAML: ${err instanceof Error ? err.message : String(err)}`);
-        console.error(`Failed to apply ${otherSection} YAML changes:`, err);
-        return false;
-      }
     }
     
     return true;
@@ -479,12 +413,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     if (!workOrder) return;
     
     console.log("Saving work order. YAML changed:", yamlChanged);
-    
-    // First apply any pending YAML changes
-    if (!applyYamlChangesIfNeeded()) {
-      console.error("Failed to apply YAML changes before saving");
-      return;
-    }
     
     if (!validateWorkOrder()) {
       return;
@@ -512,13 +440,9 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         setWorkOrder(result);
         setOriginalWorkOrder(JSON.parse(JSON.stringify(result))); // Deep clone
         
-        // Clear pending YAML since we've saved successfully
-        setPendingYaml({
-          [ConfigSection.INTENT]: null,
-          [ConfigSection.SYSTEM]: null
-        });
-        
         setSaved(true);
+        
+        // Reset YAML change tracking after saving
         setYamlChanged({
           [ConfigSection.INTENT]: false,
           [ConfigSection.SYSTEM]: false
@@ -545,11 +469,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   const handleSubmitJob = async (): Promise<void> => {
     if (!workOrder || !workOrder.id) {
       setError("Please save the work order before submitting");
-      return;
-    }
-
-    // First apply any pending YAML changes and save
-    if (!applyYamlChangesIfNeeded()) {
       return;
     }
 
@@ -603,23 +522,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   }, [id, fetchWorkOrder]);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number): void => {
-    // If there are yaml changes in the current tab, apply them before switching tabs
-    if (activeTab === 0 && yamlChanged[ConfigSection.INTENT]) {
-      try {
-        const parsedIntent = yamlLoad(intentYaml);
-        handleApplyChanges(ConfigSection.INTENT, parsedIntent);
-      } catch (err) {
-        setError(`Failed to apply intent changes before tab switch: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    } else if (activeTab === 1 && yamlChanged[ConfigSection.SYSTEM]) {
-      try {
-        const parsedSystem = yamlLoad(systemYaml);
-        handleApplyChanges(ConfigSection.SYSTEM, parsedSystem);
-      } catch (err) {
-        setError(`Failed to apply system changes before tab switch: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-    
     setActiveTab(newValue);
   };
 

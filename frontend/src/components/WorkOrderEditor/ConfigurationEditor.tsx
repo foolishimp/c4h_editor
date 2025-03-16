@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, Alert, Typography, Paper } from '@mui/material';
 import { WorkOrder } from '../../types/workorder';
 import Editor from '@monaco-editor/react';
-import { load as yamlLoad } from 'js-yaml'; // ES Module import for js-yaml
+import { load as yamlLoad } from 'js-yaml'; 
 
 // Define configuration section types for type safety
 export enum ConfigSection {
@@ -40,10 +40,14 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
   title,
   description
 }) => {
+  // State management
   const [yamlContent, setYamlContent] = useState<string>(initialYaml);
   const [error, setError] = useState<string | null>(null);
+  
+  // Refs
   const editorRef = useRef<any>(null);
   const isInitialRender = useRef<boolean>(true);
+  const lastSavedContent = useRef<string>(initialYaml);
   
   // Function to handle editor mount
   const handleEditorDidMount = (editor: any) => {
@@ -51,12 +55,17 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
   };
   
   // Initialize YAML content when the initialYaml changes from parent
-  // but only on the first render or when explicitly receiving new content from parent
   useEffect(() => {
-    if (initialYaml && (isInitialRender.current || initialYaml !== yamlContent)) {
-      console.log(`Initializing ${section} editor with new YAML content`);
-      setYamlContent(initialYaml);
-      isInitialRender.current = false;
+    if (initialYaml) {
+      if (isInitialRender.current || yamlContent !== lastSavedContent.current) {
+        console.log(`Initializing ${section} editor with new YAML content`);
+        setYamlContent(initialYaml);
+        // Only update lastSavedContent if this is initial render or explicit update from parent
+        if (isInitialRender.current) {
+          lastSavedContent.current = initialYaml;
+        }
+        isInitialRender.current = false;
+      }
     }
   }, [initialYaml, section, yamlContent]);
   
@@ -85,11 +94,16 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
         throw new Error('Empty or invalid YAML configuration.');
       }
       
+      console.log(`Saving ${section} YAML changes:`, parsed);
+      
+      // Update our reference to the last saved content
+      lastSavedContent.current = yamlContent;
+      
       // Apply the changes to the parent component
       onApplyChanges(parsed);
       setError(null);
       
-      // Save to backend
+      // Save to backend via parent save function
       onSave();
     } catch (err) {
       setError(`Error parsing YAML: ${err instanceof Error ? err.message : String(err)}`);
@@ -141,7 +155,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
             <Button 
               variant="contained" 
               onClick={handleSave}
-              disabled={!yamlContent}
+              disabled={!yamlContent || yamlContent === lastSavedContent.current}
             >
               Save
             </Button>
