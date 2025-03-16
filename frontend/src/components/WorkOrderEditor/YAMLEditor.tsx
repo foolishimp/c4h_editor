@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, Alert, Typography } from '@mui/material';
 import { WorkOrder } from '../../types/workorder';
 import Editor from '@monaco-editor/react';
-import { load as yamlLoad } from 'js-yaml'; // ES Module import for js-yaml
+import { load as yamlLoad, dump as yamlDump } from 'js-yaml'; // ES Module import for js-yaml
 
 interface YAMLEditorProps {
   workOrder: WorkOrder;
@@ -29,8 +29,8 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
 }) => {
   const [yamlContent, setYamlContent] = useState<string>(initialYaml);
   const [error, setError] = useState<string | null>(null);
-  const lastSavedContent = useRef<string>(initialYaml);
   const editorRef = useRef<any>(null);
+  const isInitialRender = useRef<boolean>(true);
   
   // Function to handle editor mount
   const handleEditorDidMount = (editor: any) => {
@@ -38,12 +38,12 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
   };
   
   // Initialize YAML content when the initialYaml changes from parent
+  // but only on the first render or when explicitly receiving new content from parent
   useEffect(() => {
-    if (initialYaml && initialYaml !== yamlContent && initialYaml !== lastSavedContent.current) {
+    if (initialYaml && (isInitialRender.current || initialYaml !== yamlContent)) {
       console.log('Initializing editor with new YAML content');
       setYamlContent(initialYaml);
-      lastSavedContent.current = initialYaml;
-      setError(null);
+      isInitialRender.current = false;
     }
   }, [initialYaml]);
   
@@ -67,18 +67,10 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       // Parse the YAML
       const parsed = yamlLoad(yamlContent) as any;
       
-      // Validate that we have proper structure based on schema
+      // Validate that we have proper structure
       if (!parsed) {
         throw new Error('Empty or invalid YAML configuration.');
       }
-      
-      // Clean up any date fields to prevent validation errors
-      if (parsed.due_date === '') {
-        parsed.due_date = null;
-      }
-      
-      // Update the last saved content reference
-      lastSavedContent.current = yamlContent;
       
       // Apply the changes to the parent component
       onApplyChanges(parsed);
@@ -87,11 +79,6 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
       setError(`Error parsing YAML: ${err instanceof Error ? err.message : String(err)}`);
       console.error('Error parsing YAML:', err);
     }
-  };
-
-  // Get the current editor content - useful for parent component to access
-  const getCurrentContent = (): string => {
-    return yamlContent;
   };
   
   return (
@@ -131,7 +118,7 @@ export const YAMLEditor: React.FC<YAMLEditorProps> = ({
         <Button 
           variant="contained" 
           onClick={handleSaveChanges}
-          disabled={!yamlContent || yamlContent === lastSavedContent.current}
+          disabled={!yamlContent}
         >
           Save Changes
         </Button>
