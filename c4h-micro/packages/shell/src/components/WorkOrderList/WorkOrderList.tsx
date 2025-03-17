@@ -1,7 +1,4 @@
-// File: c4h-editor-micro/packages/shell/src/components/WorkOrderList/WorkOrderList.tsx
-// Migrated from original frontend
-
-// File: frontend/src/components/WorkOrderList/WorkOrderList.tsx
+// File: packages/shell/src/components/WorkOrderList/WorkOrderList.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -37,9 +34,9 @@ import {
   Search as SearchIcon,
   MoreVert as MoreVertIcon
 } from '@mui/icons-material';
-import TimeAgo from '../common/TimeAgo';;
-import { WorkOrder } from 'shared';;
-import { useWorkOrderApi } from '@/hooks/useWorkOrderApi';;
+import TimeAgo from '../common/TimeAgo';
+import { WorkOrder } from 'shared';
+import { useWorkOrderApi } from '@/hooks/useWorkOrderApi';
 
 // New component for work order list filtering
 const WorkOrderFilters: React.FC<{
@@ -107,6 +104,20 @@ export const WorkOrderList: React.FC = () => {
   useEffect(() => {
     fetchWorkOrders();
   }, []);
+
+  // Add event listener to refresh work orders when notified by other components
+  useEffect(() => {
+    const handleRefreshEvent = () => {
+      console.log('Refreshing work orders list due to event');
+      fetchWorkOrders();
+    };
+    
+    window.addEventListener('refreshWorkOrders', handleRefreshEvent);
+    
+    return () => {
+      window.removeEventListener('refreshWorkOrders', handleRefreshEvent);
+    };
+  }, [fetchWorkOrders]);
 
   // Filter work orders based on search term and archived status
   useEffect(() => {

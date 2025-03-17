@@ -227,10 +227,10 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
       if (result) {
         setWorkOrder(result);
 
-      // Notify shell app about the save
-      if (result) {
+        // Notify shell app about the save
+        console.log('Publishing workorder:saved event', result);
         eventBus.publish('workorder:saved', result);
-      }
+        
         setOriginalWorkOrder(JSON.parse(JSON.stringify(result)));
         setYamlDirty(false);
         setSaved(true);
@@ -292,7 +292,7 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
     submitWorkOrder,
     resetSavedState
   };
-    
+  
   return (
     <WorkOrderContext.Provider value={value}>
       {children}
