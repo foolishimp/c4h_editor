@@ -1,48 +1,38 @@
 /**
- * ConfigurationEditor component for editing different sections of work order configuration
- * Provides a unified YAML editing experience with consistent behavior
+ * File: frontend/src/components/WorkOrderEditor/ConfigurationEditor.tsx
+ * 
+ * ConfigurationEditor component for editing YAML configuration
+ * Simplified to work directly with the WorkOrderContext
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Box, Button, Alert, Typography, Paper } from '@mui/material';
-import { WorkOrder } from '../../types/workorder';
 import Editor from '@monaco-editor/react';
-import { load as yamlLoad } from 'js-yaml'; 
+import { ConfigSection } from '../../contexts/WorkOrderContext';
 
-// Define configuration section types for type safety
-export enum ConfigSection {
-  INTENT = 'intent',
-  SYSTEM = 'system'
-}
-
-// Interface for editor props following TypeScript Design Principles
+// Interface for editor props
 export interface ConfigurationEditorProps {
-  workOrder: WorkOrder;
   section: ConfigSection;
-  initialYaml: string;
+  yaml: string;
   onChange: (yaml: string) => void;
-  onApplyChanges: (parsedData: any) => void;
   onSave: () => void;
-  schemaExample?: any;
   title: string;
   description?: string;
+  schemaExample?: any;
 }
 
 export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
-  workOrder,
   section,
-  initialYaml = '',
+  yaml,
   onChange,
-  onApplyChanges,
   onSave,
-  schemaExample,
   title,
-  description
+  description,
 }) => {
-  // State management
+  // Local state just for UI
   const [error, setError] = useState<string | null>(null);
   
-  // Refs
+  // Editor reference
   const editorRef = useRef<any>(null);
   
   // Function to handle editor mount
@@ -58,33 +48,19 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
     }
   };
   
-  // Handle saving the YAML changes to the WorkOrder
+  // Handle saving
   const handleSave = () => {
-    if (!initialYaml) {
+    if (!yaml) {
       setError("No content to save");
       return;
     }
     
     try {
-      // Parse the YAML
-      const parsed = yamlLoad(initialYaml) as any;
-      
-      // Validate that we have proper structure
-      if (!parsed) {
-        throw new Error('Empty or invalid YAML configuration.');
-      }
-      
-      console.log(`Saving ${section} YAML changes:`, parsed);
-      
-      // Apply the changes to the parent component
-      onApplyChanges(parsed);
-      setError(null);
-      
-      // Save to backend via parent save function
       onSave();
+      setError(null);
     } catch (err) {
-      setError(`Error parsing YAML: ${err instanceof Error ? err.message : String(err)}`);
-      console.error(`Error parsing ${section} YAML:`, err);
+      setError(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      console.error(`Error saving ${section} configuration:`, err);
     }
   };
   
@@ -111,7 +87,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
             <Editor
               height="100%"
               defaultLanguage="yaml"
-              value={initialYaml}
+              value={yaml}
               onChange={handleEditorChange}
               onMount={handleEditorDidMount}
               options={{
@@ -132,7 +108,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
             <Button 
               variant="contained" 
               onClick={handleSave}
-              disabled={!initialYaml}
+              disabled={!yaml}
             >
               Save
             </Button>

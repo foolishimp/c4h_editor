@@ -6,7 +6,6 @@ import {
   Typography,
   Button,
   Card,
-  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -32,9 +31,7 @@ import {
   Refresh as RefreshIcon,
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon,
-  FilterList as FilterListIcon,
   Search as SearchIcon,
-  ContentCopy as CopyIcon,
   MoreVert as MoreVertIcon
 } from '@mui/icons-material';
 import TimeAgo from '../common/TimeAgo';
