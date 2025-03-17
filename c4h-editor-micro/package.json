@@ -1,0 +1,21 @@
+{
+  "name": "c4h-editor",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "concurrently \"npm run start:shell\" \"npm run start:config-editor\"",
+    "start:shell": "npm run start -w packages/shell",
+    "start:config-editor": "npm run start -w packages/config-editor",
+    "build": "npm run build:shared && npm run build:config-editor && npm run build:shell",
+    "build:shared": "npm run build -w packages/shared",
+    "build:shell": "npm run build -w packages/shell",
+    "build:config-editor": "npm run build -w packages/config-editor"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  }
+}

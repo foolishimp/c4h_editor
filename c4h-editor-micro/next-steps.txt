@@ -1,0 +1,27 @@
+# Next Steps for C4H Editor Migration
+
+Now that the basic project structure is set up, you need to run the following scripts in order:
+
+1. Run the script to set up shared package:
+   ```
+   python 2_setup_shared.py
+   ```
+
+2. Run the script to set up the config-editor microfrontend:
+   ```
+   python 3_setup_config_editor.py
+   ```
+
+3. Run the script to set up the shell application:
+   ```
+   python 4_setup_shell.py
+   ```
+
+4. Install dependencies and start the application:
+   ```
+   cd c4h-editor
+   npm install
+   npm start
+   ```
+
+After completing these steps, you should have a fully functional microfrontend architecture.
