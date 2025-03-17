@@ -13,9 +13,14 @@ import WorkOrderList from './components/WorkOrderList/WorkOrderList';
 import JobsList from './components/JobsList/JobsList';
 import { JobDetails } from './components/JobDetails/JobDetails';
 
+// Import the useEventBus hook instead of the HOC
+import { useEventBus } from './utils/eventListener';
+
 // Lazy load the ConfigEditor from remote
-const ConfigEditor = lazy(() => import('configEditor/ConfigEditor'));
-import { withEventListener } from './utils/eventListener';
+const ConfigEditor = lazy(() => import('configEditor/ConfigEditor').catch(err => {
+  console.error("Failed to load ConfigEditor microfrontend:", err);
+  return { default: () => <div>Failed to load ConfigEditor component</div> };
+}));
 
 // Create theme
 const theme = createTheme({
@@ -55,6 +60,9 @@ const Loading = () => (
 
 // Main App component
 function App() {
+  // Use our event bus hook to set up event listeners
+  useEventBus();
+  
   const [selectedJobId, setSelectedJobId] = React.useState<string | null>(null);
 
   const handleJobSelect = (jobId: string) => {
@@ -124,4 +132,4 @@ function App() {
   );
 }
 
-export default withEventListener(App);
+export default App;

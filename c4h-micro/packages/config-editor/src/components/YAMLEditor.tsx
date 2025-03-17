@@ -1,13 +1,4 @@
-// File: c4h-editor-micro/packages/config-editor/src/components/YAMLEditor.tsx
-// Migrated from original frontend
-
-/**
- * File: frontend/src/components/WorkOrderEditor/YamlEditor.tsx
- * 
- * A simplified YAML editor component focused solely on YAML editing.
- * Completely removes schema validation and merging logic.
- */
-
+// File: packages/config-editor/src/components/YAMLEditor.tsx
 import React, { useRef } from 'react';
 import { Box, Button, Paper, Typography, Alert } from '@mui/material';
 import Editor from '@monaco-editor/react';

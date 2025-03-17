@@ -1,7 +1,4 @@
-// File: c4h-editor-micro/packages/shell/src/hooks/useJobApi.ts
-// Migrated from original frontend
-
-// File: frontend/src/hooks/useJobApi.ts
+// File: packages/shell/src/hooks/useJobApi.ts
 /**
  * Custom hook for interacting with the Job API
  * Provides methods for job management including submission, polling, and cancellation
@@ -9,8 +6,8 @@
 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Job } from 'shared';;
-import api, { API_ENDPOINTS } from '@/config/api';;
+import { Job } from 'shared';
+import { api, API_ENDPOINTS } from '@/config/api';
 
 export interface JobSubmitRequest {
   workOrderId: string;

@@ -12,7 +12,7 @@ export default defineConfig({
       remotes: {
         configEditor: 'http://localhost:3001/assets/remoteEntry.js',
       },
-      shared: ['react', 'react-dom', '@mui/material', 'axios']
+      shared: ['react', 'react-dom', '@mui/material', 'react-router-dom', 'axios', 'js-yaml']
     })
   ],
   resolve: {

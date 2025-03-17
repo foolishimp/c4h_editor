@@ -1,7 +1,4 @@
-// File: c4h-editor-micro/packages/config-editor/src/hooks/useWorkOrderApi.ts
-// Migrated from original frontend
-
-// File: frontend/src/hooks/useWorkOrderApi.ts
+// File: packages/shell/src/hooks/useWorkOrderApi.ts
 /**
  * Custom hook for interacting with the WorkOrder API
  * Provides methods for CRUD operations on work orders
@@ -9,8 +6,8 @@
 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { WorkOrder } from 'shared';;
-import api from 'shared';;
+import { WorkOrder } from 'shared';
+import { api } from '@/config/api';
 
 export const useWorkOrderApi = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -46,6 +43,7 @@ export const useWorkOrderApi = () => {
     }
   }, []);
 
+  // Rest of the code remains the same...
   // Fetch a single workorder by ID
   const fetchWorkOrder = useCallback(async (id: string) => {
     setLoading(true);

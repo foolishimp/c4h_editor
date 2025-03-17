@@ -1,14 +1,14 @@
-// File: c4h-editor-micro/packages/shared/src/config/api.ts
-// Migrated from original frontend
-
-// File: frontend/src/config/api.ts
+// File: packages/shared/src/config/api.ts
 import axios from 'axios';
 
-// Replace process.env with import.meta.env for Vite applications
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Use process.env for Node.js environment compatibility
+// TypeScript doesn't recognize import.meta.env by default
+const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL 
+  ? process.env.VITE_API_BASE_URL 
+  : 'http://localhost:8000';
 
 // Create an axios instance with the base URL
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
@@ -41,4 +41,5 @@ export const API_ENDPOINTS = {
   JOB_CANCEL: (id: string) => `/api/v1/jobs/${id}/cancel`
 };
 
+// To make both named and default exports available
 export default api;

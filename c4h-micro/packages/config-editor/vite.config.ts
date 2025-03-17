@@ -13,7 +13,7 @@ export default defineConfig({
       exposes: {
         './ConfigEditor': './src/ConfigEditor.tsx',
       },
-      shared: ['react', 'react-dom', '@mui/material', 'axios', 'js-yaml', '@monaco-editor/react']
+      shared: ['react', 'react-dom', '@mui/material', 'react-router-dom', 'axios', 'js-yaml', '@monaco-editor/react']
     })
   ],
   resolve: {

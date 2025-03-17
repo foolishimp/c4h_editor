@@ -1,7 +1,4 @@
-// File: c4h-editor-micro/packages/config-editor/src/components/WorkOrderVersionControl.tsx
-// Migrated from original frontend
-
-// File: frontend/src/components/WorkOrderEditor/WorkOrderVersionControl.tsx
+// File: packages/config-editor/src/components/WorkOrderVersionControl.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   Box, 
@@ -20,7 +17,7 @@ import {
 } from '@mui/material';
 import RestoreIcon from '@mui/icons-material/Restore';
 import CompareIcon from '@mui/icons-material/Compare';
-import { WorkOrderVersionInfo } from 'shared';;
+import { WorkOrderVersionInfo } from 'shared';
 import DiffViewer from '../common/DiffViewer';
 import TimeAgo from '../common/TimeAgo';
 

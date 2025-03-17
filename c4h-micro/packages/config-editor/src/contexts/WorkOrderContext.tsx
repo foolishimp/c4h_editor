@@ -292,7 +292,7 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
     submitWorkOrder,
     resetSavedState
   };
-  
+    
   return (
     <WorkOrderContext.Provider value={value}>
       {children}
