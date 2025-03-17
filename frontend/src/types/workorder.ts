@@ -78,3 +78,22 @@ export interface WorkOrderHistoryResponse {
   workorder_id: string;
   versions: WorkOrderVersionInfo[];
 }
+export interface WorkOrderConfig {
+  temperature: number;
+  max_tokens?: number;
+  top_p?: number | null;
+  frequency_penalty?: number | null;
+  presence_penalty?: number | null;
+  stop_sequences: string[];
+  service_id?: string | null;
+  workflow_id?: string | null;
+  max_runtime?: number | null;
+  notify_on_completion?: boolean;
+  parameters?: Record<string, any>;
+  // Add these properties to avoid type assertions:
+  providers?: Record<string, any>;
+  backup?: Record<string, any>;
+  logging?: Record<string, any>;
+  project?: Record<string, any>;
+  [key: string]: any; // Allow any additional properties
+}

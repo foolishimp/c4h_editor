@@ -1,24 +1,23 @@
 /**
  * File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
  * 
- * WorkOrderEditor component for creating and editing work orders
- * Uses the WorkOrderContext for centralized state management
+ * Streamlined WorkOrderEditor component that uses YAML as the primary editing interface.
+ * Removes all technical debt and complexity from the previous implementation.
  */
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Tabs, Tab, Button, TextField, CircularProgress,
+  Box, Typography, Button, TextField, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
-  Snackbar, Alert
+  Snackbar, Alert, Paper
 } from '@mui/material';
 
 import { useWorkOrderContext, WorkOrderProvider } from '../../contexts/WorkOrderContext';
 import { useWorkOrderApi } from '../../hooks/useWorkOrderApi';
 import { useJobApi } from '../../hooks/useJobApi';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
-import IntentConfigTab from './tabs/IntentConfigTab';
-import SystemConfigTab from './tabs/SystemConfigTab';
+import { YamlEditor } from './YAMLEditor';
 
 export interface WorkOrderEditorProps {
   workOrderId?: string;
@@ -42,6 +41,7 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   // State management from context
   const {
     workOrder,
+    yaml,
     loading,
     error,
     saved,
@@ -49,13 +49,14 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
     loadWorkOrder,
     createNewWorkOrder,
     updateWorkOrderId,
+    updateYaml,
     saveWorkOrder,
     submitWorkOrder,
     resetSavedState
   } = useWorkOrderContext();
 
   // Local component state
-  const [activeTab, setActiveTab] = useState<number>(0);
+  const [showVersions, setShowVersions] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [confirmDiscard, setConfirmDiscard] = useState<boolean>(false);
   
@@ -71,11 +72,6 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
       createNewWorkOrder();
     }
   }, [id, loadWorkOrder, createNewWorkOrder]);
-
-  // Handle tab change
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number): void => {
-    setActiveTab(newValue);
-  };
 
   // Handle close button click
   const handleCloseClick = (): void => {
@@ -199,13 +195,23 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
           >
             {loading ? <CircularProgress size={24} /> : 'Save'}
           </Button>
+          {id && (
+            <Button 
+              variant="outlined" 
+              color="secondary"
+              onClick={() => setShowVersions(!showVersions)}
+              sx={{ mr: 2 }}
+            >
+              {showVersions ? 'Hide Versions' : 'Show Versions'}
+            </Button>
+          )}
           <Button variant="outlined" onClick={handleCloseClick} sx={{ mr: 2 }}>
             Close
           </Button>
           {id && (
             <Button 
               variant="outlined" 
-              color="secondary" 
+              color="warning" 
               onClick={handleArchiveToggle} 
               disabled={loading}
             >
@@ -215,55 +221,41 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
         </Box>
       </Box>
 
-      {/* Work Order ID */}
-      <TextField
-        label="Work Order ID"
-        fullWidth
-        value={workOrder.id}
-        onChange={(e) => updateWorkOrderId(e.target.value)}
-        disabled={!!id}
-        margin="normal"
-        variant="outlined"
-        helperText="Unique identifier for this work order"
+      {/* Work Order ID (only for new work orders) */}
+      {!id && (
+        <TextField
+          label="Work Order ID"
+          fullWidth
+          value={workOrder.id}
+          onChange={(e) => updateWorkOrderId(e.target.value)}
+          margin="normal"
+          variant="outlined"
+          helperText="Unique identifier for this work order"
+          sx={{ mb: 3 }}
+        />
+      )}
+
+      {/* Version History (conditionally shown) */}
+      {showVersions && id && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Version History
+          </Typography>
+          <WorkOrderVersionControl
+            workOrderId={id}
+            onFetchHistory={() => getWorkOrderHistory(id)}
+            onLoadVersion={loadWorkOrder}
+            currentVersion={workOrder.metadata.version}
+          />
+        </Paper>
+      )}
+
+      {/* YAML Editor */}
+      <YamlEditor
+        yaml={yaml}
+        onChange={updateYaml}
+        onSave={handleSave}
       />
-
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 3 }}>
-        <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tab label="Intent Configuration" />
-          <Tab label="System Configuration" />
-          <Tab label="Versions" />
-        </Tabs>
-      </Box>
-
-      {/* Intent Configuration Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 0} sx={{ mt: 3 }}>
-        {activeTab === 0 && <IntentConfigTab />}
-      </Box>
-
-      {/* System Configuration Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 1} sx={{ mt: 3 }}>
-        {activeTab === 1 && <SystemConfigTab />}
-      </Box>
-
-      {/* Versions Tab */}
-      <Box role="tabpanel" hidden={activeTab !== 2} sx={{ mt: 3 }}>
-        {activeTab === 2 && id && (
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Version History
-            </Typography>
-            <Box sx={{ border: 1, borderColor: 'grey.300', borderRadius: 1, p: 3 }}>
-              <WorkOrderVersionControl
-                workOrderId={id}
-                onFetchHistory={() => getWorkOrderHistory(id)}
-                onLoadVersion={loadWorkOrder}
-                currentVersion={workOrder.metadata.version}
-              />
-            </Box>
-          </Box>
-        )}
-      </Box>
 
       {/* Notifications */}
       <Snackbar open={!!error} autoHideDuration={6000} onClose={resetSavedState}>
