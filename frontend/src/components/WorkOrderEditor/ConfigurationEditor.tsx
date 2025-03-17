@@ -1,4 +1,3 @@
-// File: frontend/src/components/WorkOrderEditor/ConfigurationEditor.tsx
 /**
  * ConfigurationEditor component for editing different sections of work order configuration
  * Provides a unified YAML editing experience with consistent behavior
@@ -41,38 +40,19 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
   description
 }) => {
   // State management
-  const [yamlContent, setYamlContent] = useState<string>(initialYaml);
   const [error, setError] = useState<string | null>(null);
   
   // Refs
   const editorRef = useRef<any>(null);
-  const isInitialRender = useRef<boolean>(true);
-  const lastSavedContent = useRef<string>(initialYaml);
   
   // Function to handle editor mount
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
   };
   
-  // Initialize YAML content when the initialYaml changes from parent
-  useEffect(() => {
-    if (initialYaml) {
-      if (isInitialRender.current || yamlContent !== lastSavedContent.current) {
-        console.log(`Initializing ${section} editor with new YAML content`);
-        setYamlContent(initialYaml);
-        // Only update lastSavedContent if this is initial render or explicit update from parent
-        if (isInitialRender.current) {
-          lastSavedContent.current = initialYaml;
-        }
-        isInitialRender.current = false;
-      }
-    }
-  }, [initialYaml, section, yamlContent]);
-  
   // Handle YAML content changes in the editor
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
-      setYamlContent(value);
       setError(null);
       onChange(value);
     }
@@ -80,14 +60,14 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
   
   // Handle saving the YAML changes to the WorkOrder
   const handleSave = () => {
-    if (!yamlContent) {
+    if (!initialYaml) {
       setError("No content to save");
       return;
     }
     
     try {
       // Parse the YAML
-      const parsed = yamlLoad(yamlContent) as any;
+      const parsed = yamlLoad(initialYaml) as any;
       
       // Validate that we have proper structure
       if (!parsed) {
@@ -95,9 +75,6 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
       }
       
       console.log(`Saving ${section} YAML changes:`, parsed);
-      
-      // Update our reference to the last saved content
-      lastSavedContent.current = yamlContent;
       
       // Apply the changes to the parent component
       onApplyChanges(parsed);
@@ -134,7 +111,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
             <Editor
               height="100%"
               defaultLanguage="yaml"
-              value={yamlContent}
+              value={initialYaml}
               onChange={handleEditorChange}
               onMount={handleEditorDidMount}
               options={{
@@ -155,7 +132,7 @@ export const ConfigurationEditor: React.FC<ConfigurationEditorProps> = ({
             <Button 
               variant="contained" 
               onClick={handleSave}
-              disabled={!yamlContent || yamlContent === lastSavedContent.current}
+              disabled={!initialYaml}
             >
               Save
             </Button>

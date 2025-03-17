@@ -1,4 +1,3 @@
-// File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
 /**
  * WorkOrderEditor component for creating and editing work orders
  * This component handles the main editing interface with multiple tabs for different
@@ -102,7 +101,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   // YAML editor states
   const [intentYaml, setIntentYaml] = useState<string>('');
   const [systemYaml, setSystemYaml] = useState<string>('');
-  const [yamlChanged, setYamlChanged] = useState<{
+  const [pendingChanges, setPendingChanges] = useState<{
     [ConfigSection.INTENT]: boolean;
     [ConfigSection.SYSTEM]: boolean;
   }>({
@@ -134,14 +133,19 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
   // Update YAML content when workOrder changes
   useEffect(() => {
     if (workOrder) {
-      try {
-        // Skip if we already have YAML that's been changed
-        if (yamlChanged[ConfigSection.INTENT] || yamlChanged[ConfigSection.SYSTEM]) {
-          console.log("Not regenerating YAML from workOrder because there are pending changes");
-          return;
-        }
-
-        // Extract intent configuration
+      generateYamlFromWorkOrder();
+    }
+  }, [workOrder]);
+  
+  // Clear function to generate YAML from the workOrder object
+  const generateYamlFromWorkOrder = () => {
+    try {
+      if (!workOrder) return;
+      
+      const intentPending = pendingChanges[ConfigSection.INTENT];
+      const systemPending = pendingChanges[ConfigSection.SYSTEM];
+      
+      if (!intentPending) {
         const intentConfig = {
           description: workOrder.metadata.description || '',
           goal: workOrder.metadata.goal || '',
@@ -150,8 +154,10 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
           assignee: workOrder.metadata.assignee || '',
           parameters: workOrder.template.parameters || []
         };
-        
-        // Extract system configuration
+        setIntentYaml(yamlDump(intentConfig, { indent: 2 }));
+      }
+      
+      if (!systemPending) {
         const systemConfig = {
           llm_config: workOrder.template.config,
           project: {
@@ -167,15 +173,12 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
             notify_on_completion: workOrder.template.config.notify_on_completion
           }
         };
-        
-        // Convert to YAML using imported function
-        setIntentYaml(yamlDump(intentConfig, { indent: 2 }));
         setSystemYaml(yamlDump(systemConfig, { indent: 2 }));
-      } catch (e) {
-        console.error('Error converting to YAML:', e);
       }
+    } catch (e) {
+      console.error('Error converting to YAML:', e);
     }
-  }, [workOrder, yamlChanged]);
+  };
 
   const loadWorkOrder = async (id: string): Promise<void> => {
     setLoading(true);
@@ -183,7 +186,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       const result = await fetchWorkOrder(id);
       if (result) {
         // Reset YAML change tracking when loading a new work order
-        setYamlChanged({
+        setPendingChanges({
           [ConfigSection.INTENT]: false,
           [ConfigSection.SYSTEM]: false
         });
@@ -242,10 +245,97 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     setOriginalWorkOrder(JSON.parse(JSON.stringify(newWorkOrder))); // Deep clone
     
     // Reset YAML change tracking when creating a new work order
-    setYamlChanged({
+    setPendingChanges({
       [ConfigSection.INTENT]: false,
       [ConfigSection.SYSTEM]: false
     });
+  };
+
+  // Separate YAML parsing from state updates - pure function
+  const mapYamlToWorkOrder = (section: ConfigSection, parsedData: any, currentWorkOrder: WorkOrder): WorkOrder => {
+    const updatedWorkOrder = JSON.parse(JSON.stringify(currentWorkOrder));
+    
+    const isFullConfig = parsedData.project || 
+                        parsedData.intent || 
+                        parsedData.llm_config || 
+                        parsedData.orchestration;
+    
+    if (isFullConfig) {
+      console.log(`Detected full configuration paste in ${section} tab, handling specially`);
+      
+      updatedWorkOrder.metadata = {
+        ...updatedWorkOrder.metadata,
+        description: parsedData.intent?.description || parsedData.description || updatedWorkOrder.metadata.description || '',
+        goal: parsedData.intent?.goal || parsedData.goal || updatedWorkOrder.metadata.goal || '',
+        priority: parsedData.intent?.priority || parsedData.priority || updatedWorkOrder.metadata.priority || 'medium',
+        due_date: parsedData.intent?.due_date || parsedData.due_date || updatedWorkOrder.metadata.due_date,
+        assignee: parsedData.intent?.assignee || parsedData.assignee || updatedWorkOrder.metadata.assignee || '',
+        asset: parsedData.project?.asset || parsedData.asset || updatedWorkOrder.metadata.asset || '',
+        tags: parsedData.project?.tags || parsedData.tags || updatedWorkOrder.metadata.tags || []
+      };
+      
+      updatedWorkOrder.template = {
+        ...updatedWorkOrder.template,
+        parameters: parsedData.intent?.parameters || 
+                    parsedData.parameters || 
+                    updatedWorkOrder.template.parameters || [],
+        config: {
+          ...updatedWorkOrder.template.config,
+          ...(parsedData.llm_config || {}),
+          service_id: parsedData.orchestration?.service_id || 
+                    parsedData.service_id || 
+                    updatedWorkOrder.template.config.service_id,
+          workflow_id: parsedData.orchestration?.workflow_id || 
+                     parsedData.workflow_id || 
+                     updatedWorkOrder.template.config.workflow_id,
+          max_runtime: parsedData.runtime?.max_runtime || 
+                     parsedData.max_runtime || 
+                     updatedWorkOrder.template.config.max_runtime,
+          notify_on_completion: parsedData.runtime?.notify_on_completion || 
+                              parsedData.notify_on_completion || 
+                              updatedWorkOrder.template.config.notify_on_completion
+        }
+      };
+    } else if (section === ConfigSection.INTENT) {
+      updatedWorkOrder.metadata = {
+        ...updatedWorkOrder.metadata,
+        description: parsedData.description || '',
+        goal: parsedData.goal || '',
+        priority: parsedData.priority || 'medium',
+        due_date: parsedData.due_date ? parsedData.due_date : null,
+        assignee: parsedData.assignee || ''
+      };
+      
+      updatedWorkOrder.template = {
+        ...updatedWorkOrder.template,
+        parameters: parsedData.parameters || []
+      };
+    } else {
+      const llmConfig = parsedData.llm_config || {};
+      const projectConfig = parsedData.project || {};
+      const orchestrationConfig = parsedData.orchestration || {};
+      const runtimeConfig = parsedData.runtime || {};
+      
+      updatedWorkOrder.metadata = {
+        ...updatedWorkOrder.metadata,
+        asset: projectConfig.asset || '',
+        tags: projectConfig.tags || []
+      };
+      
+      updatedWorkOrder.template = {
+        ...updatedWorkOrder.template,
+        config: {
+          ...updatedWorkOrder.template.config,
+          ...llmConfig,
+          service_id: orchestrationConfig.service_id,
+          workflow_id: orchestrationConfig.workflow_id,
+          max_runtime: runtimeConfig.max_runtime,
+          notify_on_completion: runtimeConfig.notify_on_completion
+        }
+      };
+    }
+    
+    return updatedWorkOrder;
   };
 
   // Handler for when YAML is edited in the editor
@@ -258,7 +348,8 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       setSystemYaml(yaml);
     }
     
-    setYamlChanged(prev => ({ ...prev, [section]: true }));
+    // Mark this section as having pending changes
+    setPendingChanges(prev => ({ ...prev, [section]: true }));
   };
 
   // Handler for applying changes from the editors
@@ -267,152 +358,92 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     
     console.log(`Applying ${section} changes to work order:`, parsedData);
     
-    // Special case for when the user pastes a complete config
-    // Look for common top-level keys to detect if this is a full config
-    const isFullConfig = parsedData.project || 
-                      parsedData.intent || 
-                      parsedData.llm_config || 
-                      parsedData.orchestration;
-    
-    let updatedWorkOrder: WorkOrder;
-    
-    if (isFullConfig) {
-      // This is a complete pasted configuration
-      console.log(`Detected full configuration paste in ${section} tab, handling specially`);
-      
-      updatedWorkOrder = {
-        ...workOrder,
-        metadata: {
-          ...workOrder.metadata,
-          description: parsedData.intent?.description || parsedData.description || workOrder.metadata.description || '',
-          goal: parsedData.intent?.goal || parsedData.goal || workOrder.metadata.goal || '',
-          priority: parsedData.intent?.priority || parsedData.priority || workOrder.metadata.priority || 'medium',
-          due_date: parsedData.intent?.due_date || parsedData.due_date || workOrder.metadata.due_date,
-          assignee: parsedData.intent?.assignee || parsedData.assignee || workOrder.metadata.assignee || '',
-          asset: parsedData.project?.asset || parsedData.asset || workOrder.metadata.asset || '',
-          tags: parsedData.project?.tags || parsedData.tags || workOrder.metadata.tags || []
-        },
-        template: {
-          ...workOrder.template,
-          parameters: parsedData.intent?.parameters || 
-                      parsedData.parameters || 
-                      workOrder.template.parameters || [],
-          config: {
-            ...workOrder.template.config,
-            ...(parsedData.llm_config || {}),
-            service_id: parsedData.orchestration?.service_id || 
-                      parsedData.service_id || 
-                      workOrder.template.config.service_id,
-            workflow_id: parsedData.orchestration?.workflow_id || 
-                       parsedData.workflow_id || 
-                       workOrder.template.config.workflow_id,
-            max_runtime: parsedData.runtime?.max_runtime || 
-                       parsedData.max_runtime || 
-                       workOrder.template.config.max_runtime,
-            notify_on_completion: parsedData.runtime?.notify_on_completion || 
-                                parsedData.notify_on_completion || 
-                                workOrder.template.config.notify_on_completion
-          }
-        }
-      };
-    } else if (section === ConfigSection.INTENT) {
-      // Standard intent tab update
-      updatedWorkOrder = {
-        ...workOrder,
-        metadata: {
-          ...workOrder.metadata,
-          description: parsedData.description || '',
-          goal: parsedData.goal || '',
-          priority: parsedData.priority || 'medium',
-          due_date: parsedData.due_date ? parsedData.due_date : null,
-          assignee: parsedData.assignee || ''
-        },
-        template: {
-          ...workOrder.template,
-          parameters: parsedData.parameters || []
-        }
-      };
-    } else {
-      // Standard system tab update
-      const llmConfig = parsedData.llm_config || {};
-      const projectConfig = parsedData.project || {};
-      const orchestrationConfig = parsedData.orchestration || {};
-      const runtimeConfig = parsedData.runtime || {};
-      
-      updatedWorkOrder = {
-        ...workOrder,
-        metadata: {
-          ...workOrder.metadata,
-          asset: projectConfig.asset || '',
-          tags: projectConfig.tags || []
-        },
-        template: {
-          ...workOrder.template,
-          config: {
-            ...workOrder.template.config,
-            ...llmConfig,
-            service_id: orchestrationConfig.service_id,
-            workflow_id: orchestrationConfig.workflow_id,
-            max_runtime: runtimeConfig.max_runtime,
-            notify_on_completion: runtimeConfig.notify_on_completion
-          }
-        }
-      };
-    }
-    
+    const updatedWorkOrder = mapYamlToWorkOrder(section, parsedData, workOrder);
+     
     setWorkOrder(updatedWorkOrder);
-    setYamlChanged(prev => ({ ...prev, [section]: false }));
+    // Mark this section as no longer having pending changes
+    setPendingChanges(prev => ({ ...prev, [section]: false }));
   };
 
-  const handleArchiveToggle = async (): Promise<void> => {
-    if (!workOrder || !id) return;
-    
-    setLoading(true);
-    try {
-      const isArchived = workOrder.metadata.archived || false;
-      if (isArchived) {
-        await unarchiveWorkOrder(id);
-      } else {
-        await archiveWorkOrder(id);
+  // When changing tabs, check if we need to apply pending changes first
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number): void => {
+    if (activeTab === 0 && pendingChanges[ConfigSection.INTENT]) {
+      try {
+        const parsed = yamlLoad(intentYaml) as any;
+        handleApplyChanges(ConfigSection.INTENT, parsed);
+      } catch (err) {
+        console.error('Error parsing intent YAML before tab change:', err);
       }
-      
-      // Reload the workorder to get updated state
-      await loadWorkOrder(id);
-    } catch (err) {
-      setError(`Failed to ${workOrder.metadata.archived ? 'unarchive' : 'archive'} work order: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setLoading(false);
+    } else if (activeTab === 1 && pendingChanges[ConfigSection.SYSTEM]) {
+      try {
+        const parsed = yamlLoad(systemYaml) as any;
+        handleApplyChanges(ConfigSection.SYSTEM, parsed);
+      } catch (err) {
+        console.error('Error parsing system YAML before tab change:', err);
+      }
+    }
+    
+    setActiveTab(newValue);
+  };
+
+  const handleCloseClick = (): void => {
+    // Check if changes were made
+    const hasChanges = JSON.stringify(workOrder) !== JSON.stringify(originalWorkOrder) || 
+                      pendingChanges[ConfigSection.INTENT] || 
+                      pendingChanges[ConfigSection.SYSTEM];
+                      
+    if (hasChanges) {
+      setConfirmDiscard(true);
+    } else if (onClose) {
+      onClose();
+    } else {
+      navigate('/workorders');
     }
   };
 
-  const validateWorkOrder = (): boolean => {
-    if (!workOrder) {
-      setError("No work order to save");
-      return false;
+  const handleConfirmDiscard = (): void => {
+    setConfirmDiscard(false);
+    if (onClose) {
+      onClose();
+    } else {
+      navigate('/workorders');
     }
+  };
 
-    if (!workOrder.id.trim()) {
-      setError("Work order ID is required");
-      return false;
-    }
+  const handleCancelDiscard = (): void => {
+    setConfirmDiscard(false);
+  };
 
-    if (!workOrder.metadata.author.trim()) {
-      setError("Author is required");
-      return false;
-    }
-
-    // Ensure due_date is either null or a valid date
-    if (workOrder.metadata.due_date === '') {
-      workOrder.metadata.due_date = null;
-    }
-    
-    return true;
+  const handleCloseNotification = (): void => {
+    setError(null);
+    setSaved(false);
   };
 
   const handleSave = async (): Promise<void> => {
     if (!workOrder) return;
     
-    console.log("Saving work order. YAML changed:", yamlChanged);
+    console.log("Saving work order. Pending changes:", pendingChanges);
+    
+    // Apply any pending changes before saving
+    if (pendingChanges[ConfigSection.INTENT]) {
+      try {
+        const parsed = yamlLoad(intentYaml) as any;
+        handleApplyChanges(ConfigSection.INTENT, parsed);
+      } catch (err) {
+        setError(`Failed to parse intent YAML: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    }
+    
+    if (pendingChanges[ConfigSection.SYSTEM]) {
+      try {
+        const parsed = yamlLoad(systemYaml) as any;
+        handleApplyChanges(ConfigSection.SYSTEM, parsed);
+      } catch (err) {
+        setError(`Failed to parse system YAML: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+      }
+    }
     
     if (!validateWorkOrder()) {
       return;
@@ -424,31 +455,26 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
       
       let result;
       
-      // Check if this is a new work order or an update
       if (!id) {
-        // Creating a new work order
         result = await createWorkOrder(workOrder);
       } else {
-        // Updating an existing work order
         result = await updateWorkOrder(workOrder);
       }
       
       if (result) {
         console.log("Work order saved successfully:", result);
         
-        // Update both local state references
         setWorkOrder(result);
-        setOriginalWorkOrder(JSON.parse(JSON.stringify(result))); // Deep clone
+        setOriginalWorkOrder(JSON.parse(JSON.stringify(result)));
         
         setSaved(true);
         
         // Reset YAML change tracking after saving
-        setYamlChanged({
+        setPendingChanges({
           [ConfigSection.INTENT]: false,
           [ConfigSection.SYSTEM]: false
         });
         
-        // If this is a new work order, navigate to its edit page
         if (!id && result.id) {
           navigate(`/workorders/${result.id}`);
         }
@@ -474,16 +500,12 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
 
     setSubmitting(true);
     try {
-      // Make sure the work order is saved first
       await handleSave();
       
-      // Then submit the job
       const result = await submitJob({ workOrderId: workOrder.id });
       
       if (result) {
-        // Show success notification
         setSaved(true);
-        // Navigate to jobs list to see the submitted job
         navigate('/jobs');
       } else {
         throw new Error("Failed to submit job");
@@ -513,7 +535,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
     
     try {
-      // Use the version hash to fetch the specific version
       const result = await fetchWorkOrder(id);
       return result;
     } catch (err) {
@@ -521,44 +542,33 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     }
   }, [id, fetchWorkOrder]);
 
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number): void => {
-    setActiveTab(newValue);
+  const handleCloseNotificationClick = (): void => {
+    handleCloseNotification();
   };
 
-  const handleCloseClick = (): void => {
-    // Check if changes were made
-    const hasChanges = JSON.stringify(workOrder) !== JSON.stringify(originalWorkOrder) || 
-                      yamlChanged[ConfigSection.INTENT] || 
-                      yamlChanged[ConfigSection.SYSTEM];
-                      
-    if (hasChanges) {
-      setConfirmDiscard(true);
-    } else if (onClose) {
-      onClose();
-    } else {
-      navigate('/workorders');
+  const validateWorkOrder = (): boolean => {
+    if (!workOrder) {
+      setError("No work order to save");
+      return false;
     }
-  };
 
-  const handleConfirmDiscard = (): void => {
-    setConfirmDiscard(false);
-    if (onClose) {
-      onClose();
-    } else {
-      navigate('/workorders');
+    if (!workOrder.id.trim()) {
+      setError("Work order ID is required");
+      return false;
     }
+
+    if (!workOrder.metadata.author.trim()) {
+      setError("Author is required");
+      return false;
+    }
+
+    if (workOrder.metadata.due_date === '') {
+      workOrder.metadata.due_date = null;
+    }
+    
+    return true;
   };
 
-  const handleCancelDiscard = (): void => {
-    setConfirmDiscard(false);
-  };
-
-  const handleCloseNotification = (): void => {
-    setError(null);
-    setSaved(false);
-  };
-
-  // Fallback loading UI
   if (loading && !workOrder) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -567,7 +577,6 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
     );
   }
 
-  // Fallback for missing workOrder
   if (!workOrder) {
     return (
       <Box sx={{ p: 3 }}>
@@ -613,7 +622,23 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
             <Button 
               variant="outlined" 
               color="secondary" 
-              onClick={handleArchiveToggle} 
+              onClick={async () => {
+                if (!workOrder || !id) return;
+                setLoading(true);
+                try {
+                  const isArchived = workOrder.metadata.archived || false;
+                  if (isArchived) {
+                    await unarchiveWorkOrder(id);
+                  } else {
+                    await archiveWorkOrder(id);
+                  }
+                  await loadWorkOrder(id);
+                } catch (err) {
+                  setError(`Failed to ${workOrder.metadata.archived ? 'unarchive' : 'archive'} work order: ${err instanceof Error ? err.message : String(err)}`);
+                } finally {
+                  setLoading(false);
+                }
+              }} 
               disabled={loading}
             >
               {workOrder.metadata.archived ? 'Unarchive' : 'Archive'}
@@ -628,7 +653,7 @@ export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = ({
         fullWidth
         value={workOrder.id}
         onChange={(e) => setWorkOrder({ ...workOrder, id: e.target.value })}
-        disabled={!!id} // Disable if editing existing
+        disabled={!!id}
         margin="normal"
         variant="outlined"
         helperText="Unique identifier for this work order"
