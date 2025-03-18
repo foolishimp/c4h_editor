@@ -36,6 +36,9 @@ const ConfigEditor = lazy(() => import('configEditor/ConfigEditor').catch(err =>
       <Typography variant="body1">
         Please ensure the config-editor service is running on port 3001.
       </Typography>
+      <Typography variant="body2" color="textSecondary" sx={{ mt: 2, mb: 2 }}>
+        Error details: {err?.message || 'Unknown error'}
+      </Typography>
       <Button 
         variant="contained" 
         onClick={() => window.location.reload()} 
@@ -83,6 +86,48 @@ const Loading = () => (
   </Box>
 );
 
+// Set up custom error boundary to handle MF errors
+class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: {children: React.ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("Error in component:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Typography variant="h5" color="error" gutterBottom>
+            Something went wrong
+          </Typography>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            There was an error loading the component
+          </Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+            {this.state.error?.toString()}
+          </Typography>
+          <Button 
+            variant="contained" 
+            onClick={() => window.location.reload()}
+          >
+            Reload Page
+          </Button>
+        </Box>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Main App component
 function App() {
   // Use our event bus hook to set up event listeners
@@ -128,14 +173,18 @@ function App() {
               
               {/* WorkOrder editor routes - using remote microfrontend */}
               <Route path="/workorders/new" element={
-                <Suspense fallback={<Loading />}>
-                  <ConfigEditor />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<Loading />}>
+                    <ConfigEditor />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="/workorders/:id" element={
-                <Suspense fallback={<Loading />}>
-                  <ConfigEditor />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<Loading />}>
+                    <ConfigEditor />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               
               {/* Job routes */}

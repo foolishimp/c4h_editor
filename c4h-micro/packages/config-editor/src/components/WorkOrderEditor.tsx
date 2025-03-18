@@ -1,11 +1,10 @@
 // File: packages/config-editor/src/components/WorkOrderEditor.tsx
 /**
  * Streamlined WorkOrderEditor component that uses YAML as the primary editing interface.
- * Removes all technical debt and complexity from the previous implementation.
+ * Handles Router context gracefully for Module Federation.
  */
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, TextField, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions,
@@ -14,10 +13,23 @@ import {
 
 import { useWorkOrderContext } from '../contexts/WorkOrderContext';
 import { useWorkOrderApi } from '../hooks/useWorkOrderApi';
-// Import the entire module to access the submitJob function
 import useJobApi from '../hooks/useJobApi';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YamlEditor } from './YAMLEditor';
+
+// Create a custom hook that safely uses the router hooks
+const useSafeNavigate = () => {
+  // This is a safe navigation function that works both with and without Router context
+  const navigate = (path: string) => {
+    console.log(`Navigation requested to: ${path}`);
+    // Try to use window.location if available
+    if (typeof window !== 'undefined') {
+      window.location.href = path;
+    }
+  };
+
+  return navigate;
+};
 
 export interface WorkOrderEditorProps {
   workOrderId?: string;
@@ -31,12 +43,11 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   onSave,
   onClose
 }) => {
-  // Router params
-  const params = useParams<Record<string, string | undefined>>();
-  const navigate = useNavigate();
+  // Use our safe navigate function instead of useNavigate
+  const navigate = useSafeNavigate();
   
-  // Get the ID either from props or from URL params
-  const id = workOrderId || params.id;
+  // Get the ID from props
+  const id = workOrderId;
   
   // State management from context
   const {
@@ -62,7 +73,6 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   
   // Additional API hooks
   const { archiveWorkOrder, unarchiveWorkOrder, getWorkOrderHistory } = useWorkOrderApi();
-  // Use the useJobApi hook with proper typing
   const { submitJob } = useJobApi();
 
   // Load work order on component mount or workOrderId change
@@ -289,7 +299,6 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
 };
 
 // Wrapper component that simply returns the content
-// WorkOrderProvider is not needed here as it's already provided in ConfigEditor.tsx
 export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = (props) => {
   return <WorkOrderEditorContent {...props} />;
 };

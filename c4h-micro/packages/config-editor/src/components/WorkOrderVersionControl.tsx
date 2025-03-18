@@ -131,7 +131,7 @@ export const WorkOrderVersionControl: React.FC<WorkOrderVersionControlProps> = (
                       {version.message}
                     </Typography>
                     <Typography variant="caption" display="block">
-                      By {version.author}, <TimeAgo timestamp={version.created_at} />
+                      By {version.author}, <TimeAgo timestamp={version.created_at} typography={false} />
                     </Typography>
                   </>
                 }
