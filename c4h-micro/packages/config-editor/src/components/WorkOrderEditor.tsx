@@ -1,9 +1,5 @@
-// File: c4h-editor-micro/packages/config-editor/src/components/WorkOrderEditor.tsx
-// Migrated from original frontend
-
+// File: packages/config-editor/src/components/WorkOrderEditor.tsx
 /**
- * File: frontend/src/components/WorkOrderEditor/WorkOrderEditor.tsx
- * 
  * Streamlined WorkOrderEditor component that uses YAML as the primary editing interface.
  * Removes all technical debt and complexity from the previous implementation.
  */
@@ -16,9 +12,10 @@ import {
   Snackbar, Alert, Paper
 } from '@mui/material';
 
-import { useWorkOrderContext, WorkOrderProvider } from '../contexts/WorkOrderContext';;
-import { useWorkOrderApi } from '../hooks/useWorkOrderApi';;
-import { useJobApi } from '../hooks/useJobApi';;
+import { useWorkOrderContext } from '../contexts/WorkOrderContext';
+import { useWorkOrderApi } from '../hooks/useWorkOrderApi';
+// Import the entire module to access the submitJob function
+import useJobApi from '../hooks/useJobApi';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YamlEditor } from './YAMLEditor';
 
@@ -35,7 +32,7 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   onClose
 }) => {
   // Router params
-  const params = useParams<{ id?: string }>();
+  const params = useParams<Record<string, string | undefined>>();
   const navigate = useNavigate();
   
   // Get the ID either from props or from URL params
@@ -65,6 +62,7 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   
   // Additional API hooks
   const { archiveWorkOrder, unarchiveWorkOrder, getWorkOrderHistory } = useWorkOrderApi();
+  // Use the useJobApi hook with proper typing
   const { submitJob } = useJobApi();
 
   // Load work order on component mount or workOrderId change
@@ -290,13 +288,10 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   );
 };
 
-// Wrapper component that provides the context
+// Wrapper component that simply returns the content
+// WorkOrderProvider is not needed here as it's already provided in ConfigEditor.tsx
 export const WorkOrderEditor: React.FC<WorkOrderEditorProps> = (props) => {
-  return (
-    <WorkOrderProvider>
-      <WorkOrderEditorContent {...props} />
-    </WorkOrderProvider>
-  );
+  return <WorkOrderEditorContent {...props} />;
 };
 
 export default WorkOrderEditor;

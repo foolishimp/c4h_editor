@@ -1,7 +1,4 @@
-// File: c4h-editor-micro/packages/config-editor/src/hooks/useJobApi.ts
-// Migrated from original frontend
-
-// File: frontend/src/hooks/useJobApi.ts
+// File: packages/config-editor/src/hooks/useJobApi.ts
 /**
  * Custom hook for interacting with the Job API
  * Provides methods for job management including submission, polling, and cancellation
@@ -9,8 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Job } from 'shared';;
-import api, { API_ENDPOINTS } from 'shared';;
+import { Job, api, API_ENDPOINTS } from 'shared';
 
 export interface JobSubmitRequest {
   workOrderId: string;
@@ -18,7 +14,20 @@ export interface JobSubmitRequest {
   configuration?: Record<string, any>;
 }
 
-export const useJobApi = () => {
+export interface JobApiHook {
+  jobs: Job[];
+  job: Job | null;
+  loading: boolean;
+  error: Error | null;
+  fetchJobs: () => Promise<Job[]>;
+  fetchJob: (id: string) => Promise<Job | null>;
+  submitJob: (data: JobSubmitRequest) => Promise<any>;
+  cancelJob: (id: string) => Promise<any>;
+  pollJobStatus: (id: string) => Promise<any>;
+  getJobLogs: (jobId: string) => Promise<any>;
+}
+
+export const useJobApi = (): JobApiHook => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -174,7 +183,7 @@ export const useJobApi = () => {
 
   const getJobLogs = useCallback(async (jobId: string) => {
     try {
-      const response = await api.get(API_ENDPOINTS.JOB(jobId) + '/logs');
+      const response = await api.get(`${API_ENDPOINTS.JOB(jobId)}/logs`);
       return response.data;
     } catch (err) {
       console.error('Error getting job logs:', err);

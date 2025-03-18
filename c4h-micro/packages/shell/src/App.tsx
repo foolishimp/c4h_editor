@@ -3,8 +3,8 @@
  * Main App component for the shell application
  * Orchestrates all microfrontends and handles routing
  */
-import React, { lazy, Suspense } from 'react';
-import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
+import React, { lazy, Suspense, useEffect } from 'react';
+import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography, Button } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -13,13 +13,38 @@ import WorkOrderList from './components/WorkOrderList/WorkOrderList';
 import JobsList from './components/JobsList/JobsList';
 import { JobDetails } from './components/JobDetails/JobDetails';
 
-// Import the useEventBus hook instead of the HOC
+// Import the useEventBus hook
 import { useEventBus } from './utils/eventListener';
 
 // Lazy load the ConfigEditor from remote
 const ConfigEditor = lazy(() => import('configEditor/ConfigEditor').catch(err => {
   console.error("Failed to load ConfigEditor microfrontend:", err);
-  return { default: () => <div>Failed to load ConfigEditor component</div> };
+  // Return a fallback component
+  return { default: () => (
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        height: '70vh' 
+      }}
+    >
+      <Typography variant="h5" color="error" gutterBottom>
+        Failed to load Config Editor
+      </Typography>
+      <Typography variant="body1">
+        Please ensure the config-editor service is running on port 3001.
+      </Typography>
+      <Button 
+        variant="contained" 
+        onClick={() => window.location.reload()} 
+        sx={{ mt: 2 }}
+      >
+        Retry
+      </Button>
+    </Box>
+  ) };
 }));
 
 // Create theme
@@ -82,6 +107,11 @@ function App() {
     console.log('Refresh jobs');
     // Implementation will be handled by JobsList component
   };
+
+  // Add debugging for module federation
+  useEffect(() => {
+    console.log('Attempting to load ConfigEditor module...');
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>

@@ -1,4 +1,4 @@
-// File: packages/shell/src/hooks/useWorkOrderApi.ts
+// File: packages/config-editor/src/hooks/useWorkOrderApi.ts
 /**
  * Custom hook for interacting with the WorkOrder API
  * Provides methods for CRUD operations on work orders
@@ -6,8 +6,7 @@
 
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { WorkOrder } from 'shared';
-import { api } from '@/config/api';
+import { WorkOrder, api, API_ENDPOINTS } from 'shared';
 
 export const useWorkOrderApi = () => {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -32,7 +31,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/api/v1/workorders');
+      const response = await api.get(API_ENDPOINTS.WORKORDERS);
       setWorkOrders(response.data);
       return response.data;
     } catch (err) {
@@ -43,13 +42,12 @@ export const useWorkOrderApi = () => {
     }
   }, []);
 
-  // Rest of the code remains the same...
   // Fetch a single workorder by ID
   const fetchWorkOrder = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(`/api/v1/workorders/${id}`);
+      const response = await api.get(API_ENDPOINTS.WORKORDER(id));
       setWorkOrder(response.data);
       return response.data;
     } catch (err) {
@@ -74,7 +72,7 @@ export const useWorkOrderApi = () => {
         author: workOrder.metadata.author || "system"
       };
       
-      const response = await api.post('/api/v1/workorders', requestData);
+      const response = await api.post(API_ENDPOINTS.WORKORDERS, requestData);
       
       // Update the local state with the response
       if (response.data) {
@@ -114,7 +112,7 @@ export const useWorkOrderApi = () => {
       console.log("Sending update request:", JSON.stringify(requestData));
       
       try {
-        const response = await api.put(`/api/v1/workorders/${workOrder.id}`, requestData);
+        const response = await api.put(`${API_ENDPOINTS.WORKORDER(workOrder.id)}`, requestData);
         
         // Update the local state with the response
         if (response.data) {
@@ -139,7 +137,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      await api.delete(`/api/v1/workorders/${id}?commit_message=Deleted&author=system`);
+      await api.delete(`${API_ENDPOINTS.WORKORDER(id)}?commit_message=Deleted&author=system`);
       return true;
     } catch (err) {
       setError(err as Error);
@@ -154,7 +152,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post(`/api/v1/workorders/${id}/archive`);
+      const response = await api.post(API_ENDPOINTS.WORKORDER_ARCHIVE(id));
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -169,7 +167,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post(`/api/v1/workorders/${id}/unarchive`);
+      const response = await api.post(API_ENDPOINTS.WORKORDER_UNARCHIVE(id));
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -184,7 +182,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post(`/api/v1/workorders/${id}/clone`, { new_id: newId });
+      const response = await api.post(API_ENDPOINTS.WORKORDER_CLONE(id), { new_id: newId });
       const clonedId = response.data.id;
       
       // Only navigate if we have a valid navigate function (inside Router context)
@@ -206,7 +204,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(`/api/v1/workorders/${id}/history`);
+      const response = await api.get(API_ENDPOINTS.WORKORDER_HISTORY(id));
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -221,7 +219,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post(`/api/v1/workorders/${id}/test`, { parameters });
+      const response = await api.post(API_ENDPOINTS.WORKORDER_TEST(id), { parameters });
       return response.data;
     } catch (err) {
       setError(err as Error);
@@ -236,7 +234,7 @@ export const useWorkOrderApi = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post(`/api/v1/workorders/${id}/render`, parameters);
+      const response = await api.post(API_ENDPOINTS.WORKORDER_RENDER(id), parameters);
       return response.data;
     } catch (err) {
       setError(err as Error);

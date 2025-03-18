@@ -10,8 +10,8 @@ import WorkOrderEditor from './components/WorkOrderEditor';
 
 // Main component exported for Module Federation
 const ConfigEditor: React.FC = () => {
-  // Get workOrderId from URL params
-  const { id } = useParams<{ id?: string }>();
+  // Use string Record type to match react-router-dom's useParams constraint
+  const { id } = useParams<Record<string, string | undefined>>();
   
   return (
     <WorkOrderProvider>
