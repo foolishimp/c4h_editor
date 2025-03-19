@@ -11,7 +11,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
 import { WorkOrder, eventBus } from 'shared';
-import { useWorkOrderApi } from '../hooks/useWorkOrderApi';
+import { apiService } from 'shared';
 
 // Context state interface
 interface WorkOrderContextState {

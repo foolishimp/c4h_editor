@@ -7,14 +7,49 @@ import {
   Toolbar,
   Typography,
   Box,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Tooltip
 } from '@mui/material';
-import ConfigTypeSidebar from './ConfigTypeSidebar';
+import { 
+  Description as DescriptionIcon,
+  Group as GroupIcon,
+  Settings as SettingsIcon,
+  Work as WorkIcon,
+  Add as AddIcon 
+} from '@mui/icons-material';
+import { configTypes } from 'shared';
 
 interface NavigationProps {
   drawerWidth: number;
 }
 
 const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
+  const location = useLocation();
+  
+  // Function to determine if a path is active
+  const isActive = (path: string): boolean => {
+    return location.pathname.startsWith(path);
+  };
+  
+  // Function to get an icon for a config type
+  const getConfigTypeIcon = (configType: string) => {
+    switch (configType) {
+      case 'workorder':
+        return <DescriptionIcon />;
+      case 'teamconfig':
+        return <GroupIcon />;
+      case 'runtimeconfig':
+        return <SettingsIcon />;
+      default:
+        return <DescriptionIcon />;
+    }
+  };
+  
   return (
     <>
       {/* App Bar */}
@@ -45,7 +80,64 @@ const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
           },
         }}
       >
-        <ConfigTypeSidebar drawerWidth={drawerWidth} />
+        <Box
+          sx={{
+            width: drawerWidth,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: drawerWidth,
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          <List>
+            {/* Config type navigation */}
+            {Object.entries(configTypes).map(([type, config]) => (
+              <ListItem key={type} disablePadding>
+                <ListItemButton
+                  component={RouterLink}
+                  to={`/configs/${type}`}
+                  selected={isActive(`/configs/${type}`)}
+                >
+                  <ListItemIcon>
+                    {getConfigTypeIcon(type)}
+                  </ListItemIcon>
+                  <ListItemText primary={config.name} />
+                </ListItemButton>
+              </ListItem>
+            ))}
+            
+            {/* Add new config dropdown */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={RouterLink}
+                to="/configs/create"
+                selected={isActive('/configs/create')}
+              >
+                <ListItemIcon>
+                  <AddIcon />
+                </ListItemIcon>
+                <ListItemText primary="Create New" />
+              </ListItemButton>
+            </ListItem>
+            
+            <Divider sx={{ my: 1 }} />
+            
+            {/* Jobs navigation */}
+            <ListItem disablePadding>
+              <ListItemButton
+                component={RouterLink}
+                to="/jobs"
+                selected={isActive('/jobs')}
+              >
+                <ListItemIcon>
+                  <WorkIcon />
+                </ListItemIcon>
+                <ListItemText primary="Jobs" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </Box>
       </Drawer>
     </>
   );

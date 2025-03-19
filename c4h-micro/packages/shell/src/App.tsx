@@ -5,34 +5,8 @@ import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import Navigation from './components/common/Navigation';
+import { RemoteComponent } from 'shared';
 import ConfigTypeSelector from './components/create/ConfigTypeSelector';
-import RemoteComponent from './utils/RemoteComponent';
-import { remotes } from 'shared';
-
-// Legacy components (for backward compatibility)
-import WorkOrderList from './components/WorkOrderList/WorkOrderList';
-
-// Lazy load remote components
-const ConfigEditor = lazy(() => 
-  import('configEditor/ConfigEditor').catch(err => {
-    console.error("Failed to load ConfigEditor microfrontend:", err);
-    return { default: () => <div>Failed to load ConfigEditor</div> };
-  })
-);
-
-const ConfigManager = lazy(() => 
-  import('configSelector/ConfigManager').catch(err => {
-    console.error("Failed to load ConfigSelector microfrontend:", err);
-    return { default: () => <div>Failed to load ConfigSelector</div> };
-  })
-);
-
-const JobManager = lazy(() => 
-  import('jobManagement/JobManager').catch(err => {
-    console.error("Failed to load JobManager microfrontend:", err);
-    return { default: () => <div>Failed to load JobManager</div> };
-  })
-);
 
 // Create theme
 const theme = createTheme({
@@ -111,26 +85,60 @@ function App() {
       <Router>
         <Box sx={{ display: 'flex' }}>
           <Navigation drawerWidth={drawerWidth} />
-          <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8 }}>
+          <Box component="main" sx={{ flexGrow: 1, p: 3, mt: 8, ml: `${drawerWidth}px` }}>
             <ErrorBoundary>
               <Suspense fallback={<Loading />}>
                 <Routes>
-                  {/* New routes for the config-driven approach */}
+                  {/* Home route redirects to configs */}
                   <Route path="/" element={<Navigate to="/configs/workorder" replace />} />
                   
                   {/* Config management routes */}
                   <Route path="/configs/create" element={<ConfigTypeSelector />} />
-                  <Route path="/configs/:configType" element={<ConfigManager />} />
-                  <Route path="/configs/:configType/:id" element={<ConfigManager />} />
+                  <Route 
+                    path="/configs/:configType" 
+                    element={
+                      <RemoteComponent
+                        url="http://localhost:3003/remoteEntry.js"
+                        scope="configSelector"
+                        module="./ConfigManager"
+                      />
+                    } 
+                  />
+                  <Route 
+                    path="/configs/:configType/:id" 
+                    element={
+                      <RemoteComponent
+                        url="http://localhost:3003/remoteEntry.js"
+                        scope="configSelector"
+                        module="./ConfigManager"
+                      />
+                    } 
+                  />
                   
                   {/* Job management routes */}
-                  <Route path="/jobs" element={<JobManager />} />
-                  <Route path="/jobs/:id" element={<JobManager />} />
+                  <Route 
+                    path="/jobs" 
+                    element={
+                      <RemoteComponent
+                        url="http://localhost:3004/remoteEntry.js"
+                        scope="jobManagement"
+                        module="./JobManager"
+                      />
+                    } 
+                  />
+                  <Route 
+                    path="/jobs/:id" 
+                    element={
+                      <RemoteComponent
+                        url="http://localhost:3004/remoteEntry.js"
+                        scope="jobManagement"
+                        module="./JobManager"
+                      />
+                    } 
+                  />
                   
-                  {/* Legacy routes for backward compatibility */}
-                  <Route path="/workorders" element={<WorkOrderList />} />
-                  <Route path="/workorders/new" element={<ConfigEditor />} />
-                  <Route path="/workorders/:id" element={<ConfigEditor />} />
+                  {/* Fallback for unknown routes */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>
             </ErrorBoundary>

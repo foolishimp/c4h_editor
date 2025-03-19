@@ -12,8 +12,8 @@ import {
 } from '@mui/material';
 
 import { useWorkOrderContext } from '../contexts/WorkOrderContext';
-import { useWorkOrderApi } from '../hooks/useWorkOrderApi';
-import useJobApi from '../hooks/useJobApi';
+import { apiService } from 'shared';
+import { apiService } from 'shared';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YamlEditor } from './YAMLEditor';
 

@@ -1,4 +1,4 @@
-// File: packages/shell/src/utils/RemoteComponent.tsx
+// File: packages/shared/src/components/RemoteComponent.tsx
 import React from 'react';
 import { CircularProgress, Typography, Box } from '@mui/material';
 
@@ -10,7 +10,11 @@ interface RemoteComponentProps {
   fallback?: React.ReactNode;
 }
 
-class RemoteComponent extends React.Component<RemoteComponentProps, { loading: boolean, error: string | null, Component: React.ComponentType<any> | null }> {
+class RemoteComponent extends React.Component<RemoteComponentProps, { 
+  loading: boolean, 
+  error: string | null, 
+  Component: React.ComponentType<any> | null 
+}> {
   constructor(props: RemoteComponentProps) {
     super(props);
     this.state = {
@@ -24,6 +28,15 @@ class RemoteComponent extends React.Component<RemoteComponentProps, { loading: b
     this.loadComponent();
   }
 
+  componentDidUpdate(prevProps: RemoteComponentProps) {
+    // Reload component if any of these props change
+    if (prevProps.url !== this.props.url || 
+        prevProps.scope !== this.props.scope || 
+        prevProps.module !== this.props.module) {
+      this.setState({ loading: true, Component: null }, this.loadComponent);
+    }
+  }
+
   async loadComponent() {
     const { url, scope, module } = this.props;
     
@@ -33,17 +46,19 @@ class RemoteComponent extends React.Component<RemoteComponentProps, { loading: b
       if (!container) {
         // Load the remote container
         await new Promise<void>((resolve, reject) => {
+          console.log(`Loading remote module ${scope} from ${url}`);
           const script = document.createElement('script');
           script.src = url;
           script.type = 'text/javascript';
           script.async = true;
 
           script.onload = () => {
+            console.log(`Successfully loaded ${scope}`);
             resolve();
           };
 
-          script.onerror = () => {
-            reject(new Error(`Failed to load remote module: ${url}`));
+          script.onerror = (event) => {
+            reject(new Error(`Failed to load remote module: ${url}, error: ${event}`));
           };
 
           document.head.appendChild(script);
@@ -61,14 +76,14 @@ class RemoteComponent extends React.Component<RemoteComponentProps, { loading: b
       
       this.setState({
         loading: false,
-        Component: Module.default
+        Component: Module.default || Module
       });
     } catch (error) {
+      console.error('Error loading remote component:', error);
       this.setState({
         loading: false,
         error: error instanceof Error ? error.message : 'Failed to load component'
       });
-      console.error('Error loading remote component:', error);
     }
   }
 

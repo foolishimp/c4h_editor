@@ -11,6 +11,11 @@ export interface ConfigMetadata {
   description?: string;
   tags: string[];
   version: string;
+  goal?: string;
+  priority?: string;
+  due_date?: string | null;
+  assignee?: string;
+  asset?: string;
 }
 
 export interface ConfigVersionInfo {
@@ -36,7 +41,7 @@ export interface ConfigHistoryResponse {
   versions: ConfigVersionInfo[];
 }
 
-// Export editor tab types for backward compatibility
+// WorkOrder specific types for backward compatibility
 export enum EditorTab {
   INTENT = 'intent',
   SYSTEM = 'system'
@@ -59,15 +64,50 @@ export enum ConfigSection {
   LOGGING = 'logging'
 }
 
-// Maps UI tabs to specific config sections they edit (backward compatibility)
-export const TAB_SECTIONS: Record<EditorTab, ConfigSection[]> = {
-  [EditorTab.INTENT]: [ConfigSection.INTENT],
-  [EditorTab.SYSTEM]: [
-    ConfigSection.PROJECT,
-    ConfigSection.LLM_CONFIG,
-    ConfigSection.ORCHESTRATION,
-    ConfigSection.RUNTIME,
-    ConfigSection.BACKUP,
-    ConfigSection.LOGGING
-  ]
-};
+// TeamConfig specific types
+export interface LLMConfig {
+  providers: ProviderConfig[];
+  default_provider: string;
+  default_model: string;
+}
+
+export interface ProviderConfig {
+  name: string;
+  api_key?: string;
+  models: string[];
+  endpoint?: string;
+}
+
+export interface OrchestrationConfig {
+  enabled: boolean;
+  teams: TeamDefinition[];
+}
+
+export interface TeamDefinition {
+  name: string;
+  agents: AgentConfig[];
+}
+
+export interface AgentConfig {
+  name: string;
+  role: string;
+  model: string;
+  provider: string;
+}
+
+// RuntimeConfig specific types
+export interface LineageConfig {
+  enabled: boolean;
+  namespace: string;
+}
+
+export interface LoggingConfig {
+  level: 'debug' | 'info' | 'warning' | 'error';
+  format: 'json' | 'text';
+  agent_level?: 'debug' | 'info' | 'warning' | 'error';
+}
+
+export interface BackupConfig {
+  enabled: boolean;
+  path: string;
+}

@@ -1,7 +1,4 @@
-// File: c4h-editor-micro/packages/shared/src/components/TimeAgo.tsx
-// Migrated from original frontend
-
-// File: frontend/src/components/common/TimeAgo.tsx
+// File: packages/shared/src/components/TimeAgo.tsx
 import React from 'react';
 import { Tooltip, Typography } from '@mui/material';
 import { formatDistanceToNow } from 'date-fns';
@@ -13,14 +10,12 @@ interface TimeAgoProps {
   variant?: 'body1' | 'body2' | 'caption';
 }
 
-// TimeAgo component that shows relative time with full timestamp on hover
 const TimeAgo: React.FC<TimeAgoProps> = ({ 
   timestamp, 
-  date, // Support both prop names for backward compatibility
+  date,
   typography = true, 
   variant = 'body2' 
 }) => {
-  // Use either timestamp or date prop
   const dateString = timestamp || date;
   
   if (!dateString) {
@@ -30,7 +25,6 @@ const TimeAgo: React.FC<TimeAgoProps> = ({
   try {
     const dateObj = new Date(dateString);
     
-    // Check if date is valid
     if (isNaN(dateObj.getTime())) {
       console.error(`Invalid date: ${dateString}`);
       return null;

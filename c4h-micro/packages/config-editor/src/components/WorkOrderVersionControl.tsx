@@ -18,8 +18,8 @@ import {
 import RestoreIcon from '@mui/icons-material/Restore';
 import CompareIcon from '@mui/icons-material/Compare';
 import { WorkOrderVersionInfo } from 'shared';
-import DiffViewer from '../common/DiffViewer';
-import TimeAgo from '../common/TimeAgo';
+import { DiffViewer } from 'shared';
+import { TimeAgo } from 'shared';
 
 interface WorkOrderVersionControlProps {
   workOrderId: string;
