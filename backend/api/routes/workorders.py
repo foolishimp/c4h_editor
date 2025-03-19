@@ -1,3 +1,13 @@
+# File: backend/api/routes/workorders.py
+"""
+Legacy API routes for workorder management.
+These routes are maintained for backward compatibility but will be 
+deprecated in favor of the generic config routes.
+
+WARNING: This file contains legacy code. New features should use 
+the generic config API in backend/api/routes/configs.py.
+"""
+
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import time
@@ -6,9 +16,10 @@ import traceback
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks
 from pydantic import BaseModel, ValidationError
 
-# Fix imports to use absolute paths instead of relative paths
-from backend.models.workorder import WorkOrder, WorkOrderVersion, WorkOrderTestCase, WorkOrderTemplate, WorkOrderMetadata, WorkOrderConfig, WorkOrderParameter
-from backend.services.workorder_repository import WorkOrderRepository
+# Use the new workorder repository
+from backend.models.workorder import WorkOrder, WorkOrderVersion, WorkOrderTestCase
+from backend.models.workorder import WorkOrderTemplate, WorkOrderMetadata, WorkOrderConfig, WorkOrderParameter
+from backend.services.workorder_repository_v2 import WorkOrderRepository
 from backend.services.lineage_tracker import LineageTracker
 from backend.services.llm_service import LLMService, ModelResponse
 from backend.dependencies import get_workorder_repository, get_lineage_tracker, get_llm_service
@@ -18,6 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Create the router object
 router = APIRouter(prefix="/api/v1/workorders", tags=["workorders"])
+
+# Log deprecation warning
+logger.warning("Using deprecated workorders routes. Consider migrating to the generic config API.")
 
 # Request/Response Models
 class WorkOrderCreateRequest(BaseModel):
@@ -125,7 +139,8 @@ async def create_workorder(
         try:
             workorder = WorkOrder(
                 id=request.id,
-                template=template,
+                config_type="workorder",  # Set the config_type for compatibility
+                content={"template": template.dict()},  # Wrap in content for new format
                 metadata=metadata
             )
         except ValidationError as e:
@@ -145,10 +160,11 @@ async def create_workorder(
         # Log success
         logger.info(f"Successfully created workorder with ID: {workorder.id}")
         
+        # Format response to maintain backward compatibility
         return WorkOrderResponse(
             id=created_workorder.id,
             version=created_workorder.metadata.version,
-            template=created_workorder.template.dict(),
+            template=created_workorder.content.get("template", {}),
             metadata=created_workorder.metadata.dict(),
             commit=commit,
             updated_at=created_workorder.metadata.updated_at

@@ -6,9 +6,10 @@ Dependency injection functions for FastAPI endpoints.
 from fastapi import Depends
 from pathlib import Path
 from typing import Dict, Optional
+import logging
 
 # Import services
-from backend.services.config_repository import ConfigRepository, get_config_repository
+from backend.services.config_repository import ConfigRepository
 from backend.services.workorder_repository_v2 import WorkOrderRepository
 from backend.services.teamconfig_repository import TeamConfigRepository
 from backend.services.runtimeconfig_repository import RuntimeConfigRepository
@@ -18,6 +19,9 @@ from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config.config_types import get_config_types
 
+# Configure logger
+logger = logging.getLogger(__name__)
+
 # Singleton instances
 _repositories = {}
 _lineage_tracker = None
@@ -25,7 +29,7 @@ _llm_service = None
 _job_repository = None
 _c4h_service = None
 
-def get_config_repository_instance(config_type: str) -> ConfigRepository:
+def get_config_repository(config_type: str) -> ConfigRepository:
     """Get or create a configuration repository instance."""
     global _repositories
     
@@ -37,28 +41,33 @@ def get_config_repository_instance(config_type: str) -> ConfigRepository:
             
             if config_type == "workorder":
                 _repositories[config_type] = WorkOrderRepository(str(path))
+                logger.info(f"Created WorkOrderRepository at {path}")
             elif config_type == "teamconfig":
                 _repositories[config_type] = TeamConfigRepository(str(path))
+                logger.info(f"Created TeamConfigRepository at {path}")
             elif config_type == "runtimeconfig":
                 _repositories[config_type] = RuntimeConfigRepository(str(path))
+                logger.info(f"Created RuntimeConfigRepository at {path}")
             else:
                 _repositories[config_type] = ConfigRepository(config_type, str(path))
+                logger.info(f"Created generic ConfigRepository for {config_type} at {path}")
         else:
             _repositories[config_type] = ConfigRepository(config_type)
+            logger.info(f"Created generic ConfigRepository for {config_type} with default path")
             
     return _repositories[config_type]
 
 def get_workorder_repository():
     """Get or create a workorder repository instance."""
-    return get_config_repository_instance("workorder")
+    return get_config_repository("workorder")
 
 def get_teamconfig_repository():
     """Get or create a team config repository instance."""
-    return get_config_repository_instance("teamconfig")
+    return get_config_repository("teamconfig")
 
 def get_runtimeconfig_repository():
     """Get or create a runtime config repository instance."""
-    return get_config_repository_instance("runtimeconfig")
+    return get_config_repository("runtimeconfig")
 
 def get_lineage_tracker():
     """Get or create a lineage tracker instance."""
@@ -67,6 +76,7 @@ def get_lineage_tracker():
         lineage_path = Path("./data/lineage")
         lineage_path.parent.mkdir(exist_ok=True)
         _lineage_tracker = LineageTracker(str(lineage_path))
+        logger.info(f"Created LineageTracker at {lineage_path}")
     return _lineage_tracker
 
 def get_llm_service():
@@ -77,8 +87,10 @@ def get_llm_service():
         config_path = Path("./config.yaml")
         if config_path.exists():
             _llm_service = LLMService(str(config_path))
+            logger.info(f"Created LLMService with config from {config_path}")
         else:
             _llm_service = LLMService()
+            logger.info("Created LLMService with default config")
     return _llm_service
 
 def get_job_repository():
@@ -88,6 +100,7 @@ def get_job_repository():
         job_path = Path("./data/jobs")
         job_path.parent.mkdir(exist_ok=True)
         _job_repository = JobRepository(str(job_path))
+        logger.info(f"Created JobRepository at {job_path}")
     return _job_repository
 
 def get_c4h_service():
@@ -98,6 +111,8 @@ def get_c4h_service():
         config_path = Path("./config.yaml")
         if config_path.exists():
             _c4h_service = C4HService(str(config_path))
+            logger.info(f"Created C4HService with config from {config_path}")
         else:
             _c4h_service = C4HService()
+            logger.info("Created C4HService with default config")
     return _c4h_service

@@ -1,7 +1,7 @@
 # File: backend/services/llm_service.py
 """
 Service for interacting with Language Model providers.
-Follows the Agent Design Principles with minimal processing and clear responsibility.
+This service is used for testing configurations by sending prompts to LLM providers.
 """
 
 import os
@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List
 import httpx
 from pydantic import BaseModel
 
-# Load configuration
+# Fix import to use the correct path
 from backend.config import load_config
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,9 @@ class LLMService:
     """
     Service for interacting with Language Model providers.
     Supports Anthropic and OpenAI providers.
+    
+    This service is used for testing configuration templates by rendering
+    them and sending them to LLM providers for evaluation.
     """
     
     def __init__(self, config_path: Optional[str] = None):
@@ -41,11 +44,11 @@ class LLMService:
             config_path: Path to configuration file
         """
         self.config = load_config(config_path)
-        self.llm_config = self.config.get("llm_config", {})
+        self.llm_config = self.config.get("llm", {})
         
         # Default provider and model
-        self.default_provider = self.llm_config.get("default_provider", "anthropic")
-        self.default_model = self.llm_config.get("default_model", "claude-3-opus-20240229")
+        self.default_provider = self.llm_config.get("provider", "anthropic")
+        self.default_model = self.llm_config.get("model", "claude-3-opus-20240229")
         
         # Initialize HTTP client
         self.http_client = httpx.AsyncClient(timeout=60.0)
@@ -72,21 +75,15 @@ class LLMService:
             Model response
         """
         # Get API key from environment
-        api_key = os.environ.get(
-            self.llm_config.get("providers", {}).get("anthropic", {}).get("env_var", "ANTHROPIC_API_KEY")
-        )
+        api_key_env = self.llm_config.get("api_key_env", "ANTHROPIC_API_KEY")
+        api_key = os.environ.get(api_key_env)
         
         if not api_key:
-            logger.error("Anthropic API key not found in environment")
-            raise ValueError("Anthropic API key not found in environment")
-        
-        # Get API base URL
-        api_base = self.llm_config.get("providers", {}).get("anthropic", {}).get(
-            "api_base", "https://api.anthropic.com"
-        )
+            logger.error(f"Anthropic API key not found in environment variable: {api_key_env}")
+            raise ValueError(f"Anthropic API key not found in environment variable: {api_key_env}")
         
         # Prepare request
-        url = f"{api_base}/v1/messages"
+        url = "https://api.anthropic.com/v1/messages"
         
         headers = {
             "x-api-key": api_key,
@@ -152,22 +149,16 @@ class LLMService:
         Returns:
             Model response
         """
-        # Get API key from environment
-        api_key = os.environ.get(
-            self.llm_config.get("providers", {}).get("openai", {}).get("env_var", "OPENAI_API_KEY")
-        )
+        # Get API key from environment - check for dedicated OpenAI key config or fallback to general config
+        api_key_env = self.llm_config.get("openai_api_key_env", "OPENAI_API_KEY")
+        api_key = os.environ.get(api_key_env)
         
         if not api_key:
-            logger.error("OpenAI API key not found in environment")
-            raise ValueError("OpenAI API key not found in environment")
-        
-        # Get API base URL
-        api_base = self.llm_config.get("providers", {}).get("openai", {}).get(
-            "api_base", "https://api.openai.com/v1"
-        )
+            logger.error(f"OpenAI API key not found in environment variable: {api_key_env}")
+            raise ValueError(f"OpenAI API key not found in environment variable: {api_key_env}")
         
         # Prepare request
-        url = f"{api_base}/chat/completions"
+        url = "https://api.openai.com/v1/chat/completions"
         
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -237,11 +228,7 @@ class LLMService:
         """
         # Use default provider and model if not specified
         provider = provider or self.default_provider
-        
-        if not model:
-            # Get default model for provider
-            provider_config = self.llm_config.get("providers", {}).get(provider, {})
-            model = provider_config.get("default_model", self.default_model)
+        model = model or self.default_model
         
         # Call appropriate provider
         if provider == "anthropic":
