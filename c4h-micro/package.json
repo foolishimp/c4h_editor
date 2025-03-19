@@ -19,15 +19,20 @@
     "start:config-selector": "npm run start -w packages/config-selector",
     "build:config-selector": "npm run build -w packages/config-selector",
     "start:job-management": "npm run start -w packages/job-management",
-    "build:job-management": "npm run build -w packages/job-management"
+    "build:job-management": "npm run build -w packages/job-management",
+    "reset": "node scripts/reset-ports.js && rm -rf node_modules/.vite packages/*/node_modules/.vite",
+    "clean": "rm -rf node_modules/.vite packages/*/node_modules/.vite dist packages/*/dist",
+    "restart": "npm run clean && npm run reset && npm run build:shared && npm start",
+    "rebuild": "node scripts/rebuild-all.js",
+    "cleanup": "bash scripts/cleanup-redundant-files.sh"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
     "concurrently": "^8.2.2",
-    "glob": "^11.0.1",
+    "wait-on": "^7.2.0",
     "typescript": "^5.3.3",
-    "wait-on": "^7.2.0"
+    "glob": "^8.1.0"
   }
 }

@@ -44,7 +44,7 @@ const JobCreator: React.FC = () => {
           const response = await api.get(config.apiEndpoints.list);
           
           // Map response data to ConfigOption array
-          options[configType] = response.data.map((item: any) => ({
+          options[configType] = (response.data as any[]).map((item: any) => ({
             id: item.id,
             description: item.metadata?.description || 'No description'
           }));

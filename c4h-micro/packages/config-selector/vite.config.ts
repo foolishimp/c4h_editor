@@ -14,7 +14,7 @@ export default defineConfig({
         './ConfigManager': './src/ConfigManager.tsx',
       },
       remotes: {
-        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js'
+        yamlEditor: 'http://localhost:3002/remoteEntry.js'
       },
       shared: ['react', 'react-dom', 'shared']
     })
@@ -29,11 +29,21 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    modulePreload: false
+    modulePreload: false,
+    rollupOptions: {
+      output: {
+        format: 'esm',
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+      }
+    }
   },
   server: {
     port: 3003,
-    strictPort: true
+    strictPort: true,
+    hmr: {
+      timeout: 5000
+    }
   },
   preview: {
     port: 3003,

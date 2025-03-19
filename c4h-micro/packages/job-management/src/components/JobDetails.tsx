@@ -19,7 +19,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useJobContext } from '../contexts/JobContext';
 import { JobStatus } from 'shared';
-import TimeAgo from './TimeAgo';
+import { TimeAgo } from 'shared';
 
 interface JobDetailsProps {
   jobId: string;

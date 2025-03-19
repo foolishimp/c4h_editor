@@ -1,17 +1,7 @@
-// File: c4h-editor-micro/packages/config-editor/src/contexts/WorkOrderContext.tsx
-// Migrated from original frontend
-
-/**
- * File: frontend/src/contexts/WorkOrderContext.tsx
- * 
- * Clean WorkOrder context that uses YAML as the primary editing interface.
- * Completely removes dual editing approach and technical debt.
- */
-
+// File: packages/config-editor/src/contexts/WorkOrderContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { load as yamlLoad, dump as yamlDump } from 'js-yaml';
-import { WorkOrder, eventBus } from 'shared';
-import { apiService } from 'shared';
+import { WorkOrder, eventBus, apiService } from 'shared';
 
 // Context state interface
 interface WorkOrderContextState {
@@ -69,15 +59,6 @@ const emptyWorkOrder: WorkOrder = {
 
 // Provider component
 export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }) => {
-  // API hooks
-  const {
-    fetchWorkOrder,
-    updateWorkOrder,
-    createWorkOrder,
-    loading: apiLoading,
-    error: apiError,
-  } = useWorkOrderApi();
-  
   // Core state
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [originalWorkOrder, setOriginalWorkOrder] = useState<WorkOrder | null>(null);
@@ -115,10 +96,10 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
     setError(null);
     
     try {
-      const result = await fetchWorkOrder(id);
+      const result = await apiService.getConfig('workorder', id);
       
       if (result) {
-        setWorkOrder(result);
+        setWorkOrder(null);;
         // Deep clone to preserve original state
         setOriginalWorkOrder(JSON.parse(JSON.stringify(result)));
         // Reset YAML dirty state
@@ -131,7 +112,7 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
     } finally {
       setLoading(false);
     }
-  }, [fetchWorkOrder]);
+  }, []);
   
   // Create a new empty work order
   const createNewWorkOrder = useCallback(() => {
@@ -214,18 +195,18 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
         }
       };
       
-      let result;
+      let result: WorkOrder;
       
       if (originalWorkOrder && originalWorkOrder.id) {
         // Update existing work order
-        result = await updateWorkOrder(cleanWorkOrder);
+        result = await apiService.updateConfig('workorder', cleanWorkOrder.id, cleanWorkOrder) as WorkOrder;
       } else {
         // Create new work order
-        result = await createWorkOrder(cleanWorkOrder);
+        result = await apiService.createConfig('workorder', cleanWorkOrder) as WorkOrder;
       }
       
       if (result) {
-        setWorkOrder(result);
+        setWorkOrder(null);
 
         // Notify shell app about the save
         console.log('Publishing workorder:saved event', result);
@@ -244,7 +225,7 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
     } finally {
       setLoading(false);
     }
-  }, [yaml, yamlDirty, workOrder, originalWorkOrder, updateWorkOrder, createWorkOrder]);
+  }, [yaml, yamlDirty, workOrder, originalWorkOrder]);
   
   // Submit the work order as a job
   const submitWorkOrder = useCallback(async () => {
@@ -262,18 +243,6 @@ export const WorkOrderProvider: React.FC<WorkOrderProviderProps> = ({ children }
   const resetSavedState = useCallback(() => {
     setSaved(false);
   }, []);
-  
-  // Update error state from API errors
-  useEffect(() => {
-    if (apiError) {
-      setError(apiError.message);
-    }
-  }, [apiError]);
-  
-  // Combine local and API loading states
-  useEffect(() => {
-    setLoading(apiLoading || loading);
-  }, [apiLoading, loading]);
   
   // Context value
   const value: WorkOrderContextState = {

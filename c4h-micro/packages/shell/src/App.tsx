@@ -1,5 +1,5 @@
 // File: packages/shell/src/App.tsx
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';

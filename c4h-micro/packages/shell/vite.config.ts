@@ -10,10 +10,22 @@ export default defineConfig({
     federation({
       name: 'shell',
       remotes: {
-        configEditor: 'http://localhost:3001/assets/remoteEntry.js',
-        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js',
-        configSelector: 'http://localhost:3003/assets/remoteEntry.js',
-        jobManagement: 'http://localhost:3004/assets/remoteEntry.js'
+        configEditor: {
+          external: 'http://localhost:3001/remoteEntry.js',
+          externalType: 'url',
+        },
+        yamlEditor: {
+          external: 'http://localhost:3002/remoteEntry.js',
+          externalType: 'url',
+        },
+        configSelector: {
+          external: 'http://localhost:3003/remoteEntry.js',
+          externalType: 'url',
+        },
+        jobManagement: {
+          external: 'http://localhost:3004/remoteEntry.js',
+          externalType: 'url',
+        }
       },
       shared: ['react', 'react-dom']
     })
@@ -28,10 +40,16 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    // Make sure modulePreload is false for Module Federation
     modulePreload: false
   },
   server: {
-    port: 3000
+    port: 3000,
+    strictPort: true,
+    hmr: {
+      timeout: 5000
+    }
+  },
+  optimizeDeps: {
+    force: true
   }
 });

@@ -1,7 +1,7 @@
 // File: packages/job-management/src/contexts/JobContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { api } from 'shared';
-import { Job, JobStatus } from 'shared';
+import { Job, JobStatus, JobConfiguration } from 'shared';
 
 // Context state interface
 interface JobContextState {
@@ -44,13 +44,14 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
       const jobsData = response.data.items.map((item: any) => ({
         id: item.id,
         configurations: item.configurations || {},
-        status: item.status,
+        status: item.status as JobStatus,
         serviceJobId: item.service_job_id,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
         submittedAt: item.submitted_at,
         completedAt: item.completed_at,
         userId: item.user_id,
+        jobConfiguration: item.job_configuration || {},
         result: item.result
       }));
       
@@ -72,16 +73,17 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
       const response = await api.get(`/api/v1/jobs/${id}`);
       
       // Map response to Job type
-      const jobData = {
+      const jobData: Job = {
         id: response.data.id,
         configurations: response.data.configurations || {},
-        status: response.data.status,
+        status: response.data.status as JobStatus,
         serviceJobId: response.data.service_job_id,
         createdAt: response.data.created_at,
         updatedAt: response.data.updated_at,
         submittedAt: response.data.submitted_at,
         completedAt: response.data.completed_at,
         userId: response.data.user_id,
+        jobConfiguration: response.data.job_configuration || {},
         result: response.data.result
       };
       

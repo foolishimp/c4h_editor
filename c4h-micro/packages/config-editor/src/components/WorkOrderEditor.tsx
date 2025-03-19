@@ -1,9 +1,4 @@
 // File: packages/config-editor/src/components/WorkOrderEditor.tsx
-/**
- * Streamlined WorkOrderEditor component that uses YAML as the primary editing interface.
- * Handles Router context gracefully for Module Federation.
- */
-
 import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Button, TextField, CircularProgress,
@@ -12,7 +7,6 @@ import {
 } from '@mui/material';
 
 import { useWorkOrderContext } from '../contexts/WorkOrderContext';
-import { apiService } from 'shared';
 import { apiService } from 'shared';
 import { WorkOrderVersionControl } from './WorkOrderVersionControl';
 import { YamlEditor } from './YAMLEditor';
@@ -70,10 +64,6 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
   const [showVersions, setShowVersions] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [confirmDiscard, setConfirmDiscard] = useState<boolean>(false);
-  
-  // Additional API hooks
-  const { archiveWorkOrder, unarchiveWorkOrder, getWorkOrderHistory } = useWorkOrderApi();
-  const { submitJob } = useJobApi();
 
   // Load work order on component mount or workOrderId change
   useEffect(() => {
@@ -116,9 +106,9 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
     try {
       const isArchived = workOrder.metadata.archived || false;
       if (isArchived) {
-        await unarchiveWorkOrder(id);
+        await apiService.unarchiveConfig('workorder', id);
       } else {
-        await archiveWorkOrder(id);
+        await apiService.archiveConfig('workorder', id);
       }
       // Reload the work order to get updated archive status
       await loadWorkOrder(id);
@@ -148,7 +138,7 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
       const savedWorkOrder = await submitWorkOrder();
       
       if (savedWorkOrder) {
-        const result = await submitJob({ workOrderId: savedWorkOrder.id });
+        const result = await apiService.submitJob({ workorder: savedWorkOrder.id });
         if (result) {
           navigate('/jobs');
         }
@@ -254,7 +244,7 @@ const WorkOrderEditorContent: React.FC<WorkOrderEditorProps> = ({
           </Typography>
           <WorkOrderVersionControl
             workOrderId={id}
-            onFetchHistory={() => getWorkOrderHistory(id)}
+            onFetchHistory={() => apiService.getConfigHistory('workorder', id)}
             onLoadVersion={loadWorkOrder}
             currentVersion={workOrder.metadata.version}
           />

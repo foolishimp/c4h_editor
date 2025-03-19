@@ -17,7 +17,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useJobContext } from '../contexts/JobContext';
 import { JobStatus } from 'shared';
-import TimeAgo from './TimeAgo';
+import { TimeAgo } from 'shared';
 
 interface JobsListProps {
   onSelectJob: (jobId: string) => void;

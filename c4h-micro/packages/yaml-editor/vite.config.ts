@@ -26,11 +26,21 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    modulePreload: false
+    modulePreload: false,
+    rollupOptions: {
+      output: {
+        format: 'esm',
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+      }
+    }
   },
   server: {
     port: 3002,
-    strictPort: true
+    strictPort: true,
+    hmr: {
+      timeout: 5000
+    }
   },
   preview: {
     port: 3002,

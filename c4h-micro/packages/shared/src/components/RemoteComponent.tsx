@@ -51,6 +51,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           script.src = url;
           script.type = 'text/javascript';
           script.async = true;
+          script.crossOrigin = "anonymous";
 
           script.onload = () => {
             console.log(`Successfully loaded ${scope}`);
@@ -58,11 +59,18 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           };
 
           script.onerror = (event) => {
+            console.error(`Failed to load script: ${url}`);
             reject(new Error(`Failed to load remote module: ${url}, error: ${event}`));
           };
 
           document.head.appendChild(script);
         });
+      }
+      
+      // Check if the container was loaded
+      // @ts-ignore - federation types are not available
+      if (!window[scope]) {
+        throw new Error(`Remote container ${scope} was not loaded properly from ${url}`);
       }
       
       // Initialize the container
@@ -72,6 +80,10 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       // Get the module factory
       // @ts-ignore - federation types are not available
       const factory = await window[scope].get(module);
+      if (!factory) {
+        throw new Error(`Module ${module} not found in remote container ${scope}`);
+      }
+      
       const Module = factory();
       
       this.setState({
@@ -108,6 +120,13 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           <Typography variant="body2" color="text.secondary">
             {error}
           </Typography>
+          <Button 
+            variant="contained" 
+            onClick={() => window.location.reload()} 
+            sx={{ mt: 2 }}
+          >
+            Reload Page
+          </Button>
         </Box>
       );
     }
@@ -119,5 +138,8 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     return <Component {...props} />;
   }
 }
+
+// Add missing Button import
+import { Button } from '@mui/material';
 
 export default RemoteComponent;

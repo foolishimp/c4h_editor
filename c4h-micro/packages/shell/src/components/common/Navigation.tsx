@@ -1,6 +1,6 @@
 // File: packages/shell/src/components/common/Navigation.tsx
 import React from 'react';
-import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Drawer,
   AppBar,
@@ -12,8 +12,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Divider,
-  Tooltip
+  Divider
 } from '@mui/material';
 import { 
   Description as DescriptionIcon,
@@ -95,7 +94,7 @@ const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
             {Object.entries(configTypes).map(([type, config]) => (
               <ListItem key={type} disablePadding>
                 <ListItemButton
-                  component={RouterLink}
+                  component={Link}
                   to={`/configs/${type}`}
                   selected={isActive(`/configs/${type}`)}
                 >
@@ -110,7 +109,7 @@ const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
             {/* Add new config dropdown */}
             <ListItem disablePadding>
               <ListItemButton
-                component={RouterLink}
+                component={Link}
                 to="/configs/create"
                 selected={isActive('/configs/create')}
               >
@@ -126,7 +125,7 @@ const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
             {/* Jobs navigation */}
             <ListItem disablePadding>
               <ListItemButton
-                component={RouterLink}
+                component={Link}
                 to="/jobs"
                 selected={isActive('/jobs')}
               >

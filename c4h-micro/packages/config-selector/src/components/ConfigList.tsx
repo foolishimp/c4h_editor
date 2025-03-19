@@ -33,8 +33,7 @@ import {
   Unarchive as UnarchiveIcon
 } from '@mui/icons-material';
 import { useConfigContext } from '../contexts/ConfigContext';
-import { configTypes } from 'shared';
-import TimeAgo from './TimeAgo';
+import { configTypes, TimeAgo } from 'shared';
 
 const ConfigList: React.FC = () => {
   const navigate = useNavigate();
