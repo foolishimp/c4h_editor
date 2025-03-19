@@ -1,6 +1,7 @@
 # File: backend/dependencies.py
 """
 Dependency injection functions for FastAPI endpoints.
+Focused on configuration management and C4H service access.
 """
 
 from fastapi import Depends
@@ -8,13 +9,12 @@ from pathlib import Path
 from typing import Dict, Optional
 import logging
 
-# Import services
+# Import services - remove LLM service
 from backend.services.config_repository import ConfigRepository
 from backend.services.workorder_repository_v2 import WorkOrderRepository
 from backend.services.teamconfig_repository import TeamConfigRepository
 from backend.services.runtimeconfig_repository import RuntimeConfigRepository
 from backend.services.lineage_tracker import LineageTracker
-from backend.services.llm_service import LLMService
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config.config_types import get_config_types
@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 # Singleton instances
 _repositories = {}
 _lineage_tracker = None
-_llm_service = None
 _job_repository = None
 _c4h_service = None
 
@@ -78,20 +77,6 @@ def get_lineage_tracker():
         _lineage_tracker = LineageTracker(str(lineage_path))
         logger.info(f"Created LineageTracker at {lineage_path}")
     return _lineage_tracker
-
-def get_llm_service():
-    """Get or create an LLM service instance."""
-    global _llm_service
-    if _llm_service is None:
-        # Load from default config path if available
-        config_path = Path("./config.yaml")
-        if config_path.exists():
-            _llm_service = LLMService(str(config_path))
-            logger.info(f"Created LLMService with config from {config_path}")
-        else:
-            _llm_service = LLMService()
-            logger.info("Created LLMService with default config")
-    return _llm_service
 
 def get_job_repository():
     """Get or create a job repository instance."""

@@ -1,6 +1,8 @@
+# File: backend/main.py
 """
 Main application entry point for the C4H Backend.
 Sets up FastAPI, routes, and middleware.
+Focused on configuration management and C4H service access.
 """
 
 import logging
@@ -10,17 +12,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from backend.api.routes.workorders import router as workorders_router
-from backend.api.routes.jobs import router as jobs_router
+# Import only the routes we need - removing legacy routes
 from backend.api.routes.configs import router as configs_router
+from backend.api.routes.jobs import router as jobs_router
 from backend.services.config_repository import ConfigRepository
 from backend.services.lineage_tracker import LineageTracker
-from backend.services.llm_service import LLMService
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config import load_config
 from backend.config.config_types import load_config_types, get_config_types
-from backend.dependencies import get_lineage_tracker, get_llm_service, get_job_repository, get_c4h_service
+from backend.dependencies import get_lineage_tracker, get_job_repository, get_c4h_service
 
 # Configure logging
 logging.basicConfig(
@@ -55,7 +56,6 @@ async def lifespan(app: FastAPI):
     get_lineage_tracker()
     get_job_repository()
     
-    llm_service = get_llm_service()
     c4h_service = get_c4h_service()
     
     yield
@@ -63,8 +63,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: clean up resources
     logger.info("Application shutting down")
     
-    # Close LLM service client
-    await llm_service.close()
+    # Close C4H service client
     await c4h_service.close()
 
 # Create FastAPI app with lifespan
@@ -85,9 +84,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(configs_router)  # New generic configs router
-app.include_router(workorders_router)  # Legacy workorders router (for backward compatibility)
+# Include routers - only using the new generic ones
+app.include_router(configs_router)
 app.include_router(jobs_router)
 
 # Add health check endpoint
@@ -104,7 +102,6 @@ async def health_check():
         "services": {
             "repository": True,
             "lineage": True,
-            "llm": True,
             "jobs": True,
             "c4h": True
         },
