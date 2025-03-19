@@ -32,6 +32,15 @@ interface ConfigProviderProps {
   configType: string;
 }
 
+// Define interfaces for API responses
+interface ConfigResponse {
+  data: any[];
+}
+
+interface SingleConfigResponse {
+  data: any;
+}
+
 // Provider component
 export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, configType }) => {
   const [configs, setConfigs] = useState<any[]>([]);
@@ -59,7 +68,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     
     try {
-      const response = await api.get(apiEndpoints.list);
+      const response = await api.get<ConfigResponse>(apiEndpoints.list);
       setConfigs(response.data);
     } catch (err: any) {
       setError(err.message || 'Failed to load configurations');
@@ -75,16 +84,16 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     
     try {
-      const response = await api.get(apiEndpoints.get(id));
+      const response = await api.get<SingleConfigResponse>(apiEndpoints.get(id));
       setCurrentConfig(response.data);
       
       // Convert to YAML
       try {
         const yamlString = yamlDump(response.data.content);
         setYaml(yamlString);
-      } catch (yamlErr) {
+      } catch (yamlErr: any) {
         console.error('Error converting to YAML:', yamlErr);
-        setError('Failed to convert configuration to YAML');
+        setError(`Failed to convert configuration to YAML: ${yamlErr.message}`);
       }
     } catch (err: any) {
       setError(err.message || `Failed to load configuration: ${id}`);
@@ -136,7 +145,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       let content;
       try {
         content = yamlLoad(yaml);
-      } catch (yamlErr) {
+      } catch (yamlErr: any) {
         setError(`Invalid YAML: ${yamlErr.message}`);
         setLoading(false);
         return null;
@@ -159,7 +168,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       };
       
       try {
-        const response = await api.post(endpoint, requestData);
+        const response = await api.post<SingleConfigResponse>(endpoint, requestData);
         setCurrentConfig(response.data);
         setSaved(true);
         

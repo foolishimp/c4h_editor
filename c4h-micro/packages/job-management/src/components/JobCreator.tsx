@@ -22,6 +22,15 @@ interface ConfigOption {
   description: string;
 }
 
+interface ConfigResponse {
+  data: Array<{
+    id: string;
+    metadata?: {
+      description?: string;
+    };
+  }>;
+}
+
 const JobCreator: React.FC = () => {
   const { submitJob, loading, error } = useJobContext();
   
@@ -41,10 +50,10 @@ const JobCreator: React.FC = () => {
       
       for (const [configType, config] of Object.entries(configTypes)) {
         try {
-          const response = await api.get(config.apiEndpoints.list);
+          const response = await api.get<ConfigResponse>(config.apiEndpoints.list);
           
           // Map response data to ConfigOption array
-          options[configType] = (response.data as any[]).map((item: any) => ({
+          options[configType] = response.data.map((item) => ({
             id: item.id,
             description: item.metadata?.description || 'No description'
           }));

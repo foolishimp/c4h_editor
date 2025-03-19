@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardActions,
   Chip,
   CircularProgress,
   Divider,
@@ -18,7 +17,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useJobContext } from '../contexts/JobContext';
-import { JobStatus } from 'shared';
+import { JobStatus, JobConfigReference } from 'shared';
 import { TimeAgo } from 'shared';
 
 interface JobDetailsProps {
@@ -71,12 +70,11 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
   };
   
   // Format configurations for display
-  const formatConfigs = (configurations: Record<string, any>) => {
-    if (!configurations) return 'No configurations';
-    
-    return Object.entries(configurations)
-      .map(([type, config]) => `${type}: ${config.id || config}`)
-      .join(', ');
+  const formatConfigValue = (value: string | JobConfigReference): string => {
+    if (typeof value === 'string') {
+      return value;
+    }
+    return value.id || 'Unknown';
   };
   
   if (loading && !job) {
@@ -154,7 +152,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
           {Object.entries(job.configurations).map(([type, config]) => (
             <Box key={type} sx={{ mb: 1 }}>
               <Typography variant="subtitle2">{type}:</Typography>
-              <Typography variant="body2">{config.id || config}</Typography>
+              <Typography variant="body2">{formatConfigValue(config)}</Typography>
             </Box>
           ))}
         </Paper>

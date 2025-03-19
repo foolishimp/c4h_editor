@@ -1,7 +1,7 @@
 // File: packages/job-management/src/contexts/JobContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { api } from 'shared';
-import { Job, JobStatus, JobConfiguration } from 'shared';
+import { Job, JobStatus } from 'shared';
 
 // Context state interface
 interface JobContextState {
@@ -25,6 +25,29 @@ interface JobProviderProps {
   children: ReactNode;
 }
 
+// Define interfaces for API responses
+interface JobsResponse {
+  data: {
+    items: any[];
+  };
+}
+
+interface JobResponse {
+  data: {
+    id: string;
+    configurations: Record<string, any>;
+    status: string;
+    service_job_id: string;
+    created_at: string;
+    updated_at: string;
+    submitted_at: string;
+    completed_at: string;
+    user_id: string;
+    job_configuration: Record<string, any>;
+    result: any;
+  };
+}
+
 // Provider component
 export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -38,7 +61,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await api.get('/api/v1/jobs');
+      const response = await api.get<JobsResponse>('/api/v1/jobs');
       
       // Map response to Job type
       const jobsData = response.data.items.map((item: any) => ({
@@ -70,7 +93,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await api.get(`/api/v1/jobs/${id}`);
+      const response = await api.get<JobResponse>(`/api/v1/jobs/${id}`);
       
       // Map response to Job type
       const jobData: Job = {
