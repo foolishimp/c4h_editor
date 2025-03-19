@@ -1,15 +1,16 @@
-# File: backend/services/job_repository.py
-"""Repository for storing and retrieving jobs."""
+# backend/services/job_repository.py
+"""Repository for storing and retrieving jobs with multiple configurations."""
 
 import os
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
 from pathlib import Path
 import uuid
 
-from backend.models.job import Job, JobStatus, JobResult
+from backend.models.job import Job, JobStatus, JobResult, ConfigReference
+from backend.config.config_types import get_config_types
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +36,39 @@ class JobRepository:
         """Deserialize a dictionary to a job."""
         return Job(**data)
     
-    def create_job(self, work_order_id: str, work_order_version: str, 
+    def create_job(self, 
+                  configurations: Dict[str, Dict[str, str]], 
                   user_id: Optional[str] = None, 
                   configuration: Optional[Dict[str, Any]] = None) -> Job:
-        """Create a new job."""
+        """
+        Create a new job with multiple configurations.
+        
+        Args:
+            configurations: Dict mapping config_type to {"id": config_id, "version": version}
+            user_id: Optional user ID
+            configuration: Optional job configuration
+            
+        Returns:
+            Created job
+        """
+        # Validate configurations
+        self._validate_configurations(configurations)
+        
         # Generate a unique job ID
         job_id = str(uuid.uuid4())
+        
+        # Convert configurations to ConfigReference objects
+        config_refs = {}
+        for config_type, config_info in configurations.items():
+            config_refs[config_type] = ConfigReference(
+                id=config_info["id"],
+                version=config_info.get("version", "latest")
+            )
         
         # Create job
         job = Job(
             id=job_id,
-            work_order_id=work_order_id,
-            work_order_version=work_order_version,
+            configurations=config_refs,
             status=JobStatus.CREATED,
             user_id=user_id,
             configuration=configuration or {}
@@ -57,9 +79,37 @@ class JobRepository:
         with open(job_path, "w") as f:
             json.dump(self._serialize_job(job), f, indent=2)
         
-        logger.info(f"Created job {job_id} for work order {work_order_id}")
+        logger.info(f"Created job {job_id} with configurations: {list(configurations.keys())}")
         
         return job
+    
+    def _validate_configurations(self, configurations: Dict[str, Dict[str, str]]) -> bool:
+        """
+        Validate that all required configuration types are present.
+        
+        Args:
+            configurations: Dict mapping config_type to {"id": config_id, "version": version}
+            
+        Returns:
+            True if valid, raises ValueError otherwise
+        """
+        # Get registered config types
+        registered_types = set(get_config_types().keys())
+        
+        # Check that all provided types are valid
+        for config_type in configurations.keys():
+            if config_type not in registered_types:
+                raise ValueError(f"Invalid configuration type: {config_type}")
+                
+            # Validate that id is provided
+            if "id" not in configurations[config_type]:
+                raise ValueError(f"Missing 'id' for configuration type: {config_type}")
+        
+        # Make sure all required types are present
+        # In a real implementation, this might check for mandatory config types
+        # or configurations required for specific service types
+        
+        return True
     
     def get_job(self, job_id: str) -> Optional[Job]:
         """Get a job by ID."""
@@ -110,12 +160,27 @@ class JobRepository:
         
         return True
     
-    def list_jobs(self, work_order_id: Optional[str] = None, 
+    def list_jobs(self, 
+                 config_type: Optional[str] = None,
+                 config_id: Optional[str] = None,
                  status: Optional[JobStatus] = None,
                  user_id: Optional[str] = None,
                  limit: int = 100,
                  offset: int = 0) -> List[Job]:
-        """List jobs with optional filtering."""
+        """
+        List jobs with optional filtering.
+        
+        Args:
+            config_type: Optional configuration type to filter by
+            config_id: Optional configuration ID to filter by
+            status: Optional status to filter by
+            user_id: Optional user ID to filter by
+            limit: Maximum number of jobs to return
+            offset: Offset for pagination
+            
+        Returns:
+            List of jobs
+        """
         jobs = []
         
         # Find all JSON files in directory
@@ -130,8 +195,15 @@ class JobRepository:
                 job = self._deserialize_job(data)
                 
                 # Apply filters
-                if work_order_id and job.work_order_id != work_order_id:
-                    continue
+                if config_type and config_id:
+                    # Check if job has this configuration
+                    if (config_type not in job.configurations or 
+                        job.configurations[config_type].id != config_id):
+                        continue
+                elif config_type:
+                    # Check if job has this configuration type
+                    if config_type not in job.configurations:
+                        continue
                 
                 if status and job.status != status:
                     continue
@@ -154,7 +226,9 @@ class JobRepository:
         
         return paginated_jobs
     
-    def count_jobs(self, work_order_id: Optional[str] = None, 
+    def count_jobs(self, 
+                  config_type: Optional[str] = None,
+                  config_id: Optional[str] = None,
                   status: Optional[JobStatus] = None,
                   user_id: Optional[str] = None) -> int:
         """Count jobs with optional filtering."""
@@ -172,8 +246,15 @@ class JobRepository:
                 job = self._deserialize_job(data)
                 
                 # Apply filters
-                if work_order_id and job.work_order_id != work_order_id:
-                    continue
+                if config_type and config_id:
+                    # Check if job has this configuration
+                    if (config_type not in job.configurations or 
+                        job.configurations[config_type].id != config_id):
+                        continue
+                elif config_type:
+                    # Check if job has this configuration type
+                    if config_type not in job.configurations:
+                        continue
                 
                 if status and job.status != status:
                     continue

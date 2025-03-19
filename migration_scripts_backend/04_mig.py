@@ -1,8 +1,32 @@
-# backend/models/workorder.py
-"""
+#!/usr/bin/env python
+# Script to update WorkOrder model for compatibility with new architecture
+
+import os
+import sys
+from pathlib import Path
+
+# Ensure backend directory exists
+backend_dir = Path("backend")
+if not backend_dir.exists():
+    print("Error: backend directory not found")
+    sys.exit(1)
+
+# Ensure models directory exists
+models_dir = backend_dir / "models"
+if not models_dir.exists():
+    print("Error: models directory not found")
+    sys.exit(1)
+
+# Update workorder.py to be compatible with Configuration base model
+workorder_model_path = models_dir / "workorder.py"
+if workorder_model_path.exists():
+    # Create updated workorder.py with compatibility with base Configuration model
+    with open(workorder_model_path, "w") as f:
+        f.write("""# backend/models/workorder.py
+\"\"\"
 WorkOrder model for defining refactoring tasks.
 Updated to be compatible with the base Configuration model.
-"""
+\"\"\"
 
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
@@ -12,7 +36,7 @@ from enum import Enum
 from backend.models.configuration import Configuration, ConfigurationMetadata, ConfigurationVersion
 
 class ParameterType(str, Enum):
-    """Types of parameters that can be used in a workorder template."""
+    \"\"\"Types of parameters that can be used in a workorder template.\"\"\"
     STRING = "string"
     NUMBER = "number"
     BOOLEAN = "boolean"
@@ -20,7 +44,7 @@ class ParameterType(str, Enum):
     OBJECT = "object"
 
 class WorkOrderParameter(BaseModel):
-    """Definition of a parameter that can be used in a workorder template."""
+    \"\"\"Definition of a parameter that can be used in a workorder template.\"\"\"
     name: str = Field(..., description="Name of the parameter")
     type: ParameterType = Field(..., description="Data type of the parameter")
     description: Optional[str] = Field(None, description="Description of the parameter")
@@ -34,7 +58,7 @@ class WorkOrderParameter(BaseModel):
         return v
 
 class WorkOrderConfig(BaseModel):
-    """Configuration options for the workorder."""
+    \"\"\"Configuration options for the workorder.\"\"\"
     temperature: float = Field(0.7, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(None, gt=0)
     top_p: Optional[float] = Field(None, ge=0.0, le=1.0)
@@ -49,16 +73,16 @@ class WorkOrderConfig(BaseModel):
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Service-specific parameters")
 
 class WorkOrderTemplate(BaseModel):
-    """The core workorder template with text and configuration."""
+    \"\"\"The core workorder template with text and configuration.\"\"\"
     text: str = Field(..., description="The workorder template text")
     parameters: List[WorkOrderParameter] = Field(default_factory=list)
     config: WorkOrderConfig = Field(default_factory=WorkOrderConfig)
     
     def validate_template(self) -> bool:
-        """Validates that all parameters in the template are defined."""
+        \"\"\"Validates that all parameters in the template are defined.\"\"\"
         import re
         # Find all parameters in the template using a regex pattern like {parameter_name}
-        pattern = r'\{([a-zA-Z_][a-zA-Z0-9_]*)\}'
+        pattern = r'\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}'
         referenced_params = set(re.findall(pattern, self.text))
         defined_params = {param.name for param in self.parameters}
         
@@ -70,11 +94,11 @@ class WorkOrderTemplate(BaseModel):
         return True
 
 class WorkOrderContent(BaseModel):
-    """Content of a work order for compatibility with Configuration model."""
+    \"\"\"Content of a work order for compatibility with Configuration model.\"\"\"
     template: WorkOrderTemplate = Field(..., description="The template definition")
     
     def render(self, parameters: Dict[str, Any]) -> str:
-        """Renders the workorder template with the provided parameters."""
+        \"\"\"Renders the workorder template with the provided parameters.\"\"\"
         # Validate parameters against the template
         self.template.validate_template()
         
@@ -100,7 +124,7 @@ class WorkOrderContent(BaseModel):
 
 # Legacy model for backward compatibility
 class WorkOrderMetadata(ConfigurationMetadata):
-    """Metadata associated with a workorder."""
+    \"\"\"Metadata associated with a workorder.\"\"\"
     # Extended metadata for work orders
     asset: Optional[str] = Field(None, description="Asset being worked on")
     intent: Optional[str] = Field(None, description="User's intent for the work")
@@ -111,21 +135,21 @@ class WorkOrderMetadata(ConfigurationMetadata):
 
 # Legacy model for backward compatibility
 class WorkOrder(Configuration):
-    """
+    \"\"\"
     Complete workorder definition.
     This class provides compatibility between the legacy WorkOrder model
     and the new Configuration-based architecture.
-    """
+    \"\"\"
     config_type: str = "workorder"
     content: WorkOrderContent
     metadata: WorkOrderMetadata
     
     def render(self, parameters: Dict[str, Any]) -> str:
-        """Renders the workorder template with the provided parameters."""
+        \"\"\"Renders the workorder template with the provided parameters.\"\"\"
         return self.content.render(parameters)
 
     def to_submission_payload(self) -> Dict[str, Any]:
-        """Convert the work order to a submission payload for the C4H service."""
+        \"\"\"Convert the work order to a submission payload for the C4H service.\"\"\"
         # Render the workorder with any default parameters
         try:
             rendered_prompt = self.render({})
@@ -145,7 +169,7 @@ class WorkOrder(Configuration):
     
     @classmethod
     def from_legacy(cls, legacy_workorder):
-        """Create a new WorkOrder from a legacy WorkOrder model."""
+        \"\"\"Create a new WorkOrder from a legacy WorkOrder model.\"\"\"
         # Convert legacy template to new content format
         content = WorkOrderContent(
             template=legacy_workorder.template
@@ -162,7 +186,7 @@ class WorkOrder(Configuration):
     
     @classmethod
     def create(cls, id: str, template: WorkOrderTemplate, metadata: Optional[WorkOrderMetadata] = None):
-        """Create a new WorkOrder."""
+        \"\"\"Create a new WorkOrder.\"\"\"
         if metadata is None:
             metadata = WorkOrderMetadata(author="system")
             
@@ -176,12 +200,19 @@ class WorkOrder(Configuration):
         )
 
 class WorkOrderVersion(ConfigurationVersion):
-    """Information about a specific version of a workorder."""
+    \"\"\"Information about a specific version of a workorder.\"\"\"
     configuration: WorkOrder
 
 class WorkOrderTestCase(BaseModel):
-    """Test case for a workorder with inputs and expected outputs."""
+    \"\"\"Test case for a workorder with inputs and expected outputs.\"\"\"
     name: str
     parameters: Dict[str, Any]
     expected_output: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+""")
+
+    print(f"Updated {workorder_model_path}")
+else:
+    print(f"Warning: {workorder_model_path} does not exist.")
+
+print("WorkOrder Model updated successfully.")

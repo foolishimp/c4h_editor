@@ -1,4 +1,14 @@
-# C4H Editor Backend
+#!/usr/bin/env python
+# Script to create README and example configuration
+
+import os
+import sys
+from pathlib import Path
+
+# Create main README file
+readme_path = Path("README.md")
+with open(readme_path, "w") as f:
+    f.write("""# C4H Editor Backend
 
 ## Overview
 
@@ -121,3 +131,94 @@ If you're upgrading from an older version that only supported WorkOrders, you ca
 ```
 python -m backend.scripts.migrate_workorders --source ./data/legacy_repo --dest ./data/repositories/workorders --backup
 ```
+""")
+
+print(f"Created {readme_path}")
+
+# Create example config.yaml
+config_path = Path("config.yaml.example")
+with open(config_path, "w") as f:
+    f.write("""# Example configuration for C4H Editor Backend
+app:
+  name: c4h-editor
+  environment: development
+
+repository:
+  path: ./data/repositories
+
+api:
+  host: 0.0.0.0
+  port: 8000
+  cors_origins:
+    - "*"
+
+llm:
+  provider: anthropic
+  model: claude-3-opus-20240229
+  api_key_env: ANTHROPIC_API_KEY
+
+c4h_service:
+  api_base: https://api.c4h.example.com
+  api_version: v1
+  api_key_env: C4H_API_KEY
+  default_config:
+    max_runtime: 3600
+    notify_on_completion: true
+
+# Configuration types - can also be defined separately
+config_types:
+  workorder:
+    name: Work Orders
+    description: Defines what needs to be done and against which asset
+    supportsVersioning: true
+    schema: schemas/workorder.json
+    repository:
+      type: git
+      path: ./data/repositories/workorders
+
+  teamconfig:
+    name: Team Configuration
+    description: Defines agent teams and their capabilities
+    supportsVersioning: true
+    schema: schemas/teamconfig.json
+    repository:
+      type: git
+      path: ./data/repositories/teamconfigs
+
+  runtimeconfig:
+    name: Runtime Configuration
+    description: Manages operational aspects of the C4H Service
+    supportsVersioning: true
+    schema: schemas/runtimeconfig.json
+    repository:
+      type: git
+      path: ./data/repositories/runtimeconfigs
+""")
+
+print(f"Created {config_path}")
+
+print("README and Example Configuration created successfully.")
+
+# Final summary message
+print("""
+C4H Backend Refactoring Complete!
+
+The refactoring has transformed the backend to support multiple configuration types
+with a unified API. The changes include:
+
+1. Configuration Type Registry
+2. Generic Configuration Models
+3. Configuration-specific Models (WorkOrder, TeamConfig, RuntimeConfig)
+4. Generic Repository Pattern
+5. Unified API for all configuration types
+6. Updated Job system with multiple configurations
+7. Migration utilities and documentation
+
+To complete the migration:
+
+1. Review the generated code for any customizations needed
+2. Run the migration script to convert legacy workorders
+3. Update any client applications to use the new API
+
+The backend now supports the design requirements from the specification.
+""")

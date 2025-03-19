@@ -5,29 +5,60 @@ Dependency injection functions for FastAPI endpoints.
 
 from fastapi import Depends
 from pathlib import Path
+from typing import Dict, Optional
 
-# Import the new WorkOrderRepository
-from backend.services.workorder_repository import WorkOrderRepository
+# Import services
+from backend.services.config_repository import ConfigRepository, get_config_repository
+from backend.services.workorder_repository_v2 import WorkOrderRepository
+from backend.services.teamconfig_repository import TeamConfigRepository
+from backend.services.runtimeconfig_repository import RuntimeConfigRepository
 from backend.services.lineage_tracker import LineageTracker
 from backend.services.llm_service import LLMService
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
+from backend.config.config_types import get_config_types
 
 # Singleton instances
-_workorder_repository = None
+_repositories = {}
 _lineage_tracker = None
 _llm_service = None
 _job_repository = None
 _c4h_service = None
 
+def get_config_repository_instance(config_type: str) -> ConfigRepository:
+    """Get or create a configuration repository instance."""
+    global _repositories
+    
+    if config_type not in _repositories:
+        repo_path = get_config_types().get(config_type, {}).get("repository", {}).get("path")
+        if repo_path:
+            path = Path(repo_path)
+            path.parent.mkdir(exist_ok=True)
+            
+            if config_type == "workorder":
+                _repositories[config_type] = WorkOrderRepository(str(path))
+            elif config_type == "teamconfig":
+                _repositories[config_type] = TeamConfigRepository(str(path))
+            elif config_type == "runtimeconfig":
+                _repositories[config_type] = RuntimeConfigRepository(str(path))
+            else:
+                _repositories[config_type] = ConfigRepository(config_type, str(path))
+        else:
+            _repositories[config_type] = ConfigRepository(config_type)
+            
+    return _repositories[config_type]
+
 def get_workorder_repository():
     """Get or create a workorder repository instance."""
-    global _workorder_repository
-    if _workorder_repository is None:
-        repo_path = Path("./data/workorder_repository")
-        repo_path.parent.mkdir(exist_ok=True)
-        _workorder_repository = WorkOrderRepository(str(repo_path))
-    return _workorder_repository
+    return get_config_repository_instance("workorder")
+
+def get_teamconfig_repository():
+    """Get or create a team config repository instance."""
+    return get_config_repository_instance("teamconfig")
+
+def get_runtimeconfig_repository():
+    """Get or create a runtime config repository instance."""
+    return get_config_repository_instance("runtimeconfig")
 
 def get_lineage_tracker():
     """Get or create a lineage tracker instance."""

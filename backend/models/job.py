@@ -1,5 +1,5 @@
-# File: backend/models/job.py
-"""Job model for tracking work order submissions to C4H service."""
+# backend/models/job.py
+"""Job model for tracking configuration job submissions to C4H service."""
 
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -25,11 +25,18 @@ class JobResult(BaseModel):
     error: Optional[str] = Field(None, description="Error message if job failed")
 
 
+class ConfigReference(BaseModel):
+    """Reference to a specific configuration."""
+    id: str = Field(..., description="Identifier of the configuration")
+    version: str = Field(..., description="Version of the configuration")
+
+
 class Job(BaseModel):
-    """Job represents a work order submission to the C4H service."""
+    """Job represents a configuration tuple submission to the C4H service."""
     id: str = Field(..., description="Unique identifier for the job")
-    work_order_id: str = Field(..., description="ID of the associated work order")
-    work_order_version: str = Field(..., description="Version of the work order")
+    configurations: Dict[str, ConfigReference] = Field(
+        ..., description="Map of configuration types to references"
+    )
     status: JobStatus = Field(JobStatus.CREATED, description="Current status of the job")
     service_job_id: Optional[str] = Field(None, description="Job ID in the C4H service")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -53,3 +60,7 @@ class Job(BaseModel):
             
         if result and (status == JobStatus.COMPLETED or status == JobStatus.FAILED):
             self.result = JobResult(**result)
+
+    def get_configuration_ids(self) -> Dict[str, str]:
+        """Get a map of configuration types to IDs."""
+        return {config_type: config_ref.id for config_type, config_ref in self.configurations.items()}

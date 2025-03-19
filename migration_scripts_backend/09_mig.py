@@ -1,5 +1,23 @@
-# backend/services/c4h_service.py
-"""Service client for interacting with the C4H API with support for multiple configurations."""
+#!/usr/bin/env python
+# Script to update C4H Service for multiple configurations
+
+import os
+import sys
+from pathlib import Path
+
+# Ensure backend directory exists
+backend_dir = Path("backend")
+if not backend_dir.exists():
+    print("Error: backend directory not found")
+    sys.exit(1)
+
+# Update c4h_service.py
+c4h_service_path = backend_dir / "services" / "c4h_service.py"
+if c4h_service_path.exists():
+    # Create updated c4h_service.py with support for multiple configurations
+    with open(c4h_service_path, "w") as f:
+        f.write("""# backend/services/c4h_service.py
+\"\"\"Service client for interacting with the C4H API with support for multiple configurations.\"\"\"
 
 import os
 import json
@@ -18,14 +36,14 @@ logger = logging.getLogger(__name__)
 
 
 class JobSubmissionResponse(BaseModel):
-    """Response from job submission."""
+    \"\"\"Response from job submission.\"\"\"
     job_id: str
     status: str
     message: Optional[str] = None
 
 
 class JobStatusResponse(BaseModel):
-    """Response from job status check."""
+    \"\"\"Response from job status check.\"\"\"
     job_id: str
     status: str
     progress: Optional[float] = None
@@ -36,10 +54,10 @@ class JobStatusResponse(BaseModel):
 
 
 class C4HService:
-    """Client for the C4H service API."""
+    \"\"\"Client for the C4H service API.\"\"\"
     
     def __init__(self, config_path: Optional[str] = None):
-        """Initialize the C4H service client."""
+        \"\"\"Initialize the C4H service client.\"\"\"
         self.config = load_config(config_path)
         self.c4h_config = self.config.get("c4h_service", {})
         
@@ -60,7 +78,7 @@ class C4HService:
         logger.info(f"C4H service client initialized with API base: {self.api_base}")
     
     async def submit_job(self, configurations: Dict[str, Configuration]) -> JobSubmissionResponse:
-        """
+        \"\"\"
         Submit a job with multiple configurations to the C4H service.
         
         Args:
@@ -68,7 +86,7 @@ class C4HService:
             
         Returns:
             Job submission response
-        """
+        \"\"\"
         if not self.api_key:
             raise ValueError(f"C4H API key not found in environment variable {self.api_key_env}")
         
@@ -141,7 +159,7 @@ class C4HService:
             )
     
     async def get_job_status(self, job_id: str) -> JobStatusResponse:
-        """Check the status of a job."""
+        \"\"\"Check the status of a job.\"\"\"
         if not self.api_key:
             raise ValueError(f"C4H API key not found in environment variable {self.api_key_env}")
         
@@ -206,7 +224,7 @@ class C4HService:
             )
     
     async def cancel_job(self, job_id: str) -> bool:
-        """Cancel a job."""
+        \"\"\"Cancel a job.\"\"\"
         if not self.api_key:
             raise ValueError(f"C4H API key not found in environment variable {self.api_key_env}")
         
@@ -240,6 +258,11 @@ class C4HService:
             return False
     
     async def close(self):
-        """Close the HTTP client."""
+        \"\"\"Close the HTTP client.\"\"\"
         await self.http_client.aclose()
         logger.info("C4H service client closed")
+""")
+
+    print(f"Updated {c4h_service_path}")
+
+print("C4H Service updated successfully for multiple configurations.")

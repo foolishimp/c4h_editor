@@ -7,6 +7,8 @@ import os
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
+from backend.config.config_types import load_config_types
+
 
 # Default configuration
 DEFAULT_CONFIG = {

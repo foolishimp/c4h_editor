@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TeamConfig Schema",
+  "description": "Schema for Team Configuration",
+  "type": "object",
+  "properties": {
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the role"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the role"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Capabilities of the role"
+          },
+          "model": {
+            "type": "string",
+            "description": "LLM model for this role"
+          },
+          "config": {
+            "type": "object",
+            "description": "Configuration for this role"
+          }
+        }
+      }
+    },
+    "teams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "agents"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the team"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the team"
+          },
+          "agents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "role"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the agent"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Name of the agent"
+                },
+                "role": {
+                  "type": "string",
+                  "description": "Role of the agent"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Description of the agent"
+                },
+                "config": {
+                  "type": "object",
+                  "description": "Agent-specific configuration"
+                }
+              }
+            }
+          },
+          "workflow": {
+            "type": "object",
+            "description": "Team workflow configuration"
+          }
+        }
+      }
+    },
+    "default_team": {
+      "type": "string",
+      "description": "Default team to use"
+    },
+    "global_config": {
+      "type": "object",
+      "description": "Global team configuration"
+    }
+  }
+}
