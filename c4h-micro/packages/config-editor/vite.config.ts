@@ -43,7 +43,8 @@ export default defineConfig({
     }
   },
   preview: {
-    port: 3001,
-    strictPort: true
+    port: 3001, // (use appropriate port for each: 3001, 3002, or 3004)
+    strictPort: true,
+    cors: true  // Add this line
   }
 });

@@ -1,6 +1,6 @@
 // File: packages/shared/src/components/RemoteComponent.tsx
 import React from 'react';
-import { CircularProgress, Typography, Box } from '@mui/material';
+import { CircularProgress, Typography, Box, Button } from '@mui/material';
 
 interface RemoteComponentProps {
   url: string;
@@ -13,14 +13,16 @@ interface RemoteComponentProps {
 class RemoteComponent extends React.Component<RemoteComponentProps, { 
   loading: boolean, 
   error: string | null, 
-  Component: React.ComponentType<any> | null 
+  Component: React.ComponentType<any> | null,
+  retryCount: number
 }> {
   constructor(props: RemoteComponentProps) {
     super(props);
     this.state = {
       loading: true,
       error: null,
-      Component: null
+      Component: null,
+      retryCount: 0
     };
   }
 
@@ -33,7 +35,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     if (prevProps.url !== this.props.url || 
         prevProps.scope !== this.props.scope || 
         prevProps.module !== this.props.module) {
-      this.setState({ loading: true, Component: null }, this.loadComponent);
+      this.setState({ loading: true, Component: null, retryCount: 0 }, this.loadComponent);
     }
   }
 
@@ -41,30 +43,20 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     const { url, scope, module } = this.props;
     
     try {
+      console.log(`Loading remote module ${scope} from ${url}`);
+      
       // @ts-ignore - federation types are not available
       const container = window[scope];
       if (!container) {
-        // Load the remote container
-        await new Promise<void>((resolve, reject) => {
-          console.log(`Loading remote module ${scope} from ${url}`);
-          const script = document.createElement('script');
-          script.src = url;
-          script.type = 'text/javascript';
-          script.async = true;
-          script.crossOrigin = "anonymous";
-
-          script.onload = () => {
-            console.log(`Successfully loaded ${scope}`);
-            resolve();
-          };
-
-          script.onerror = (event) => {
-            console.error(`Failed to load script: ${url}`);
-            reject(new Error(`Failed to load remote module: ${url}, error: ${event}`));
-          };
-
-          document.head.appendChild(script);
-        });
+        // Load the remote container using import() instead of script tag
+        // This is the key change - using import() means it's loaded as an ES module
+        try {
+          await import(/* @vite-ignore */ url);
+          console.log(`Successfully loaded ${scope}`);
+        } catch (err) {
+          console.error(`Failed to load script: ${url}`, err);
+          throw new Error(`Failed to load remote module: ${url}, error: ${err}`);
+        }
       }
       
       // Check if the container was loaded
@@ -88,20 +80,26 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       
       this.setState({
         loading: false,
-        Component: Module.default || Module
+        Component: Module.default || Module,
+        error: null
       });
     } catch (error) {
       console.error('Error loading remote component:', error);
       this.setState({
         loading: false,
-        error: error instanceof Error ? error.message : 'Failed to load component'
+        error: error instanceof Error ? error.message : 'Failed to load component',
+        retryCount: this.state.retryCount + 1
       });
     }
   }
 
+  handleRetry = () => {
+    this.setState({ loading: true, error: null }, this.loadComponent);
+  }
+
   render() {
     const { fallback, props = {} } = this.props;
-    const { loading, error, Component } = this.state;
+    const { loading, error, Component, retryCount } = this.state;
     
     if (loading) {
       return fallback || (
@@ -113,17 +111,35 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     
     if (error) {
       return (
-        <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Box sx={{ p: 3, textAlign: 'center', border: '1px solid #f5f5f5', borderRadius: 2 }}>
           <Typography variant="h6" color="error" gutterBottom>
             Failed to load component
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {error}
           </Typography>
+          <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="body2">
+              This could be because:
+            </Typography>
+            <ul style={{ textAlign: 'left' }}>
+              <li>The microfrontend server is not running</li>
+              <li>The remoteEntry.js file is not being served at the expected URL</li>
+              <li>There's a network issue preventing the connection</li>
+              <li>Module Federation configuration is incompatible</li>
+            </ul>
+          </Box>
           <Button 
             variant="contained" 
+            onClick={this.handleRetry} 
+            sx={{ mr: 2 }}
+            disabled={retryCount > 5}
+          >
+            Retry Loading ({retryCount}/5)
+          </Button>
+          <Button 
+            variant="outlined" 
             onClick={() => window.location.reload()} 
-            sx={{ mt: 2 }}
           >
             Reload Page
           </Button>
@@ -138,8 +154,5 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     return <Component {...props} />;
   }
 }
-
-// Add missing Button import
-import { Button } from '@mui/material';
 
 export default RemoteComponent;

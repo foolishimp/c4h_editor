@@ -5,11 +5,14 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
+  // ADD THIS LINE HERE (1) ↓
+  base: '',  // Empty string means the root path
+  
   plugins: [
     react(),
     federation({
       name: 'configSelector',
-      filename: 'remoteEntry.js',
+      filename: 'remoteEntry.js',  // This is already correct
       exposes: {
         './ConfigManager': './src/ConfigManager.tsx',
       },
@@ -30,6 +33,9 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
+    // ADD THIS LINE HERE (2) ↓
+    assetsDir: '',  // This ensures assets aren't in a subdirectory
+    
     rollupOptions: {
       output: {
         format: 'esm',
@@ -47,6 +53,7 @@ export default defineConfig({
   },
   preview: {
     port: 3003,
-    strictPort: true
+    strictPort: true,
+    cors: true
   }
 });

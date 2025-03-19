@@ -5,13 +5,14 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
+  base: '',
   plugins: [
     react(),
     federation({
       name: 'jobManagement',
       filename: 'remoteEntry.js',
       exposes: {
-        './JobManager': './src/JobManager.tsx',
+        './JobManager': './src/JobManager.tsx',  // THIS WAS THE ERROR - make sure it's JobManager not ConfigManager
       },
       shared: ['react', 'react-dom', 'shared']
     })
@@ -27,6 +28,7 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
+    assetsDir: '',
     rollupOptions: {
       output: {
         format: 'esm',
@@ -44,6 +46,7 @@ export default defineConfig({
   },
   preview: {
     port: 3004,
-    strictPort: true
+    strictPort: true,
+    cors: true
   }
 });

@@ -6,9 +6,9 @@
  */
 
 export const remotes = {
-  yamlEditor: 'http://localhost:3002/assets/remoteEntry.js',
-  configSelector: 'http://localhost:3003/assets/remoteEntry.js',
-  jobManagement: 'http://localhost:3004/assets/remoteEntry.js'
+  yamlEditor: 'http://localhost:3002/remoteEntry.js',
+  configSelector: 'http://localhost:3003/remoteEntry.js',
+  jobManagement: 'http://localhost:3004/remoteEntry.js'
 };
 
 export default remotes;

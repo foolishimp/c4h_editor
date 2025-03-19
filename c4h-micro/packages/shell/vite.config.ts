@@ -5,27 +5,17 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
+  base: '',  // Add this line to ensure correct base path
   plugins: [
     react(),
     federation({
       name: 'shell',
+      // Simplified remotes format - this is the key change
       remotes: {
-        configEditor: {
-          external: 'http://localhost:3001/remoteEntry.js',
-          externalType: 'url',
-        },
-        yamlEditor: {
-          external: 'http://localhost:3002/remoteEntry.js',
-          externalType: 'url',
-        },
-        configSelector: {
-          external: 'http://localhost:3003/remoteEntry.js',
-          externalType: 'url',
-        },
-        jobManagement: {
-          external: 'http://localhost:3004/remoteEntry.js',
-          externalType: 'url',
-        }
+        configEditor: "http://localhost:3001/remoteEntry.js",
+        yamlEditor: "http://localhost:3002/remoteEntry.js",
+        configSelector: "http://localhost:3003/remoteEntry.js",
+        jobManagement: "http://localhost:3004/remoteEntry.js"
       },
       shared: ['react', 'react-dom']
     })
@@ -40,11 +30,13 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    modulePreload: false
+    modulePreload: false,
+    assetsDir: '',  // Add this to ensure correct path
   },
   server: {
     port: 3000,
     strictPort: true,
+    cors: true,  // Add CORS support
     hmr: {
       timeout: 5000
     }
