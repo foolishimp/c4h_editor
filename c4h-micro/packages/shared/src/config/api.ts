@@ -16,16 +16,18 @@ export const api = axios.create({
   }
 });
 
-// Maintain the API_ENDPOINTS export to preserve functionality
+// Enhanced API endpoints supporting the configuration-driven approach
 export const API_ENDPOINTS = {
-  PROMPTS: '/api/v1/prompts',
-  PROMPT: (id: string) => `/api/v1/prompts/${id}`,
-  PROMPT_HISTORY: (id: string) => `/api/v1/prompts/${id}/history`,
-  PROMPT_DIFF: (id: string) => `/api/v1/prompts/${id}/diff`,
-  PROMPT_RENDER: (id: string) => `/api/v1/prompts/${id}/render`,
-  PROMPT_TEST: (id: string) => `/api/v1/prompts/${id}/test`,
+  // Config endpoints
+  CONFIG_TYPES: '/api/v1/config-types',
+  CONFIGS: (type: string) => `/api/v1/configs/${type}`,
+  CONFIG: (type: string, id: string) => `/api/v1/configs/${type}/${id}`,
+  CONFIG_HISTORY: (type: string, id: string) => `/api/v1/configs/${type}/${id}/history`,
+  CONFIG_CLONE: (type: string, id: string) => `/api/v1/configs/${type}/${id}/clone`,
+  CONFIG_ARCHIVE: (type: string, id: string) => `/api/v1/configs/${type}/${id}/archive`,
+  CONFIG_UNARCHIVE: (type: string, id: string) => `/api/v1/configs/${type}/${id}/unarchive`,
   
-  // WorkOrder endpoints
+  // Original workorder endpoints (backward compatibility)
   WORKORDERS: '/api/v1/workorders',
   WORKORDER: (id: string) => `/api/v1/workorders/${id}`,
   WORKORDER_HISTORY: (id: string) => `/api/v1/workorders/${id}/history`,
@@ -35,7 +37,7 @@ export const API_ENDPOINTS = {
   WORKORDER_RENDER: (id: string) => `/api/v1/workorders/${id}/render`,
   WORKORDER_TEST: (id: string) => `/api/v1/workorders/${id}/test`,
    
-  // Job endpoints
+  // Enhanced job endpoints
   JOBS: '/api/v1/jobs',
   JOB: (id: string) => `/api/v1/jobs/${id}`,
   JOB_CANCEL: (id: string) => `/api/v1/jobs/${id}/cancel`

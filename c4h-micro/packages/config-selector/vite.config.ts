@@ -1,4 +1,4 @@
-// File: packages/shell/vite.config.ts
+// File: packages/config-selector/vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
@@ -8,14 +8,15 @@ export default defineConfig({
   plugins: [
     react(),
     federation({
-      name: 'shell',
-      remotes: {
-        configEditor: 'http://localhost:3001/assets/remoteEntry.js',
-        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js',
-        configSelector: 'http://localhost:3003/assets/remoteEntry.js',
-        jobManagement: 'http://localhost:3004/assets/remoteEntry.js'
+      name: 'configSelector',
+      filename: 'remoteEntry.js',
+      exposes: {
+        './ConfigManager': './src/ConfigManager.tsx',
       },
-      shared: ['react', 'react-dom']
+      remotes: {
+        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js'
+      },
+      shared: ['react', 'react-dom', 'shared']
     })
   ],
   resolve: {
@@ -28,10 +29,14 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    // Make sure modulePreload is false for Module Federation
     modulePreload: false
   },
   server: {
-    port: 3000
+    port: 3003,
+    strictPort: true
+  },
+  preview: {
+    port: 3003,
+    strictPort: true
   }
 });

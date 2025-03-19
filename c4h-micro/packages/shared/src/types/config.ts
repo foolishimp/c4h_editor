@@ -1,14 +1,54 @@
-// File: c4h-editor-micro/packages/shared/src/types/config.ts
-// Migrated from original frontend
-
+// File: packages/shared/src/types/config.ts
 /**
- * File: frontend/src/types/config.ts
- * Unified configuration types for work orders
+ * Generic Configuration types
  */
 
-import { WorkOrderParameter } from './workorder';
+export interface ConfigMetadata {
+  author: string;
+  archived?: boolean;
+  created_at: string;
+  updated_at: string;
+  description?: string;
+  tags: string[];
+  version: string;
+}
 
-// Root configuration sections
+export interface ConfigVersionInfo {
+  version: string;
+  commit_hash: string;
+  created_at: string;
+  author: string;
+  message: string;
+}
+
+export interface Config {
+  id: string;
+  config_type: string;
+  content: Record<string, any>;
+  metadata: ConfigMetadata;
+  parent_id?: string;
+  lineage: string[];
+}
+
+export interface ConfigHistoryResponse {
+  config_id: string;
+  config_type: string;
+  versions: ConfigVersionInfo[];
+}
+
+// Export editor tab types for backward compatibility
+export enum EditorTab {
+  INTENT = 'intent',
+  SYSTEM = 'system'
+}
+
+export interface TabMetadata {
+  title: string;
+  description: string;
+  schemaExample: Record<string, any>;
+}
+
+// Export config section types for backward compatibility
 export enum ConfigSection {
   PROJECT = 'project',
   INTENT = 'intent',
@@ -19,13 +59,7 @@ export enum ConfigSection {
   LOGGING = 'logging'
 }
 
-// Maps UI tabs to specific config sections they edit
-export enum EditorTab {
-  INTENT = 'intent',
-  SYSTEM = 'system'
-}
-
-// Tab to sections mapping
+// Maps UI tabs to specific config sections they edit (backward compatibility)
 export const TAB_SECTIONS: Record<EditorTab, ConfigSection[]> = {
   [EditorTab.INTENT]: [ConfigSection.INTENT],
   [EditorTab.SYSTEM]: [
@@ -37,92 +71,3 @@ export const TAB_SECTIONS: Record<EditorTab, ConfigSection[]> = {
     ConfigSection.LOGGING
   ]
 };
-
-// Full unified configuration type
-export interface UnifiedConfig {
-  // Project settings
-  project?: {
-    path?: string;
-    workspace_root?: string;
-    source_root?: string;
-    output_root?: string;
-    config_root?: string;
-  };
-
-  // Intent (work order description)
-  intent?: {
-    description?: string;
-    target_files?: string[];
-  };
-
-  // LLM configuration
-  llm_config?: {
-    providers?: Record<string, any>;
-    default_provider?: string;
-    default_model?: string;
-    agents?: Record<string, any>;
-  };
-
-  // Orchestration configuration
-  orchestration?: {
-    enabled?: boolean;
-    entry_team?: string;
-    teams?: Record<string, any>;
-    error_handling?: {
-      retry_teams?: boolean;
-      max_retries?: number;
-      log_level?: string;
-    };
-  };
-
-  // Runtime configuration
-  runtime?: {
-    workflow?: {
-      storage?: Record<string, any>;
-    };
-    lineage?: Record<string, any>;
-  };
-
-  // Backup configuration
-  backup?: {
-    enabled?: boolean;
-    path?: string;
-  };
-
-  // Logging configuration
-  logging?: {
-    level?: string;
-    format?: string;
-    agent_level?: string;
-    providers?: Record<string, any>;
-    truncate?: Record<string, any>;
-  };
-}
-
-// Interface for tab-specific metadata (title, description, etc.)
-export interface TabMetadata {
-  title: string;
-  description: string;
-  schemaExample: Record<string, any>;
-}
-
-// Interface for the intent configuration handled by IntentConfigTab
-export interface IntentTabConfig {
-  description?: string;
-  target_files?: string[];
-  goals?: string;
-  priority?: string;
-  due_date?: string | null;
-  assignee?: string;
-  parameters?: WorkOrderParameter[];
-}
-
-// Interface for the system configuration handled by SystemConfigTab
-export interface SystemTabConfig {
-  project?: Record<string, any>;
-  llm_config?: Record<string, any>;
-  orchestration?: Record<string, any>;
-  runtime?: Record<string, any>;
-  backup?: Record<string, any>;
-  logging?: Record<string, any>;
-}

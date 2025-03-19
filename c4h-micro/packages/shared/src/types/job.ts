@@ -1,5 +1,7 @@
-// File: c4h-editor-micro/packages/shared/src/types/job.ts
-// Migrated from original frontend
+// File: packages/shared/src/types/job.ts
+/**
+ * Enhanced Job types to support the configuration-driven approach
+ */
 
 export enum JobStatus {
   CREATED = "created",
@@ -19,8 +21,7 @@ export interface JobResult {
 
 export interface Job {
   id: string;
-  workOrderId: string; // This is the correct property name in the type
-  workOrderVersion: string;
+  configurations: Record<string, { id: string, version: string } | string>;
   status: JobStatus;
   serviceJobId?: string;
   createdAt: string;
@@ -28,6 +29,6 @@ export interface Job {
   submittedAt?: string;
   completedAt?: string;
   userId?: string;
-  configuration: Record<string, any>;
-  results?: JobResult; // This is the correct property in the type
+  configuration?: Record<string, any>; // Deprecated, for backward compatibility
+  result?: JobResult;
 }

@@ -1,41 +1,20 @@
-// File: c4h-editor-micro/packages/shell/src/components/common/Navigation.tsx
-// Migrated from original frontend
-
-// File: frontend/src/components/common/Navigation.tsx
-/**
- * Navigation component for the application
- */
-
+// File: packages/shell/src/components/common/Navigation.tsx
 import React from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Drawer,
   AppBar,
   Toolbar,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Typography,
   Box,
 } from '@mui/material';
-import {
-  Description as DescriptionIcon,
-  Work as WorkIcon,
-} from '@mui/icons-material';
+import ConfigTypeSidebar from './ConfigTypeSidebar';
 
-/**
- * Navigation component that displays the app bar and navigation drawer
- */
-const Navigation: React.FC = () => {
-  const location = useLocation();
-  const drawerWidth = 240;
+interface NavigationProps {
+  drawerWidth: number;
+}
 
-  // Check if the current path matches the given path
-  const isActive = (path: string): boolean => {
-    return location.pathname.startsWith(path);
-  };
-
+const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
   return (
     <>
       {/* App Bar */}
@@ -48,7 +27,7 @@ const Navigation: React.FC = () => {
       >
         <Toolbar>
           <Typography variant="h6" noWrap component="div">
-            C4H WorkOrder Editor
+            C4H Editor
           </Typography>
         </Toolbar>
       </AppBar>
@@ -66,33 +45,7 @@ const Navigation: React.FC = () => {
           },
         }}
       >
-        <Box sx={{ overflow: 'auto' }}>
-          <List>
-            <ListItem
-              button
-              component={RouterLink}
-              to="/workorders"
-              selected={isActive('/workorders')}
-            >
-              <ListItemIcon>
-                <DescriptionIcon />
-              </ListItemIcon>
-              <ListItemText primary="WorkOrders" />
-            </ListItem>
-
-            <ListItem
-              button
-              component={RouterLink}
-              to="/jobs"
-              selected={isActive('/jobs')}
-            >
-              <ListItemIcon>
-                <WorkIcon />
-              </ListItemIcon>
-              <ListItemText primary="Jobs" />
-            </ListItem>
-          </List>
-        </Box>
+        <ConfigTypeSidebar drawerWidth={drawerWidth} />
       </Drawer>
     </>
   );

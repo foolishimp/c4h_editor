@@ -9,6 +9,10 @@ export * from './types/workorder';
 export * from './types/job';
 export * from './types/config';
 
+// Export config registry
+export * from './config/configTypes';
+export * from './config/remotes';
+
 // Export utils
 export { default as eventBus } from './utils/eventBus';
 

@@ -5,22 +5,28 @@
     "packages/*"
   ],
   "scripts": {
-    "start": "concurrently -n \"config-editor,shell\" -c \"blue,green\" \"npm run start:config-editor\" \"wait-on http://localhost:3001 && npm run start:shell\"",
+    "start": "concurrently -n \"yaml-editor,config-selector,job-management,config-editor,shell\" -c \"yellow,cyan,magenta,blue,green\" \"npm run start:yaml-editor\" \"npm run start:config-selector\" \"npm run start:job-management\" \"npm run start:config-editor\" \"wait-on http://localhost:3001 http://localhost:3002 http://localhost:3003 && npm run start:shell\"",
     "start:shell": "npm run start -w packages/shell",
     "start:config-editor": "npm run start -w packages/config-editor",
     "dev:setup": "node scripts/setup-dev-environment.js",
     "dev:direct": "node scripts/dev-direct.js",
-    "build": "npm run build:shared && npm run build:config-editor && npm run build:shell",
+    "build": "npm run build:shared && npm run build:yaml-editor && npm run build:config-selector && npm run build:job-management && npm run build:config-editor && npm run build:shell",
     "build:shared": "npm run build -w packages/shared",
     "build:shell": "npm run build -w packages/shell",
-    "build:config-editor": "npm run build -w packages/config-editor"
+    "build:config-editor": "npm run build -w packages/config-editor",
+    "start:yaml-editor": "npm run start -w packages/yaml-editor",
+    "build:yaml-editor": "npm run build -w packages/yaml-editor",
+    "start:config-selector": "npm run start -w packages/config-selector",
+    "build:config-selector": "npm run build -w packages/config-selector",
+    "start:job-management": "npm run start -w packages/job-management",
+    "build:job-management": "npm run build -w packages/job-management"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
     "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
     "concurrently": "^8.2.2",
-    "wait-on": "^7.2.0", 
+    "wait-on": "^7.2.0",
     "typescript": "^5.3.3"
   }
 }
