@@ -5,12 +5,11 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
-  base: '',  // Add this line to ensure correct base path
+  base: '',
   plugins: [
     react(),
     federation({
       name: 'shell',
-      // Simplified remotes format - this is the key change
       remotes: {
         configEditor: "http://localhost:3001/remoteEntry.js",
         yamlEditor: "http://localhost:3002/remoteEntry.js",
@@ -31,17 +30,29 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: '',  // Add this to ensure correct path
+    assetsDir: '',
+    rollupOptions: {
+      output: {
+        format: 'esm',
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+      }
+    }
   },
   server: {
     port: 3000,
     strictPort: true,
-    cors: true,  // Add CORS support
+    cors: true,
     hmr: {
       timeout: 5000
     }
   },
   optimizeDeps: {
-    force: true
+    force: true,
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   }
 });

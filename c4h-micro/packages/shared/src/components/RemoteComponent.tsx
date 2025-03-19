@@ -1,4 +1,4 @@
-// File: packages/shared/src/components/RemoteComponent.tsx
+// File: c4h-micro/packages/shared/src/components/RemoteComponent.tsx
 import React from 'react';
 import { CircularProgress, Typography, Box, Button } from '@mui/material';
 
@@ -45,21 +45,31 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     try {
       console.log(`Loading remote module ${scope} from ${url}`);
       
+      // Check if the container is already loaded
       // @ts-ignore - federation types are not available
-      const container = window[scope];
-      if (!container) {
-        // Load the remote container using import() instead of script tag
-        // This is the key change - using import() means it's loaded as an ES module
-        try {
-          await import(/* @vite-ignore */ url);
-          console.log(`Successfully loaded ${scope}`);
-        } catch (err) {
-          console.error(`Failed to load script: ${url}`, err);
-          throw new Error(`Failed to load remote module: ${url}, error: ${err}`);
-        }
+      if (!window[scope]) {
+        // Load the script dynamically
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = url;
+          script.type = 'text/javascript';
+          script.async = true;
+          
+          script.onload = () => {
+            console.log(`Successfully loaded ${scope}`);
+            resolve();
+          };
+          
+          script.onerror = (error) => {
+            console.error(`Failed to load script: ${url}`, error);
+            reject(new Error(`Failed to load remote entry: ${url}`));
+          };
+          
+          document.head.appendChild(script);
+        });
       }
       
-      // Check if the container was loaded
+      // Check if the container was properly loaded
       // @ts-ignore - federation types are not available
       if (!window[scope]) {
         throw new Error(`Remote container ${scope} was not loaded properly from ${url}`);
@@ -70,7 +80,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       await window[scope].init(__webpack_share_scopes__.default);
       
       // Get the module factory
-      // @ts-ignore - federation types are not available
+      // @ts-ignore - federation types are not available  
       const factory = await window[scope].get(module);
       if (!factory) {
         throw new Error(`Module ${module} not found in remote container ${scope}`);

@@ -18,28 +18,7 @@ import {
 } from '@mui/material';
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes } from 'shared';
-import { lazy, Suspense } from 'react';
-
-// Lazy load the YamlEditor from the remote microfrontend
-const YamlEditor = lazy(() => import('yamlEditor/YamlEditor'));
-
-// Loading placeholder for the YamlEditor
-const YamlEditorLoading = () => (
-  <Paper sx={{ p: 3, height: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-    <CircularProgress />
-  </Paper>
-);
-
-// Error fallback if YamlEditor fails to load
-const YamlEditorError = () => (
-  <Paper sx={{ p: 3, height: '500px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-    <Typography variant="h6" color="error" gutterBottom>Failed to load YAML Editor</Typography>
-    <Typography>Please ensure the YAML Editor microfrontend is running on port 3002.</Typography>
-    <Button variant="contained" onClick={() => window.location.reload()} sx={{ mt: 2 }}>
-      Retry
-    </Button>
-  </Paper>
-);
+import { RemoteComponent } from 'shared';
 
 interface ConfigEditorProps {
   configId: string;
@@ -96,14 +75,14 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
     if (hasChanges) {
       setShowDiscardDialog(true);
     } else {
-      navigate(`/${configType}`);
+      navigate(`/configs/${configType}`);
     }
   };
   
   // Handle discard dialog confirm
   const handleDiscardConfirm = () => {
     setShowDiscardDialog(false);
-    navigate(`/${configType}`);
+    navigate(`/configs/${configType}`);
   };
   
   // Handle discard dialog cancel
@@ -125,7 +104,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
     if (savedConfig) {
       // Navigate to the config page if this was a new config
       if (configId === 'new') {
-        navigate(`/${configType}/${savedConfig.id}`);
+        navigate(`/configs/${configType}/${savedConfig.id}`);
       }
     }
   };
@@ -184,18 +163,24 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
         />
       )}
       
-      {/* YAML Editor */}
-      <Suspense fallback={<YamlEditorLoading />}>
-        <ErrorBoundary fallback={<YamlEditorError />}>
-          <YamlEditor
-            yaml={yaml}
-            onChange={handleYamlChange}
-            onSave={handleSave}
-            title={`${configName} Configuration`}
-            description={`Edit the ${configName.toLowerCase()} configuration in YAML format. Changes will only be applied when you save.`}
-          />
-        </ErrorBoundary>
-      </Suspense>
+      {/* YAML Editor using RemoteComponent */}
+      <RemoteComponent
+        url="http://localhost:3002/remoteEntry.js"
+        scope="yamlEditor"
+        module="./YamlEditor"
+        props={{
+          yaml: yaml,
+          onChange: handleYamlChange,
+          onSave: handleSave,
+          title: `${configName} Configuration`,
+          description: `Edit the ${configName.toLowerCase()} configuration in YAML format. Changes will only be applied when you save.`
+        }}
+        fallback={
+          <Paper sx={{ p: 3, height: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <CircularProgress />
+          </Paper>
+        }
+      />
       
       {/* Error message */}
       {error && (
@@ -229,28 +214,5 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
     </Box>
   );
 };
-
-// Simple error boundary component
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-
-    return this.props.children;
-  }
-}
 
 export default ConfigEditor;

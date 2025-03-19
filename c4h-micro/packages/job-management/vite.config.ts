@@ -12,7 +12,7 @@ export default defineConfig({
       name: 'jobManagement',
       filename: 'remoteEntry.js',
       exposes: {
-        './JobManager': './src/JobManager.tsx',  // THIS WAS THE ERROR - make sure it's JobManager not ConfigManager
+        './JobManager': './src/JobManager.tsx',
       },
       shared: ['react', 'react-dom', 'shared']
     })

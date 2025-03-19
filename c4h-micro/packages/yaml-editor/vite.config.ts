@@ -5,6 +5,8 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
+  // Add empty base for proper path resolution
+  base: '',
   plugins: [
     react(),
     federation({
@@ -27,6 +29,8 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
+    // Add assetsDir for consistent asset paths
+    assetsDir: '',
     rollupOptions: {
       output: {
         format: 'esm',
@@ -43,8 +47,8 @@ export default defineConfig({
     }
   },
   preview: {
-    port: 3001, // (use appropriate port for each: 3001, 3002, or 3004)
+    port: 3002, // Fixed port to match the expected URL
     strictPort: true,
-    cors: true  // Add this line
+    cors: true  // Enable CORS
   }
 });
