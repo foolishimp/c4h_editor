@@ -1,8 +1,343 @@
-# File: backend/api/routes/configs.py
+#!/usr/bin/env python
+# File: remove_lineage_tracker.py
 """
+Script to remove the lineage tracker from the C4H Editor backend.
+"""
+
+import os
+import shutil
+from pathlib import Path
+from datetime import datetime
+import stat
+
+# Files to update
+FILES_TO_UPDATE = {
+    "backend/main.py": "main.py",
+    "backend/dependencies.py": "dependencies.py",
+    "backend/api/routes/configs.py": "configs.py"
+}
+
+# File to remove
+LINEAGE_TRACKER_FILE = "backend/services/lineage_tracker.py"
+
+def remove_readonly(func, path, _):
+    """Clear the readonly bit and reattempt removal."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+def main():
+    """Main function to remove the lineage tracker."""
+    # Create backup directory
+    backup_dir = Path(f"lineage_backup_{datetime.now().strftime('%Y%m%d%H%M%S')}")
+    backup_dir.mkdir(exist_ok=True)
+    
+    print(f"Backing up files to {backup_dir}")
+    
+    # Backup and remove lineage tracker file
+    lineage_path = Path(LINEAGE_TRACKER_FILE)
+    if lineage_path.exists():
+        # Create parent directories in backup
+        backup_path = backup_dir / lineage_path
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Backup file
+        shutil.copy2(lineage_path, backup_path)
+        print(f"Backed up: {lineage_path}")
+        
+        # Remove file
+        if os.name == 'nt' and not os.access(lineage_path, os.W_OK):
+            # Handle read-only files on Windows
+            os.chmod(lineage_path, stat.S_IWRITE)
+        lineage_path.unlink()
+        print(f"Removed: {lineage_path}")
+    else:
+        print(f"Lineage tracker file not found: {lineage_path}")
+    
+    # Update files to remove lineage tracker dependencies
+    for file_path, name in FILES_TO_UPDATE.items():
+        path = Path(file_path)
+        if path.exists():
+            # Backup file
+            backup_path = backup_dir / path
+            backup_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, backup_path)
+            print(f"Backed up: {path}")
+            
+            # Check which file we're updating and use the appropriate content
+            if name == "main.py":
+                with open("backend/main.py", "w") as f:
+                    f.write(MAIN_PY_CONTENT)
+                print(f"Updated: {path}")
+            elif name == "dependencies.py":
+                with open("backend/dependencies.py", "w") as f:
+                    f.write(DEPENDENCIES_PY_CONTENT)
+                print(f"Updated: {path}")
+            elif name == "configs.py":
+                with open("backend/api/routes/configs.py", "w") as f:
+                    f.write(CONFIGS_PY_CONTENT)
+                print(f"Updated: {path}")
+        else:
+            print(f"File not found: {path}")
+    
+    # Search for other lineage tracker references
+    print("\nChecking for other lineage tracker references...")
+    backend_dir = Path("backend")
+    if backend_dir.exists():
+        for path in backend_dir.glob("**/*.py"):
+            # Skip files we've already updated
+            if path in [Path(p) for p in FILES_TO_UPDATE.keys()]:
+                continue
+                
+            # Check for lineage references
+            with open(path, "r") as f:
+                content = f.read()
+                
+            if "lineage_tracker" in content.lower() or "get_lineage_tracker" in content:
+                print(f"Found lineage tracker reference in: {path}")
+                print("  You may need to manually update this file to remove lineage tracker references.")
+    
+    print("\nLineage tracker removal complete!")
+    print(f"Backups stored in: {backup_dir}")
+    print("\nNext steps:")
+    print("1. Check for any manually reported files that may still contain lineage tracker references")
+    print("2. Run the server with: uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000")
+
+# File content for main.py
+MAIN_PY_CONTENT = """# File: backend/main.py
+\"\"\"
+Main application entry point for the C4H Backend.
+Sets up FastAPI, routes, and middleware.
+Focused on configuration management and C4H service access.
+\"\"\"
+
+import logging
+import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+from contextlib import asynccontextmanager
+
+# Import only the routes we need - removing legacy routes
+from backend.api.routes.configs import router as configs_router
+from backend.api.routes.jobs import router as jobs_router
+from backend.services.config_repository import ConfigRepository
+from backend.services.job_repository import JobRepository
+from backend.services.c4h_service import C4HService
+from backend.config import load_config
+from backend.config.config_types import load_config_types, get_config_types
+from backend.dependencies import get_job_repository, get_c4h_service
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Load configuration
+config_path = os.environ.get("CONFIG_PATH", "./config.yaml")
+config = load_config(config_path)
+
+# Load configuration types
+config_types = load_config_types()
+
+# Lifespan context manager for setup and cleanup
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize services
+    logger.info("Application starting up")
+    
+    # Initialize repos for all registered config types
+    for config_type in config_types.keys():
+        repo_path = config_types[config_type].get("repository", {}).get("path")
+        if repo_path:
+            path = Path(repo_path)
+            path.parent.mkdir(exist_ok=True)
+            ConfigRepository(config_type, str(path))
+            logger.info(f"Initialized repository for {config_type}")
+    
+    # Make sure other dependencies are initialized
+    get_job_repository()
+    
+    c4h_service = get_c4h_service()
+    
+    yield
+    
+    # Shutdown: clean up resources
+    logger.info("Application shutting down")
+    
+    # Close C4H service client
+    await c4h_service.close()
+
+# Create FastAPI app with lifespan
+app = FastAPI(
+    title="C4H Editor API",
+    description="API for managing configurations with version control",
+    version="0.2.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware with configuration from config
+origins = config.get("api", {}).get("cors_origins", ["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers - only using the new generic ones
+app.include_router(configs_router)
+app.include_router(jobs_router)
+
+# Add health check endpoint
+@app.get("/health")
+async def health_check():
+    \"\"\"Health check endpoint for the API.\"\"\"
+    # Get all available config types
+    available_config_types = list(get_config_types().keys())
+    
+    return {
+        "status": "healthy",
+        "version": "0.2.0",
+        "config_loaded": bool(config),
+        "services": {
+            "repository": True,
+            "jobs": True,
+            "c4h": True
+        },
+        "supported_config_types": available_config_types
+    }
+
+@app.get("/api/v1/config-types")
+async def get_config_types_endpoint():
+    \"\"\"Get all registered configuration types.\"\"\"
+    config_types_info = get_config_types()
+    
+    # Format for API response
+    result = []
+    for key, info in config_types_info.items():
+        result.append({
+            "type": key,
+            "name": info.get("name", key),
+            "description": info.get("description", ""),
+            "supportsVersioning": info.get("supportsVersioning", True)
+        })
+        
+    return result
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Get host and port from environment or config
+    host = os.environ.get("HOST", config.get("api", {}).get("host", "0.0.0.0"))
+    port = int(os.environ.get("PORT", config.get("api", {}).get("port", 8000)))
+    
+    # Start server
+    uvicorn.run(app, host=host, port=port)
+"""
+
+# File content for dependencies.py
+DEPENDENCIES_PY_CONTENT = """# File: backend/dependencies.py
+\"\"\"
+Dependency injection functions for FastAPI endpoints.
+Focused on configuration management and C4H service access.
+\"\"\"
+
+from fastapi import Depends
+from pathlib import Path
+from typing import Dict, Optional
+import logging
+
+# Import services - remove lineage tracker
+from backend.services.config_repository import ConfigRepository
+from backend.services.workorder_repository_v2 import WorkOrderRepository
+from backend.services.teamconfig_repository import TeamConfigRepository
+from backend.services.runtimeconfig_repository import RuntimeConfigRepository
+from backend.services.job_repository import JobRepository
+from backend.services.c4h_service import C4HService
+from backend.config.config_types import get_config_types
+
+# Configure logger
+logger = logging.getLogger(__name__)
+
+# Singleton instances
+_repositories = {}
+_job_repository = None
+_c4h_service = None
+
+def get_config_repository(config_type: str) -> ConfigRepository:
+    \"\"\"Get or create a configuration repository instance.\"\"\"
+    global _repositories
+    
+    if config_type not in _repositories:
+        repo_path = get_config_types().get(config_type, {}).get("repository", {}).get("path")
+        if repo_path:
+            path = Path(repo_path)
+            path.parent.mkdir(exist_ok=True)
+            
+            if config_type == "workorder":
+                _repositories[config_type] = WorkOrderRepository(str(path))
+                logger.info(f"Created WorkOrderRepository at {path}")
+            elif config_type == "teamconfig":
+                _repositories[config_type] = TeamConfigRepository(str(path))
+                logger.info(f"Created TeamConfigRepository at {path}")
+            elif config_type == "runtimeconfig":
+                _repositories[config_type] = RuntimeConfigRepository(str(path))
+                logger.info(f"Created RuntimeConfigRepository at {path}")
+            else:
+                _repositories[config_type] = ConfigRepository(config_type, str(path))
+                logger.info(f"Created generic ConfigRepository for {config_type} at {path}")
+        else:
+            _repositories[config_type] = ConfigRepository(config_type)
+            logger.info(f"Created generic ConfigRepository for {config_type} with default path")
+            
+    return _repositories[config_type]
+
+def get_workorder_repository():
+    \"\"\"Get or create a workorder repository instance.\"\"\"
+    return get_config_repository("workorder")
+
+def get_teamconfig_repository():
+    \"\"\"Get or create a team config repository instance.\"\"\"
+    return get_config_repository("teamconfig")
+
+def get_runtimeconfig_repository():
+    \"\"\"Get or create a runtime config repository instance.\"\"\"
+    return get_config_repository("runtimeconfig")
+
+def get_job_repository():
+    \"\"\"Get or create a job repository instance.\"\"\"
+    global _job_repository
+    if _job_repository is None:
+        job_path = Path("./data/jobs")
+        job_path.parent.mkdir(exist_ok=True)
+        _job_repository = JobRepository(str(job_path))
+        logger.info(f"Created JobRepository at {job_path}")
+    return _job_repository
+
+def get_c4h_service():
+    \"\"\"Get or create a C4H service client instance.\"\"\"
+    global _c4h_service
+    if _c4h_service is None:
+        # Load from default config path if available
+        config_path = Path("./config.yaml")
+        if config_path.exists():
+            _c4h_service = C4HService(str(config_path))
+            logger.info(f"Created C4HService with config from {config_path}")
+        else:
+            _c4h_service = C4HService()
+            logger.info("Created C4HService with default config")
+    return _c4h_service
+"""
+
+# File content for configs.py
+CONFIGS_PY_CONTENT = """# File: backend/api/routes/configs.py
+\"\"\"
 Generic API routes for configuration management.
 These endpoints support all configuration types in a unified interface.
-"""
+\"\"\"
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -62,7 +397,7 @@ class ConfigHistoryResponse(BaseModel):
 # Get configuration types endpoint
 @router.get("/types", response_model=List[Dict[str, Any]])
 async def get_configuration_types():
-    """Get all registered configuration types."""
+    \"\"\"Get all registered configuration types.\"\"\"
     try:
         config_types = get_config_types()
         
@@ -88,7 +423,7 @@ async def list_configs(
     config_type: str = Path(..., description="The type of configuration"),
     archived: Optional[bool] = Query(None, description="Filter by archived status")
 ):
-    """List all configurations of a specific type."""
+    \"\"\"List all configurations of a specific type.\"\"\"
     try:
         # Validate config type
         try:
@@ -121,7 +456,7 @@ async def get_config(
     config_id: str = Path(..., description="The ID of the configuration to retrieve"),
     version: Optional[str] = Query(None, description="Optional version or commit reference")
 ):
-    """Get a configuration by type, ID and optional version."""
+    \"\"\"Get a configuration by type, ID and optional version.\"\"\"
     try:
         # Validate config type
         try:
@@ -166,7 +501,7 @@ async def create_config(
     config_type: str = Path(..., description="The type of configuration"),
     request: ConfigCreateRequest = Body(...)
 ):
-    """Create a new configuration."""
+    \"\"\"Create a new configuration.\"\"\"
     try:
         # Validate config type
         try:
@@ -224,7 +559,7 @@ async def update_config(
     config_id: str = Path(..., description="The ID of the configuration to update"),
     request: ConfigUpdateRequest = Body(...)
 ):
-    """Update an existing configuration."""
+    \"\"\"Update an existing configuration.\"\"\"
     try:
         # Validate config type
         try:
@@ -288,7 +623,7 @@ async def delete_config(
     commit_message: str = Query(..., description="Commit message"),
     author: str = Query(..., description="Author of the commit")
 ):
-    """Delete a configuration."""
+    \"\"\"Delete a configuration.\"\"\"
     try:
         # Validate config type
         try:
@@ -320,7 +655,7 @@ async def get_config_history(
     config_type: str = Path(..., description="The type of configuration"),
     config_id: str = Path(..., description="The ID of the configuration")
 ):
-    """Get the version history of a configuration."""
+    \"\"\"Get the version history of a configuration.\"\"\"
     try:
         # Validate config type
         try:
@@ -365,7 +700,7 @@ async def archive_config(
     config_id: str = Path(..., description="The ID of the configuration to archive"),
     author: str = Query(..., description="Author of the action")
 ):
-    """Archive a configuration."""
+    \"\"\"Archive a configuration.\"\"\"
     try:
         # Validate config type
         try:
@@ -394,7 +729,7 @@ async def unarchive_config(
     config_id: str = Path(..., description="The ID of the configuration to unarchive"),
     author: str = Query(..., description="Author of the action")
 ):
-    """Unarchive a configuration."""
+    \"\"\"Unarchive a configuration.\"\"\"
     try:
         # Validate config type
         try:
@@ -424,7 +759,7 @@ async def clone_config(
     new_id: str = Query(..., description="ID for the cloned configuration"),
     author: str = Query(..., description="Author of the clone")
 ):
-    """Clone a configuration to create a new one."""
+    \"\"\"Clone a configuration to create a new one.\"\"\"
     try:
         # Validate config type
         try:
@@ -456,3 +791,18 @@ async def clone_config(
         logger.error(f"Error cloning configuration: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to clone configuration: {str(e)}")
+"""
+
+if __name__ == "__main__":
+    # Ask for confirmation
+    print("This script will remove the lineage tracker from the C4H Editor backend.")
+    print("The following files will be modified:")
+    for file in FILES_TO_UPDATE.keys():
+        print(f"  - {file}")
+    print(f"The following file will be removed: {LINEAGE_TRACKER_FILE}")
+    
+    confirm = input("\nAre you sure you want to proceed? (y/n): ")
+    if confirm.lower() == 'y':
+        main()
+    else:
+        print("Operation cancelled.")
