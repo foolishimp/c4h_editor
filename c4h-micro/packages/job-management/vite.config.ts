@@ -1,5 +1,4 @@
 // File: c4h-micro/packages/job-management/vite.config.ts
-// Import the type definitions we created
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
@@ -21,11 +20,13 @@ export default defineConfig({
         react: { 
           singleton: true,
           requiredVersion: '^18.0.0',
-          eager: false 
+          eager: true  // Change to eager: true
         },
-        'react-dom': { singleton: true,
+        'react-dom': { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true },
+          eager: true 
+        },
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0',
@@ -58,8 +59,7 @@ export default defineConfig({
         chunkFileNames: '[name].js',
         assetFileNames: '[name].[ext]'
       }
-    },
-    outDir: 'dist' // Ensure output directory is explicitly set
+    }
   },
   server: {
     port: 3004,
@@ -69,7 +69,8 @@ export default defineConfig({
       timeout: 5000
     },
     headers: {
-      "Access-Control-Allow-Origin": "*"
+      "Access-Control-Allow-Origin": "*",
+      "Content-Type": "application/javascript"
     }
   },
   preview: {
@@ -78,6 +79,7 @@ export default defineConfig({
     cors: true,
     headers: {
       "Access-Control-Allow-Origin": "*",
+      "Content-Type": "application/javascript"
     }
   },
   optimizeDeps: {

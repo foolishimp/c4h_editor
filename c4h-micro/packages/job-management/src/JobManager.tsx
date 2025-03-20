@@ -1,5 +1,5 @@
-// File: packages/job-management/src/JobManager.tsx
-import React, { useState } from 'react';
+// File: c4h-micro/packages/job-management/src/JobManager.tsx
+import { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { JobProvider } from './contexts/JobContext';
 import JobCreator from './components/JobCreator';
@@ -10,7 +10,10 @@ interface JobManagerProps {
   showJobCreator?: boolean;
 }
 
-const JobManager: React.FC<JobManagerProps> = ({ showJobCreator = true }) => {
+// Using regular function declaration instead of arrow function
+// to ensure React hooks work correctly across module boundaries
+function JobManager(props: JobManagerProps) {
+  const { showJobCreator = true } = props;
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   
   return (
@@ -37,6 +40,6 @@ const JobManager: React.FC<JobManagerProps> = ({ showJobCreator = true }) => {
       </Box>
     </JobProvider>
   );
-};
+}
 
 export default JobManager;

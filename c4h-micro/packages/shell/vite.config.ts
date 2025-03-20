@@ -21,10 +21,14 @@ export default defineConfig({
       shared: {
         react: { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          requiredVersion: '^18.0.0',
+          eager: true
         },
-        'react-dom': { singleton: true,
-          requiredVersion: '^18.0.0', eager: true },
+        'react-dom': { 
+          singleton: true,
+          requiredVersion: '^18.0.0', 
+          eager: true 
+        },
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0'
@@ -62,12 +66,18 @@ export default defineConfig({
     cors: true,
     hmr: {
       timeout: 5000
+    },
+    headers: {
+      "Access-Control-Allow-Origin": "*"
     }
   },
   preview: {
     port: 3000,
     strictPort: true,
-    cors: true
+    cors: true,
+    headers: {
+      "Access-Control-Allow-Origin": "*"
+    }
   },
   optimizeDeps: {
     force: true,

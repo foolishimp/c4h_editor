@@ -1,6 +1,6 @@
 #!/bin/bash
-# File: c4h-micro/rebuild-all.sh
-# This script rebuilds all packages after updating Vite configurations
+# File: c4h-micro/startup.sh
+# This script rebuilds and starts all packages with proper dependency order
 
 # This script assumes it's being run from the c4h-micro directory
 # where the package.json with workspaces is located
@@ -36,7 +36,7 @@ if [ $? -ne 0 ]; then
 fi
 echo "✅ Shared package built successfully"
 
-# 4. Build YAML Editor (needed by config-selector)
+# 4. Build all microfrontends in proper order
 echo "🔨 Building YAML Editor..."
 npm run build:yaml-editor
 if [ $? -ne 0 ]; then
@@ -45,7 +45,6 @@ if [ $? -ne 0 ]; then
 fi
 echo "✅ YAML Editor built successfully"
 
-# 5. Build remaining microfrontends
 echo "🔨 Building Config Selector..."
 npm run build:config-selector
 if [ $? -ne 0 ]; then
@@ -70,7 +69,7 @@ if [ $? -ne 0 ]; then
 fi
 echo "✅ Config Editor built successfully"
 
-echo "🔨 Building Shell..."
+echo "🔨 Building Shell (last)..."
 npm run build:shell
 if [ $? -ne 0 ]; then
   echo "❌ Failed to build Shell. Exiting."
@@ -78,9 +77,46 @@ if [ $? -ne 0 ]; then
 fi
 echo "✅ Shell built successfully"
 
-echo "🎉 All packages have been successfully rebuilt!"
-echo "Run ./startup.sh to start the application"
+# 5. Run all in preview mode for consistent environment
+echo "🚀 Starting all in preview mode..."
+echo "Starting preview servers for microfrontends..."
 
-# 6. Start all servers
-echo "🚀 Starting all servers..."
-npm run start
+# Start all preview servers - using absolute paths from project root
+ROOT_DIR=$(pwd)
+
+# Start YAML Editor
+echo "Starting YAML Editor..."
+cd "$ROOT_DIR/packages/yaml-editor" && npm run preview &
+YAML_PID=$!
+echo "Started YAML Editor preview server (PID: $YAML_PID)"
+
+# Start Config Selector
+echo "Starting Config Selector..."
+cd "$ROOT_DIR/packages/config-selector" && npm run preview &
+CONFIG_SELECTOR_PID=$!
+echo "Started Config Selector preview server (PID: $CONFIG_SELECTOR_PID)"
+
+# Start Job Management
+echo "Starting Job Management..."
+cd "$ROOT_DIR/packages/job-management" && npm run preview &
+JOB_MANAGEMENT_PID=$!
+echo "Started Job Management preview server (PID: $JOB_MANAGEMENT_PID)"
+
+# Start Config Editor
+echo "Starting Config Editor..."
+cd "$ROOT_DIR/packages/config-editor" && npm run preview &
+CONFIG_EDITOR_PID=$!
+echo "Started Config Editor preview server (PID: $CONFIG_EDITOR_PID)"
+
+# Wait for all microfrontends to be available before starting shell
+echo "Waiting for all microfrontends to be available..."
+sleep 5
+
+# Start shell in foreground
+echo "Starting Shell preview server..."
+cd "$ROOT_DIR/packages/shell" && npm run preview
+
+# This will only execute when shell is terminated
+echo "Shell terminated. Cleaning up microfrontend processes..."
+kill $YAML_PID $CONFIG_SELECTOR_PID $JOB_MANAGEMENT_PID $CONFIG_EDITOR_PID
+echo "All processes terminated."
