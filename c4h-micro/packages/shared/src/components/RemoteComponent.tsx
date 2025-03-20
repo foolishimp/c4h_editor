@@ -1,7 +1,6 @@
-// File: packages/shared/src/components/RemoteComponent.tsx
-// Improved RemoteComponent implementation for Vite Federation compatibility
+// File: c4h-micro/packages/shared/src/components/RemoteComponent.tsx
 import React from 'react';
-import { CircularProgress, Typography, Box, Button, Alert } from '@mui/material';
+import { CircularProgress, Typography, Box, Button, Alert, Paper } from '@mui/material';
 
 interface RemoteComponentProps {
   url: string;
@@ -31,7 +30,7 @@ declare global {
 }
 
 // Flag to enable detailed debug logging
-const DEBUG_MODE = false;
+const DEBUG_MODE = true; // Set to true for troubleshooting
 
 // Helper function for logging
 const logDebug = (message: string, ...args: any[]) => {
@@ -97,6 +96,19 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       if (!containerExists) {
         // Load the remote entry script
         this.addDiagnostic('Container not found, loading script...');
+        
+        // MODIFICATION: First check if the remote is accessible
+        try {
+          const checkResponse = await fetch(url, { method: 'HEAD' });
+          if (!checkResponse.ok) {
+            throw new Error(`Remote returned status ${checkResponse.status}`);
+          }
+          this.addDiagnostic(`Remote URL is accessible with status: ${checkResponse.status}`);
+        } catch (checkError) {
+          this.addDiagnostic(`Remote URL check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
+          // Continue anyway, the script loading might still succeed
+        }
+        
         await this.loadRemoteEntryScript(url);
       }
       
@@ -171,10 +183,19 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
   async loadRemoteEntryScript(url: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const startTime = performance.now();
+      
+      // MODIFICATION: Check if there's an existing script with the same URL
+      const existingScript = document.querySelector(`script[src="${url}"]`);
+      if (existingScript) {
+        this.addDiagnostic(`Found existing script tag for ${url}, removing it to retry loading`);
+        existingScript.remove();
+      }
+      
       const script = document.createElement('script');
       script.src = url;
       script.type = 'text/javascript';
       script.async = true;
+      script.crossOrigin = 'anonymous'; // Add cross-origin attribute
       
       script.onload = () => {
         const loadTime = Math.round(performance.now() - startTime);
@@ -182,8 +203,8 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
         resolve();
       };
       
-      script.onerror = () => {
-        this.addDiagnostic(`Script failed to load: ${url}`);
+      script.onerror = (event) => {
+        this.addDiagnostic(`Script failed to load: ${url}, error type: ${event.type}`);
         reject(new Error(`Failed to load remote entry script: ${url}`));
       };
       
@@ -240,7 +261,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       const healthDiagnostics = this.checkContainerHealth();
       
       return (
-        <Box sx={{ p: 3, textAlign: 'center', border: '1px solid #f5f5f5', borderRadius: 2 }}>
+        <Paper sx={{ p: 3, textAlign: 'center', border: '1px solid #f5f5f5', borderRadius: 2 }}>
           <Typography variant="h6" color="error" gutterBottom>
             Failed to load component
           </Typography>
@@ -253,7 +274,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
               This could be because:
             </Typography>
             <ul style={{ textAlign: 'left' }}>
-              <li>The microfrontend server is not running at the expected URL</li>
+              <li>The microfrontend server at <code>{this.props.url}</code> is not running</li>
               <li>The remoteEntry.js file is using a different federation format than expected</li>
               <li>There's a network issue preventing the connection</li>
               <li>The module name or scope is incorrect</li>
@@ -288,7 +309,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           >
             Reload Page
           </Button>
-        </Box>
+        </Paper>
       );
     }
     
