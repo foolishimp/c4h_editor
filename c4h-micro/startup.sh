@@ -1,6 +1,6 @@
 #!/bin/bash
-# File: c4h-micro/startup-enhanced.sh
-# An enhanced script to correctly start the C4H Editor frontend with proper build and verification
+# File: c4h-micro/fix-startup.sh
+# A simplified fix script to properly start the C4H Editor microfrontends
 
 # This script assumes it's being run from the c4h-micro directory
 # where the package.json with workspaces is located
@@ -12,16 +12,12 @@ if [ ! -f "package.json" ]; then
   exit 1
 fi
 
-# Print header
-echo "🚀 C4H Editor Microfrontend Startup"
-echo "===================================="
-echo
+# 1. Clean previous builds
+echo "🧹 Cleaning previous builds..."
+npm run clean || echo "Clean failed, continuing anyway..."
 
-# 1. Clean previous builds and kill processes
-echo "🧹 Cleaning environment..."
-npm run clean 2>/dev/null || echo "Clean command failed, continuing anyway..."
-
-echo "📋 Freeing up ports..."
+# 2. Kill any processes running on our ports
+echo "Freeing up ports..."
 for port in 3000 3001 3002 3003 3004; do
   if lsof -ti:$port > /dev/null; then
     echo "  - Killing process on port $port"
@@ -30,167 +26,97 @@ for port in 3000 3001 3002 3003 3004; do
     echo "  - Port $port is free"
   fi
 done
-echo
 
-# 2. Install dependencies if needed
-if [ ! -d "node_modules" ] || [ ! -d "packages/shared/node_modules" ]; then
-  echo "📦 Installing dependencies..."
-  npm install
-  echo
-fi
-
-# 3. Build in correct order with proper verification
-echo "🔨 Building packages in sequential order..."
-
-echo "📦 Building shared package..."
+# 3. Build in correct order with verbosity for debugging
+echo "🔨 Building shared package..."
 npm run build:shared
-if [ $? -ne 0 ]; then
-  echo "❌ Failed to build shared package. Exiting."
-  exit 1
-fi
-echo "✅ Shared package built successfully"
-echo
 
-# Build each microfrontend with verification
-for package in yaml-editor config-selector job-management config-editor; do
-  echo "📦 Building $package..."
-  npm run build:$package
+echo "🔨 Building microfrontends..."
+# Build them all in parallel for speed
+echo "Building yaml-editor..."
+npm run build:yaml-editor &
+YAML_PID=$!
+
+echo "Building config-selector..."
+npm run build:config-selector &
+CONFIG_PID=$!
+
+echo "Building job-management..."
+npm run build:job-management &
+JOB_PID=$!
+
+echo "Building config-editor..."
+npm run build:config-editor &
+EDITOR_PID=$!
+
+# Wait for all builds to complete
+wait $YAML_PID $CONFIG_PID $JOB_PID $EDITOR_PID
+echo "All builds completed!"
+
+# 4. Start all the servers in preview mode
+echo "🚀 Starting frontend servers..."
+
+# Start each service and verify it's running
+start_and_verify() {
+  local name=$1
+  local port=$2
   
-  if [ $? -ne 0 ]; then
-    echo "❌ Failed to build $package. Exiting."
-    exit 1
-  fi
+  echo "Starting $name on port $port..."
+  npm run preview -w packages/$name &
+  local PID=$!
+  echo "${name}_PID=$PID"
   
-  echo "✅ $package built successfully"
-  echo
-done
+  # Wait for the service to be ready
+  echo "Waiting for $name to start..."
+  local attempts=0
+  while [ $attempts -lt 10 ]; do
+    sleep 1
+    attempts=$((attempts+1))
+    
+    if curl -s "http://localhost:$port/remoteEntry.js" -o /dev/null; then
+      echo "✅ $name is running at http://localhost:$port/remoteEntry.js"
+      return 0
+    else
+      echo "Attempt $attempts: $name not ready yet"
+    fi
+  done
+  
+  echo "❌ Failed to start $name after $attempts attempts"
+  return 1
+}
 
-# 4. Start all servers in the correct order
-echo "🚀 Starting servers..."
-
-# Start with yaml-editor since it's used by other microfrontends
-echo "🚀 Starting yaml-editor on port 3002..."
-npm run preview -w packages/yaml-editor &
+# Start services in the right order - first yaml-editor which is used by config-selector
+start_and_verify "yaml-editor" 3002
 YAML_EDITOR_PID=$!
-sleep 2
 
-# Check if yaml-editor is running correctly
-echo "🔍 Verifying yaml-editor is accessible..."
-curl -s http://localhost:3002/remoteEntry.js -o /dev/null
-if [ $? -eq 0 ]; then
-  echo "✅ yaml-editor: remoteEntry.js is available"
-else
-  echo "❌ yaml-editor: remoteEntry.js is NOT available"
-  echo "Troubleshooting: Attempting to restart yaml-editor..."
-  kill $YAML_EDITOR_PID 2>/dev/null
-  npm run preview -w packages/yaml-editor &
-  YAML_EDITOR_PID=$!
-  sleep 3
-  curl -s http://localhost:3002/remoteEntry.js -o /dev/null
-  if [ $? -eq 0 ]; then
-    echo "✅ yaml-editor: Successfully restarted"
-  else
-    echo "❌ yaml-editor is still not available. Please check logs."
-  fi
-fi
-
-# Start config-selector (depends on yaml-editor)
-echo "🚀 Starting config-selector on port 3003..."
-npm run preview -w packages/config-selector &
+start_and_verify "config-selector" 3003
 CONFIG_SELECTOR_PID=$!
-sleep 2
 
-echo "🔍 Verifying config-selector is accessible..."
-curl -s http://localhost:3003/remoteEntry.js -o /dev/null
-if [ $? -eq 0 ]; then
-  echo "✅ config-selector: remoteEntry.js is available"
-else
-  echo "❌ config-selector: remoteEntry.js is NOT available"
-  echo "Troubleshooting: Attempting to restart config-selector..."
-  kill $CONFIG_SELECTOR_PID 2>/dev/null
-  npm run preview -w packages/config-selector &
-  CONFIG_SELECTOR_PID=$!
-  sleep 3
-  curl -s http://localhost:3003/remoteEntry.js -o /dev/null
-  if [ $? -eq 0 ]; then
-    echo "✅ config-selector: Successfully restarted"
-  else
-    echo "❌ config-selector is still not available. Please check logs."
-  fi
-fi
-
-# Start job-management
-echo "🚀 Starting job-management on port 3004..."
-npm run preview -w packages/job-management &
+start_and_verify "job-management" 3004
 JOB_MANAGEMENT_PID=$!
-sleep 2
 
-echo "🔍 Verifying job-management is accessible..."
-curl -s http://localhost:3004/remoteEntry.js -o /dev/null
-if [ $? -eq 0 ]; then
-  echo "✅ job-management: remoteEntry.js is available"
-else
-  echo "❌ job-management: remoteEntry.js is NOT available"
-  echo "Troubleshooting: Attempting to restart job-management..."
-  kill $JOB_MANAGEMENT_PID 2>/dev/null
-  npm run preview -w packages/job-management &
-  JOB_MANAGEMENT_PID=$!
-  sleep 3
-  curl -s http://localhost:3004/remoteEntry.js -o /dev/null
-  if [ $? -eq 0 ]; then
-    echo "✅ job-management: Successfully restarted"
-  else
-    echo "❌ job-management is still not available. Please check logs."
-  fi
-fi
-
-# Start config-editor
-echo "🚀 Starting config-editor on port 3001..."
-npm run preview -w packages/config-editor &
+start_and_verify "config-editor" 3001
 CONFIG_EDITOR_PID=$!
-sleep 2
 
-echo "🔍 Verifying config-editor is accessible..."
-curl -s http://localhost:3001/remoteEntry.js -o /dev/null
-if [ $? -eq 0 ]; then
-  echo "✅ config-editor: remoteEntry.js is available"
-else
-  echo "❌ config-editor: remoteEntry.js is NOT available"
-  echo "Troubleshooting: Attempting to restart config-editor..."
-  kill $CONFIG_EDITOR_PID 2>/dev/null
-  npm run preview -w packages/config-editor &
-  CONFIG_EDITOR_PID=$!
-  sleep 3
-  curl -s http://localhost:3001/remoteEntry.js -o /dev/null
-  if [ $? -eq 0 ]; then
-    echo "✅ config-editor: Successfully restarted"
-  else
-    echo "❌ config-editor is still not available. Please check logs."
-  fi
-fi
-
-# Final verification of all services
-echo
-echo "🔍 Performing final verification of all services..."
+# Final verification
+echo "🔍 Verifying all services are running..."
 curl -s http://localhost:3001/remoteEntry.js -o /dev/null && \
 curl -s http://localhost:3002/remoteEntry.js -o /dev/null && \
 curl -s http://localhost:3003/remoteEntry.js -o /dev/null && \
 curl -s http://localhost:3004/remoteEntry.js -o /dev/null
 if [ $? -eq 0 ]; then
-  echo "✅ All microfrontends are accessible"
+  echo "✅ All microfrontends are accessible! Starting shell application..."
 else
-  echo "⚠️  Not all microfrontends are accessible. The application may not work correctly."
+  echo "⚠️ Not all microfrontends are accessible. Please check the logs."
+  exit 1
 fi
 
 # 5. Start shell app
-echo
 echo "🚀 Starting shell app..."
-echo "Starting development server on port 3000..."
 npm run start -w packages/shell
 
 # Add trap to kill background processes on script exit
 cleanup() {
-  echo
   echo "Shutting down servers..."
   kill $YAML_EDITOR_PID $CONFIG_SELECTOR_PID $JOB_MANAGEMENT_PID $CONFIG_EDITOR_PID 2>/dev/null || true
   exit 0

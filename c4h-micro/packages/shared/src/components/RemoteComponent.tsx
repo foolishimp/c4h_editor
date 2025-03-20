@@ -203,10 +203,12 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
         resolve();
       };
       
-      script.onerror = (event) => {
-        this.addDiagnostic(`Script failed to load: ${url}, error type: ${event.type}`);
+      // Fix TypeScript error by using an inline function for error handling
+      // This matches the correct type for onerror in HTMLScriptElement
+      script.addEventListener('error', () => {
+        this.addDiagnostic(`Script failed to load: ${url}`);
         reject(new Error(`Failed to load remote entry script: ${url}`));
-      };
+      });
       
       document.head.appendChild(script);
       this.addDiagnostic(`Script tag appended to document head: ${url}`);
