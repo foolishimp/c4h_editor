@@ -1,4 +1,6 @@
-// File: packages/shell/vite.config.ts
+/// <reference path="../shared/src/types/federation.d.ts" />
+
+// File: c4h-micro/packages/shell/vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
@@ -11,20 +13,32 @@ export default defineConfig({
     federation({
       name: 'shell',
       remotes: {
-        // Use the simple string format which is working for the YAML editor
         configEditor: 'http://localhost:3001/remoteEntry.js',
         yamlEditor: 'http://localhost:3002/remoteEntry.js',
         configSelector: 'http://localhost:3003/remoteEntry.js',
         jobManagement: 'http://localhost:3004/remoteEntry.js'
       },
       shared: {
-        // Simplified shared configuration to match working microfrontend
-        react: {
-          eager: true
-        } as any, 
-        'react-dom': {
-          eager: true
-        } as any
+        react: { 
+          singleton: true,
+          requiredVersion: '^18.0.0'
+        },
+        'react-dom': { 
+          singleton: true,
+          requiredVersion: '^18.0.0'
+        },
+        'react/jsx-runtime': {
+          singleton: true,
+          requiredVersion: '^18.0.0'
+        },
+        '@mui/material': {
+          singleton: true,
+          requiredVersion: '^5.0.0'
+        },
+        '@mui/icons-material': {
+          singleton: true,
+          requiredVersion: '^5.0.0'
+        }
       }
     })
   ],

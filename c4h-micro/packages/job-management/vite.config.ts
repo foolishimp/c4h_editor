@@ -1,4 +1,7 @@
-// File: packages/job-management/vite.config.ts
+// File: c4h-micro/packages/job-management/vite.config.ts
+// Import the type definitions we created
+/// <reference path="../shared/src/types/federation.d.ts" />
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
@@ -16,13 +19,30 @@ export default defineConfig({
       },
       shared: {
         react: { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true 
-        } as any, 
+          eager: false 
+        },
         'react-dom': { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true 
-        } as any
+          eager: false
+        },
+        'react/jsx-runtime': {
+          singleton: true,
+          requiredVersion: '^18.0.0',
+          eager: false
+        },
+        '@mui/material': {
+          singleton: true,
+          requiredVersion: '^5.0.0',
+          eager: false
+        },
+        '@mui/icons-material': {
+          singleton: true, 
+          requiredVersion: '^5.0.0',
+          eager: false
+        }
       }
     })
   ],
@@ -58,7 +78,10 @@ export default defineConfig({
   preview: {
     port: 3004,
     strictPort: true,
-    cors: true
+    cors: true,
+    headers: {
+      "Access-Control-Allow-Origin": "*"
+    }
   },
   optimizeDeps: {
     esbuildOptions: {

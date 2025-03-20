@@ -109,7 +109,19 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           // Continue anyway, the script loading might still succeed
         }
         
-        await this.loadRemoteEntryScript(url);
+        // *** KEY CHANGE: Use dynamic import instead of script tag for ESM modules ***
+        try {
+          this.addDiagnostic(`Using dynamic import() for ${url}...`);
+          const remoteContainer = await import(/* @vite-ignore */ url);
+          
+          // Add the container to the window object manually
+          window[scope] = remoteContainer;
+          this.addDiagnostic(`Imported container and assigned to window.${scope}`);
+        } catch (importError) {
+          this.addDiagnostic(`Dynamic import failed: ${importError instanceof Error ? importError.message : String(importError)}`);
+          this.addDiagnostic(`Falling back to script tag loading...`);
+          await this.loadRemoteEntryScript(url);
+        }
       }
       
       // Re-check if container was properly loaded
@@ -119,10 +131,11 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       
       // Get the container
       const container = window[scope] as Container;
+      this.addDiagnostic(`Container loaded with methods: ${Object.keys(container).join(', ')}`);
       
       // Check for initialization method (Vite vs Webpack style)
       if (typeof container.init === 'function') {
-        this.addDiagnostic('Initializing container with Vite federation...');
+        this.addDiagnostic('Initializing container with federation...');
         
         // Ensure global shared scope exists
         if (!globalThis.__federation_shared__) {
@@ -133,8 +146,9 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           globalThis.__federation_shared__.default = {};
         }
         
-        // Initialize using Vite federation approach
+        // Initialize using federation approach
         await container.init(globalThis.__federation_shared__.default);
+        this.addDiagnostic('Container initialized successfully');
       } else {
         this.addDiagnostic('Container does not have init method, might be using non-standard federation');
       }
@@ -193,7 +207,8 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       
       const script = document.createElement('script');
       script.src = url;
-      script.type = 'text/javascript';
+      // *** KEY CHANGE: Add type="module" to script tag ***
+      script.type = 'module';
       script.async = true;
       script.crossOrigin = 'anonymous'; // Add cross-origin attribute
       
@@ -203,10 +218,8 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
         resolve();
       };
       
-      // Fix TypeScript error by using an inline function for error handling
-      // This matches the correct type for onerror in HTMLScriptElement
-      script.addEventListener('error', () => {
-        this.addDiagnostic(`Script failed to load: ${url}`);
+      script.addEventListener('error', (event) => {
+        this.addDiagnostic(`Script failed to load: ${url}, error: ${event.type}`);
         reject(new Error(`Failed to load remote entry script: ${url}`));
       });
       
@@ -231,6 +244,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           // Check container methods
           diagnostics.push(`Container has 'get' method: ${typeof container.get === 'function'}`);
           diagnostics.push(`Container has 'init' method: ${typeof container.init === 'function'}`);
+          diagnostics.push(`Available container methods: ${Object.keys(container).join(', ')}`);
           
           // Check global federation scopes
           diagnostics.push(`Global federation scope exists: ${Boolean(globalThis.__federation_shared__)}`);

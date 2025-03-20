@@ -1,11 +1,12 @@
-// File: packages/yaml-editor/vite.config.ts
+/// <reference path="../shared/src/types/federation.d.ts" />
+
+// File: c4h-micro/packages/yaml-editor/vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
-  // Empty base for proper path resolution
   base: '',
   plugins: [
     react(),
@@ -16,20 +17,35 @@ export default defineConfig({
         './YamlEditor': './src/YamlEditor.tsx',
       },
       shared: {
-        // Using type assertion to bypass TypeScript errors for valid properties
-        // that aren't included in the type definitions
         react: { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true 
-        } as any, 
+          eager: false
+        },
         'react-dom': { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true 
-        } as any,
+          eager: false
+        },
+        'react/jsx-runtime': {
+          singleton: true,
+          requiredVersion: '^18.0.0',
+          eager: false
+        },
         '@monaco-editor/react': { 
-          requiredVersion: '^4.5.0'
-        } as any,
-        'monaco-editor': {} as any
+          singleton: true,
+          requiredVersion: '^4.5.0',
+          eager: false
+        },
+        'monaco-editor': {
+          singleton: true,
+          eager: false
+        },
+        '@mui/material': {
+          singleton: true,
+          requiredVersion: '^5.0.0',
+          eager: false
+        }
       }
     })
   ],
@@ -44,7 +60,6 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    // Add assetsDir for consistent asset paths
     assetsDir: '',
     rollupOptions: {
       output: {
@@ -58,15 +73,18 @@ export default defineConfig({
   server: {
     port: 3002,
     strictPort: true,
+    cors: true,
     hmr: {
       timeout: 5000
-    },
-    cors: true
+    }
   },
   preview: {
-    port: 3002, // Fixed port to match the expected URL
+    port: 3002,
     strictPort: true,
-    cors: true  // Enable CORS for cross-origin requests
+    cors: true,
+    headers: {
+      "Access-Control-Allow-Origin": "*"
+    }
   },
   optimizeDeps: {
     esbuildOptions: {

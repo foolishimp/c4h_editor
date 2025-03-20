@@ -1,11 +1,12 @@
-// File: packages/config-selector/vite.config.ts
+/// <reference path="../shared/src/types/federation.d.ts" />
+
+// File: c4h-micro/packages/config-selector/vite.config.ts
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
-  // Empty base for proper path resolution
   base: '',
   plugins: [
     react(),
@@ -16,17 +17,39 @@ export default defineConfig({
         './ConfigManager': './src/ConfigManager.tsx',
       },
       remotes: {
-        // Simple string format - more reliable in this case since we're having issues
         yamlEditor: 'http://localhost:3002/remoteEntry.js'
       },
       shared: {
-        // Simple shared config - matches the working YAML editor
-        react: {
-          eager: true
-        } as any,
-        'react-dom': {
-          eager: true
-        } as any
+        react: { 
+          singleton: true,
+          requiredVersion: '^18.0.0',
+          eager: false
+        },
+        'react-dom': { 
+          singleton: true,
+          requiredVersion: '^18.0.0',
+          eager: false
+        },
+        'react/jsx-runtime': {
+          singleton: true,
+          requiredVersion: '^18.0.0',
+          eager: false
+        },
+        '@mui/material': {
+          singleton: true,
+          requiredVersion: '^5.0.0',
+          eager: false
+        },
+        '@mui/icons-material': {
+          singleton: true,
+          requiredVersion: '^5.0.0',
+          eager: false
+        },
+        'js-yaml': {
+          singleton: true,
+          requiredVersion: '^4.0.0',
+          eager: false
+        }
       }
     })
   ],
@@ -42,13 +65,12 @@ export default defineConfig({
     cssCodeSplit: false,
     modulePreload: false,
     assetsDir: '',
-    outDir: 'dist',
     rollupOptions: {
-      // Match the working YAML editor configuration
       output: {
         format: 'esm',
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]'
       }
     }
   },
@@ -63,6 +85,16 @@ export default defineConfig({
   preview: {
     port: 3003,
     strictPort: true,
-    cors: true
+    cors: true,
+    headers: {
+      "Access-Control-Allow-Origin": "*"
+    }
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   }
 });

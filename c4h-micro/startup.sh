@@ -1,6 +1,6 @@
 #!/bin/bash
-# File: c4h-micro/fix-startup.sh
-# A simplified fix script to properly start the C4H Editor microfrontends
+# File: c4h-micro/rebuild-all.sh
+# This script rebuilds all packages after updating Vite configurations
 
 # This script assumes it's being run from the c4h-micro directory
 # where the package.json with workspaces is located
@@ -27,99 +27,56 @@ for port in 3000 3001 3002 3003 3004; do
   fi
 done
 
-# 3. Build in correct order with verbosity for debugging
+# 3. Build shared package first
 echo "🔨 Building shared package..."
 npm run build:shared
-
-echo "🔨 Building microfrontends..."
-# Build them all in parallel for speed
-echo "Building yaml-editor..."
-npm run build:yaml-editor &
-YAML_PID=$!
-
-echo "Building config-selector..."
-npm run build:config-selector &
-CONFIG_PID=$!
-
-echo "Building job-management..."
-npm run build:job-management &
-JOB_PID=$!
-
-echo "Building config-editor..."
-npm run build:config-editor &
-EDITOR_PID=$!
-
-# Wait for all builds to complete
-wait $YAML_PID $CONFIG_PID $JOB_PID $EDITOR_PID
-echo "All builds completed!"
-
-# 4. Start all the servers in preview mode
-echo "🚀 Starting frontend servers..."
-
-# Start each service and verify it's running
-start_and_verify() {
-  local name=$1
-  local port=$2
-  
-  echo "Starting $name on port $port..."
-  npm run preview -w packages/$name &
-  local PID=$!
-  echo "${name}_PID=$PID"
-  
-  # Wait for the service to be ready
-  echo "Waiting for $name to start..."
-  local attempts=0
-  while [ $attempts -lt 10 ]; do
-    sleep 1
-    attempts=$((attempts+1))
-    
-    if curl -s "http://localhost:$port/remoteEntry.js" -o /dev/null; then
-      echo "✅ $name is running at http://localhost:$port/remoteEntry.js"
-      return 0
-    else
-      echo "Attempt $attempts: $name not ready yet"
-    fi
-  done
-  
-  echo "❌ Failed to start $name after $attempts attempts"
-  return 1
-}
-
-# Start services in the right order - first yaml-editor which is used by config-selector
-start_and_verify "yaml-editor" 3002
-YAML_EDITOR_PID=$!
-
-start_and_verify "config-selector" 3003
-CONFIG_SELECTOR_PID=$!
-
-start_and_verify "job-management" 3004
-JOB_MANAGEMENT_PID=$!
-
-start_and_verify "config-editor" 3001
-CONFIG_EDITOR_PID=$!
-
-# Final verification
-echo "🔍 Verifying all services are running..."
-curl -s http://localhost:3001/remoteEntry.js -o /dev/null && \
-curl -s http://localhost:3002/remoteEntry.js -o /dev/null && \
-curl -s http://localhost:3003/remoteEntry.js -o /dev/null && \
-curl -s http://localhost:3004/remoteEntry.js -o /dev/null
-if [ $? -eq 0 ]; then
-  echo "✅ All microfrontends are accessible! Starting shell application..."
-else
-  echo "⚠️ Not all microfrontends are accessible. Please check the logs."
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to build shared package. Exiting."
   exit 1
 fi
+echo "✅ Shared package built successfully"
 
-# 5. Start shell app
-echo "🚀 Starting shell app..."
-npm run start -w packages/shell
+# 4. Build YAML Editor (needed by config-selector)
+echo "🔨 Building YAML Editor..."
+npm run build:yaml-editor
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to build YAML Editor. Exiting."
+  exit 1
+fi
+echo "✅ YAML Editor built successfully"
 
-# Add trap to kill background processes on script exit
-cleanup() {
-  echo "Shutting down servers..."
-  kill $YAML_EDITOR_PID $CONFIG_SELECTOR_PID $JOB_MANAGEMENT_PID $CONFIG_EDITOR_PID 2>/dev/null || true
-  exit 0
-}
+# 5. Build remaining microfrontends
+echo "🔨 Building Config Selector..."
+npm run build:config-selector
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to build Config Selector. Exiting."
+  exit 1
+fi
+echo "✅ Config Selector built successfully"
 
-trap cleanup SIGINT SIGTERM EXIT
+echo "🔨 Building Job Management..."
+npm run build:job-management
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to build Job Management. Exiting."
+  exit 1
+fi
+echo "✅ Job Management built successfully"
+
+echo "🔨 Building Config Editor..."
+npm run build:config-editor
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to build Config Editor. Exiting."
+  exit 1
+fi
+echo "✅ Config Editor built successfully"
+
+echo "🔨 Building Shell..."
+npm run build:shell
+if [ $? -ne 0 ]; then
+  echo "❌ Failed to build Shell. Exiting."
+  exit 1
+fi
+echo "✅ Shell built successfully"
+
+echo "🎉 All packages have been successfully rebuilt!"
+echo "Run ./startup.sh to start the application"
