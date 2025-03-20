@@ -5,7 +5,7 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
-  // Add empty base for proper path resolution
+  // Empty base for proper path resolution
   base: '',
   plugins: [
     react(),
@@ -15,7 +15,22 @@ export default defineConfig({
       exposes: {
         './YamlEditor': './src/YamlEditor.tsx',
       },
-      shared: ['react', 'react-dom', 'monaco-editor', '@monaco-editor/react']
+      shared: {
+        // Using type assertion to bypass TypeScript errors for valid properties
+        // that aren't included in the type definitions
+        react: { 
+          requiredVersion: '^18.0.0',
+          eager: true 
+        } as any, 
+        'react-dom': { 
+          requiredVersion: '^18.0.0',
+          eager: true 
+        } as any,
+        '@monaco-editor/react': { 
+          requiredVersion: '^4.5.0'
+        } as any,
+        'monaco-editor': {} as any
+      }
     })
   ],
   resolve: {
@@ -36,6 +51,7 @@ export default defineConfig({
         format: 'esm',
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]'
       }
     }
   },
@@ -44,11 +60,19 @@ export default defineConfig({
     strictPort: true,
     hmr: {
       timeout: 5000
-    }
+    },
+    cors: true
   },
   preview: {
     port: 3002, // Fixed port to match the expected URL
     strictPort: true,
-    cors: true  // Enable CORS
+    cors: true  // Enable CORS for cross-origin requests
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   }
 });

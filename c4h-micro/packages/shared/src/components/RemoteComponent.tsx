@@ -1,6 +1,7 @@
-// File: c4h-micro/packages/shared/src/components/RemoteComponent.tsx
+// File: packages/shared/src/components/RemoteComponent.tsx
+// Improved RemoteComponent implementation for Vite Federation compatibility
 import React from 'react';
-import { CircularProgress, Typography, Box, Button } from '@mui/material';
+import { CircularProgress, Typography, Box, Button, Alert } from '@mui/material';
 
 interface RemoteComponentProps {
   url: string;
@@ -10,11 +11,41 @@ interface RemoteComponentProps {
   fallback?: React.ReactNode;
 }
 
+// Define types for federation-related objects
+interface Container {
+  init?: (shareScope: any) => Promise<void>;
+  get?: (module: string) => Promise<() => any>;
+  [key: string]: any;
+}
+
+// Augment the window interface
+declare global {
+  interface Window {
+    [key: string]: any;
+  }
+  
+  var __federation_shared__: {
+    default?: Record<string, any>;
+    [key: string]: any;
+  };
+}
+
+// Flag to enable detailed debug logging
+const DEBUG_MODE = false;
+
+// Helper function for logging
+const logDebug = (message: string, ...args: any[]) => {
+  if (DEBUG_MODE) {
+    console.log(`[RemoteComponent] ${message}`, ...args);
+  }
+};
+
 class RemoteComponent extends React.Component<RemoteComponentProps, { 
   loading: boolean, 
   error: string | null, 
   Component: React.ComponentType<any> | null,
-  retryCount: number
+  retryCount: number,
+  diagnostics: string[]
 }> {
   constructor(props: RemoteComponentProps) {
     super(props);
@@ -22,7 +53,8 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       loading: true,
       error: null,
       Component: null,
-      retryCount: 0
+      retryCount: 0,
+      diagnostics: []
     };
   }
 
@@ -35,81 +67,166 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     if (prevProps.url !== this.props.url || 
         prevProps.scope !== this.props.scope || 
         prevProps.module !== this.props.module) {
-      this.setState({ loading: true, Component: null, retryCount: 0 }, this.loadComponent);
+      this.setState({ 
+        loading: true, 
+        Component: null, 
+        retryCount: 0, 
+        diagnostics: [], 
+        error: null 
+      }, this.loadComponent);
     }
+  }
+
+  addDiagnostic(message: string) {
+    logDebug(message);
+    this.setState(prevState => ({
+      diagnostics: [...prevState.diagnostics, message]
+    }));
   }
 
   async loadComponent() {
     const { url, scope, module } = this.props;
     
     try {
-      console.log(`Loading remote module ${scope} from ${url}`);
+      this.addDiagnostic(`Loading remote module '${module}' from scope '${scope}' at URL '${url}'`);
       
-      // Check if the container is already loaded
-      // @ts-ignore - federation types are not available
-      if (!window[scope]) {
-        // Load the script dynamically
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = url;
-          script.type = 'text/javascript';
-          script.async = true;
-          
-          script.onload = () => {
-            console.log(`Successfully loaded ${scope}`);
-            resolve();
-          };
-          
-          script.onerror = (error) => {
-            console.error(`Failed to load script: ${url}`, error);
-            reject(new Error(`Failed to load remote entry: ${url}`));
-          };
-          
-          document.head.appendChild(script);
-        });
+      // Check if the container is already loaded in window object
+      const containerExists = typeof window !== 'undefined' && Boolean(window[scope]);
+      this.addDiagnostic(`Container already exists in window: ${containerExists}`);
+      
+      if (!containerExists) {
+        // Load the remote entry script
+        this.addDiagnostic('Container not found, loading script...');
+        await this.loadRemoteEntryScript(url);
       }
       
-      // Check if the container was properly loaded
-      // @ts-ignore - federation types are not available
-      if (!window[scope]) {
-        throw new Error(`Remote container ${scope} was not loaded properly from ${url}`);
+      // Re-check if container was properly loaded
+      if (typeof window === 'undefined' || !window[scope]) {
+        throw new Error(`Failed to load remote container '${scope}' from '${url}'`);
       }
       
-      // Initialize the container
-      // @ts-ignore - federation types are not available
-      await window[scope].init(__webpack_share_scopes__.default);
+      // Get the container
+      const container = window[scope] as Container;
       
-      // Get the module factory
-      // @ts-ignore - federation types are not available  
-      const factory = await window[scope].get(module);
-      if (!factory) {
-        throw new Error(`Module ${module} not found in remote container ${scope}`);
+      // Check for initialization method (Vite vs Webpack style)
+      if (typeof container.init === 'function') {
+        this.addDiagnostic('Initializing container with Vite federation...');
+        
+        // Ensure global shared scope exists
+        if (!globalThis.__federation_shared__) {
+          globalThis.__federation_shared__ = { default: {} };
+        }
+        
+        if (!globalThis.__federation_shared__.default) {
+          globalThis.__federation_shared__.default = {};
+        }
+        
+        // Initialize using Vite federation approach
+        await container.init(globalThis.__federation_shared__.default);
+      } else {
+        this.addDiagnostic('Container does not have init method, might be using non-standard federation');
       }
       
-      const Module = factory();
+      // Get the module from the container
+      let moduleFactory;
+      if (typeof container.get === 'function') {
+        this.addDiagnostic(`Getting module '${module}' from container...`);
+        moduleFactory = await container.get(module);
+      } else {
+        throw new Error(`Container '${scope}' is loaded but doesn't expose a 'get' method for federation`);
+      }
+      
+      if (!moduleFactory) {
+        throw new Error(`Module '${module}' not found in remote container '${scope}'`);
+      }
+      
+      // Get the actual component from the factory
+      const ModuleContent = await moduleFactory();
+      
+      this.addDiagnostic(`Module loaded successfully, found keys: ${Object.keys(ModuleContent).join(', ')}`);
+      
+      const Component = ModuleContent.default || ModuleContent;
+      
+      if (!Component) {
+        throw new Error(`Module '${module}' loaded but doesn't export a default or named component`);
+      }
       
       this.setState({
         loading: false,
-        Component: Module.default || Module,
+        Component,
         error: null
       });
     } catch (error) {
       console.error('Error loading remote component:', error);
-      this.setState({
+      
+      this.setState(prevState => ({
         loading: false,
         error: error instanceof Error ? error.message : 'Failed to load component',
-        retryCount: this.state.retryCount + 1
-      });
+        retryCount: prevState.retryCount + 1,
+        diagnostics: [...prevState.diagnostics, `Error: ${error instanceof Error ? error.message : String(error)}`]
+      }));
     }
   }
 
+  async loadRemoteEntryScript(url: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const startTime = performance.now();
+      const script = document.createElement('script');
+      script.src = url;
+      script.type = 'text/javascript';
+      script.async = true;
+      
+      script.onload = () => {
+        const loadTime = Math.round(performance.now() - startTime);
+        this.addDiagnostic(`Script loaded successfully in ${loadTime}ms`);
+        resolve();
+      };
+      
+      script.onerror = () => {
+        this.addDiagnostic(`Script failed to load: ${url}`);
+        reject(new Error(`Failed to load remote entry script: ${url}`));
+      };
+      
+      document.head.appendChild(script);
+      this.addDiagnostic(`Script tag appended to document head: ${url}`);
+    });
+  }
+
+  checkContainerHealth() {
+    const { scope } = this.props;
+    
+    // Various checks to diagnose federation issues
+    const diagnostics: string[] = [];
+    
+    try {
+      if (typeof window !== 'undefined') {
+        // Check container existence
+        diagnostics.push(`Container exists: ${Boolean(window[scope])}`);
+        
+        if (window[scope]) {
+          const container = window[scope] as Container;
+          // Check container methods
+          diagnostics.push(`Container has 'get' method: ${typeof container.get === 'function'}`);
+          diagnostics.push(`Container has 'init' method: ${typeof container.init === 'function'}`);
+          
+          // Check global federation scopes
+          diagnostics.push(`Global federation scope exists: ${Boolean(globalThis.__federation_shared__)}`);
+        }
+      }
+    } catch (e) {
+      diagnostics.push(`Error checking container health: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    
+    return diagnostics;
+  }
+
   handleRetry = () => {
-    this.setState({ loading: true, error: null }, this.loadComponent);
+    this.setState({ loading: true, error: null, diagnostics: [] }, this.loadComponent);
   }
 
   render() {
     const { fallback, props = {} } = this.props;
-    const { loading, error, Component, retryCount } = this.state;
+    const { loading, error, Component, retryCount, diagnostics } = this.state;
     
     if (loading) {
       return fallback || (
@@ -120,6 +237,8 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     }
     
     if (error) {
+      const healthDiagnostics = this.checkContainerHealth();
+      
       return (
         <Box sx={{ p: 3, textAlign: 'center', border: '1px solid #f5f5f5', borderRadius: 2 }}>
           <Typography variant="h6" color="error" gutterBottom>
@@ -128,17 +247,33 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {error}
           </Typography>
+          
           <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Typography variant="body2">
               This could be because:
             </Typography>
             <ul style={{ textAlign: 'left' }}>
-              <li>The microfrontend server is not running</li>
-              <li>The remoteEntry.js file is not being served at the expected URL</li>
+              <li>The microfrontend server is not running at the expected URL</li>
+              <li>The remoteEntry.js file is using a different federation format than expected</li>
               <li>There's a network issue preventing the connection</li>
-              <li>Module Federation configuration is incompatible</li>
+              <li>The module name or scope is incorrect</li>
             </ul>
           </Box>
+          
+          {diagnostics.length > 0 && (
+            <Alert severity="info" sx={{ mb: 2, textAlign: 'left' }}>
+              <Typography variant="subtitle2">Diagnostics:</Typography>
+              <ul style={{ marginTop: 4, paddingLeft: 16 }}>
+                {diagnostics.map((msg, idx) => (
+                  <li key={idx}><Typography variant="caption">{msg}</Typography></li>
+                ))}
+                {healthDiagnostics.map((msg, idx) => (
+                  <li key={`health-${idx}`}><Typography variant="caption">{msg}</Typography></li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+          
           <Button 
             variant="contained" 
             onClick={this.handleRetry} 

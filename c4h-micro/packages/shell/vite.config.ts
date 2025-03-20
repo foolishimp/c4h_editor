@@ -11,12 +11,21 @@ export default defineConfig({
     federation({
       name: 'shell',
       remotes: {
-        configEditor: "http://localhost:3001/remoteEntry.js",
-        yamlEditor: "http://localhost:3002/remoteEntry.js",
-        configSelector: "http://localhost:3003/remoteEntry.js",
-        jobManagement: "http://localhost:3004/remoteEntry.js"
+        // Use the simple string format which is working for the YAML editor
+        configEditor: 'http://localhost:3001/remoteEntry.js',
+        yamlEditor: 'http://localhost:3002/remoteEntry.js',
+        configSelector: 'http://localhost:3003/remoteEntry.js',
+        jobManagement: 'http://localhost:3004/remoteEntry.js'
       },
-      shared: ['react', 'react-dom']
+      shared: {
+        // Simplified shared configuration to match working microfrontend
+        react: {
+          eager: true
+        } as any, 
+        'react-dom': {
+          eager: true
+        } as any
+      }
     })
   ],
   resolve: {
@@ -46,6 +55,11 @@ export default defineConfig({
     hmr: {
       timeout: 5000
     }
+  },
+  preview: {
+    port: 3000,
+    strictPort: true,
+    cors: true
   },
   optimizeDeps: {
     force: true,

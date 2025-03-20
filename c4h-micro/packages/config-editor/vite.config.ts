@@ -15,7 +15,16 @@ export default defineConfig({
       exposes: {
         './ConfigEditor': './src/ConfigEditor.tsx',
       },
-      shared: ['react', 'react-dom']
+      shared: {
+        react: { 
+          requiredVersion: '^18.0.0',
+          eager: true 
+        } as any, 
+        'react-dom': { 
+          requiredVersion: '^18.0.0',
+          eager: true 
+        } as any
+      }
     })
   ],
   resolve: {
@@ -43,7 +52,8 @@ export default defineConfig({
     strictPort: true,
     hmr: {
       timeout: 5000
-    }
+    },
+    cors: true
   },
   preview: {
     port: 3001,

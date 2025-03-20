@@ -14,7 +14,16 @@ export default defineConfig({
       exposes: {
         './JobManager': './src/JobManager.tsx',
       },
-      shared: ['react', 'react-dom', 'shared']
+      shared: {
+        react: { 
+          requiredVersion: '^18.0.0',
+          eager: true 
+        } as any, 
+        'react-dom': { 
+          requiredVersion: '^18.0.0',
+          eager: true 
+        } as any
+      }
     })
   ],
   resolve: {
@@ -34,12 +43,14 @@ export default defineConfig({
         format: 'esm',
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
+        assetFileNames: '[name].[ext]'
       }
     }
   },
   server: {
     port: 3004,
     strictPort: true,
+    cors: true,
     hmr: {
       timeout: 5000
     }
@@ -48,5 +59,12 @@ export default defineConfig({
     port: 3004,
     strictPort: true,
     cors: true
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis'
+      }
+    }
   }
 });

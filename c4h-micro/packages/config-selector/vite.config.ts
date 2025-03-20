@@ -16,9 +16,18 @@ export default defineConfig({
         './ConfigManager': './src/ConfigManager.tsx',
       },
       remotes: {
+        // Simple string format - more reliable in this case since we're having issues
         yamlEditor: 'http://localhost:3002/remoteEntry.js'
       },
-      shared: ['react', 'react-dom', 'shared']
+      shared: {
+        // Simple shared config - matches the working YAML editor
+        react: {
+          eager: true
+        } as any,
+        'react-dom': {
+          eager: true
+        } as any
+      }
     })
   ],
   resolve: {
@@ -33,7 +42,9 @@ export default defineConfig({
     cssCodeSplit: false,
     modulePreload: false,
     assetsDir: '',
+    outDir: 'dist',
     rollupOptions: {
+      // Match the working YAML editor configuration
       output: {
         format: 'esm',
         entryFileNames: '[name].js',
@@ -44,6 +55,7 @@ export default defineConfig({
   server: {
     port: 3003,
     strictPort: true,
+    cors: true,
     hmr: {
       timeout: 5000
     }
