@@ -30,13 +30,34 @@ declare global {
 }
 
 // Flag to enable detailed debug logging
-const DEBUG_MODE = true; // Set to true for troubleshooting
+const DEBUG_MODE = true;
 
 // Helper function for logging
 const logDebug = (message: string, ...args: any[]) => {
   if (DEBUG_MODE) {
     console.log(`[RemoteComponent] ${message}`, ...args);
   }
+};
+
+// Create a shared React instance
+const getSharedReactInstance = () => {
+  // Ensure we're giving the remote the actual React instance used by the shell
+  return {
+    react: { 
+      '18.0.0': { 
+        get: () => Promise.resolve(() => require('react')),
+        loaded: true,
+        from: 'shell'
+      }
+    },
+    'react-dom': { 
+      '18.0.0': { 
+        get: () => Promise.resolve(() => require('react-dom')),
+        loaded: true,
+        from: 'shell'
+      }
+    }
+  };
 };
 
 class RemoteComponent extends React.Component<RemoteComponentProps, { 
@@ -94,9 +115,6 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       this.addDiagnostic(`Container already exists in window: ${containerExists}`);
       
       if (!containerExists) {
-        // Load the remote entry script
-        this.addDiagnostic('Container not found, loading script...');
-        
         // MODIFICATION: First check if the remote is accessible
         try {
           const checkResponse = await fetch(url, { method: 'HEAD' });
@@ -106,22 +124,10 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           this.addDiagnostic(`Remote URL is accessible with status: ${checkResponse.status}`);
         } catch (checkError) {
           this.addDiagnostic(`Remote URL check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`);
-          // Continue anyway, the script loading might still succeed
         }
         
-        // *** KEY CHANGE: Use dynamic import instead of script tag for ESM modules ***
-        try {
-          this.addDiagnostic(`Using dynamic import() for ${url}...`);
-          const remoteContainer = await import(/* @vite-ignore */ url);
-          
-          // Add the container to the window object manually
-          window[scope] = remoteContainer;
-          this.addDiagnostic(`Imported container and assigned to window.${scope}`);
-        } catch (importError) {
-          this.addDiagnostic(`Dynamic import failed: ${importError instanceof Error ? importError.message : String(importError)}`);
-          this.addDiagnostic(`Falling back to script tag loading...`);
-          await this.loadRemoteEntryScript(url);
-        }
+        // Fix: Use script loading instead of dynamic import for better compatibility
+        await this.loadRemoteEntryScript(url);
       }
       
       // Re-check if container was properly loaded
@@ -146,8 +152,14 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
           globalThis.__federation_shared__.default = {};
         }
         
+        // Initialize with explicit shared React
+        const sharedScope = {
+          ...globalThis.__federation_shared__.default,
+          ...getSharedReactInstance()
+        };
+        
         // Initialize using federation approach
-        await container.init(globalThis.__federation_shared__.default);
+        await container.init(sharedScope);
         this.addDiagnostic('Container initialized successfully');
       } else {
         this.addDiagnostic('Container does not have init method, might be using non-standard federation');
@@ -198,7 +210,7 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
     return new Promise<void>((resolve, reject) => {
       const startTime = performance.now();
       
-      // MODIFICATION: Check if there's an existing script with the same URL
+      // Remove any existing script with the same URL
       const existingScript = document.querySelector(`script[src="${url}"]`);
       if (existingScript) {
         this.addDiagnostic(`Found existing script tag for ${url}, removing it to retry loading`);
@@ -207,10 +219,9 @@ class RemoteComponent extends React.Component<RemoteComponentProps, {
       
       const script = document.createElement('script');
       script.src = url;
-      // *** KEY CHANGE: Add type="module" to script tag ***
-      script.type = 'module';
+      script.type = 'text/javascript'; // Use regular script tag, not module type
       script.async = true;
-      script.crossOrigin = 'anonymous'; // Add cross-origin attribute
+      script.crossOrigin = 'anonymous';
       
       script.onload = () => {
         const loadTime = Math.round(performance.now() - startTime);

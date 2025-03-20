@@ -12,7 +12,7 @@ export default defineConfig({
     react(),
     federation({
       name: 'yamlEditor',
-      filename: 'remoteEntry.js',
+      filename: 'remoteEntry.js', // Changed to plain filename
       exposes: {
         './YamlEditor': './src/YamlEditor.tsx',
       },
@@ -22,9 +22,11 @@ export default defineConfig({
           requiredVersion: '^18.0.0',
           eager: false
         },
-        'react-dom': { singleton: true,
+        'react-dom': { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true },
+          eager: true 
+        },
         '@monaco-editor/react': { 
           singleton: true,
           requiredVersion: '^4.5.0',
@@ -53,13 +55,13 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: '',
+    assetsDir: 'assets',
     rollupOptions: {
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]'
+        entryFileNames: '[name].js', // Removed assets/ prefix
+        chunkFileNames: '[name].js', // Removed assets/ prefix
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },

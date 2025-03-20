@@ -3,7 +3,7 @@
  * Module Federation Remotes Registry
  * 
  * This file defines the URLs for all remote microfrontends.
- * Updated to include explicit, absolute URLs with protocol.
+ * Updated to use remoteEntry.js files directly in root.
  */
 
 export const remotes = {

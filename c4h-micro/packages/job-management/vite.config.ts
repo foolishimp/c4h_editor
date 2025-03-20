@@ -12,7 +12,7 @@ export default defineConfig({
     react(),
     federation({
       name: 'jobManagement',
-      filename: 'remoteEntry.js',
+      filename: 'remoteEntry.js', // Changed to plain filename
       exposes: {
         './JobManager': './src/JobManager.tsx',
       },
@@ -20,7 +20,7 @@ export default defineConfig({
         react: { 
           singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true  // Change to eager: true
+          eager: true
         },
         'react-dom': { 
           singleton: true,
@@ -30,12 +30,12 @@ export default defineConfig({
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0',
-          eager: false
+          eager: true
         },
         '@mui/icons-material': {
           singleton: true, 
           requiredVersion: '^5.0.0',
-          eager: false
+          eager: true
         }
       }
     })
@@ -51,15 +51,16 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: '',
+    assetsDir: 'assets',
     rollupOptions: {
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]'
+        entryFileNames: '[name].js', // Removed assets/ prefix
+        chunkFileNames: '[name].js', // Removed assets/ prefix
+        assetFileNames: 'assets/[name].[ext]'
       }
-    }
+    },
+    outDir: 'dist'
   },
   server: {
     port: 3004,
@@ -69,8 +70,7 @@ export default defineConfig({
       timeout: 5000
     },
     headers: {
-      "Access-Control-Allow-Origin": "*",
-      "Content-Type": "application/javascript"
+      "Access-Control-Allow-Origin": "*"
     }
   },
   preview: {
@@ -79,10 +79,10 @@ export default defineConfig({
     cors: true,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Content-Type": "application/javascript"
     }
   },
   optimizeDeps: {
+    force: true,
     esbuildOptions: {
       define: {
         global: 'globalThis'

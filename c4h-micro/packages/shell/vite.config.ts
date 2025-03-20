@@ -31,11 +31,13 @@ export default defineConfig({
         },
         '@mui/material': {
           singleton: true,
-          requiredVersion: '^5.0.0'
+          requiredVersion: '^5.0.0',
+          eager: true
         },
         '@mui/icons-material': {
           singleton: true,
-          requiredVersion: '^5.0.0'
+          requiredVersion: '^5.0.0',
+          eager: true
         }
       }
     })
@@ -51,12 +53,13 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: '',
+    assetsDir: 'assets',
     rollupOptions: {
       output: {
         format: 'esm',
         entryFileNames: '[name].js',
         chunkFileNames: '[name].js',
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
@@ -66,18 +69,12 @@ export default defineConfig({
     cors: true,
     hmr: {
       timeout: 5000
-    },
-    headers: {
-      "Access-Control-Allow-Origin": "*"
     }
   },
   preview: {
     port: 3000,
     strictPort: true,
-    cors: true,
-    headers: {
-      "Access-Control-Allow-Origin": "*"
-    }
+    cors: true
   },
   optimizeDeps: {
     force: true,

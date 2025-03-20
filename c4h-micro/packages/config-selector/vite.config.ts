@@ -12,12 +12,12 @@ export default defineConfig({
     react(),
     federation({
       name: 'configSelector',
-      filename: 'remoteEntry.js',
+      filename: 'remoteEntry.js', // Changed to plain filename
       exposes: {
         './ConfigManager': './src/ConfigManager.tsx',
       },
       remotes: {
-        yamlEditor: 'http://localhost:3002/remoteEntry.js'
+        yamlEditor: 'http://localhost:3002/remoteEntry.js' // Updated to match
       },
       shared: {
         react: { 
@@ -25,9 +25,11 @@ export default defineConfig({
           requiredVersion: '^18.0.0',
           eager: false
         },
-        'react-dom': { singleton: true,
+        'react-dom': { 
+          singleton: true,
           requiredVersion: '^18.0.0',
-          eager: true },
+          eager: true 
+        },
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0',
@@ -57,13 +59,13 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: '',
+    assetsDir: 'assets',
     rollupOptions: {
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: '[name].[ext]'
+        entryFileNames: '[name].js', // Removed assets/ prefix
+        chunkFileNames: '[name].js', // Removed assets/ prefix
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
