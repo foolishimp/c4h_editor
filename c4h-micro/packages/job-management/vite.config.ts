@@ -58,7 +58,8 @@ export default defineConfig({
         chunkFileNames: '[name].js',
         assetFileNames: '[name].[ext]'
       }
-    }
+    },
+    outDir: 'dist' // Ensure output directory is explicitly set
   },
   server: {
     port: 3004,
@@ -66,6 +67,9 @@ export default defineConfig({
     cors: true,
     hmr: {
       timeout: 5000
+    },
+    headers: {
+      "Access-Control-Allow-Origin": "*"
     }
   },
   preview: {
@@ -73,7 +77,7 @@ export default defineConfig({
     strictPort: true,
     cors: true,
     headers: {
-      "Access-Control-Allow-Origin": "*"
+      "Access-Control-Allow-Origin": "*",
     }
   },
   optimizeDeps: {
