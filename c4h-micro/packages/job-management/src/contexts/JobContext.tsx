@@ -27,10 +27,12 @@ interface JobProviderProps {
 
 // Define interfaces for API responses
 interface JobsResponse {
-  data: {
-    items: any[];
-  };
+  items: any[];
+  total: number;
+  limit: number;
+  offset: number;
 }
+
 
 interface JobResponse {
   data: {
@@ -61,10 +63,11 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
+      // The response is directly the data, not wrapped in a data property
       const response = await api.get<JobsResponse>('/api/v1/jobs');
       
-      // Map response to Job type
-      const jobsData = response.data.items.map((item: any) => ({
+      // Safely access items with fallback to empty array
+      const jobsData = (response.items || []).map((item: any) => ({
         id: item.id,
         configurations: item.configurations || {},
         status: item.status as JobStatus,
@@ -85,8 +88,8 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
-  
+  }, []);      
+
   // Load a specific job
   const loadJob = useCallback(async (id: string) => {
     setLoading(true);

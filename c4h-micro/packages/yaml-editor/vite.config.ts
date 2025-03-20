@@ -22,16 +22,9 @@ export default defineConfig({
           requiredVersion: '^18.0.0',
           eager: false
         },
-        'react-dom': { 
-          singleton: true,
+        'react-dom': { singleton: true,
           requiredVersion: '^18.0.0',
-          eager: false
-        },
-        'react/jsx-runtime': {
-          singleton: true,
-          requiredVersion: '^18.0.0',
-          eager: false
-        },
+          eager: true },
         '@monaco-editor/react': { 
           singleton: true,
           requiredVersion: '^4.5.0',

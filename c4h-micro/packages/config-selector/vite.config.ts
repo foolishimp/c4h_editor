@@ -25,16 +25,9 @@ export default defineConfig({
           requiredVersion: '^18.0.0',
           eager: false
         },
-        'react-dom': { 
-          singleton: true,
+        'react-dom': { singleton: true,
           requiredVersion: '^18.0.0',
-          eager: false
-        },
-        'react/jsx-runtime': {
-          singleton: true,
-          requiredVersion: '^18.0.0',
-          eager: false
-        },
+          eager: true },
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0',

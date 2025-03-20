@@ -80,3 +80,7 @@ echo "✅ Shell built successfully"
 
 echo "🎉 All packages have been successfully rebuilt!"
 echo "Run ./startup.sh to start the application"
+
+# 6. Start all servers
+echo "🚀 Starting all servers..."
+npm run start
