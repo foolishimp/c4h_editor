@@ -21,23 +21,19 @@ export default defineConfig({
       shared: {
         react: { 
           singleton: true,
-          requiredVersion: '^18.0.0',
-          eager: true
+          requiredVersion: '^18.0.0'
         },
         'react-dom': { 
           singleton: true,
-          requiredVersion: '^18.0.0', 
-          eager: true 
+          requiredVersion: '^18.0.0'
         },
         '@mui/material': {
           singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
+          requiredVersion: '^5.0.0'
         },
         '@mui/icons-material': {
           singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
+          requiredVersion: '^5.0.0'
         }
       }
     })
@@ -53,23 +49,19 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: 'assets',
     rollupOptions: {
       output: {
-        format: 'esm',
+        format: 'es',
         entryFileNames: '[name].js',
-        chunkFileNames: '[name].js',
-        assetFileNames: 'assets/[name].[ext]'
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]'
       }
     }
   },
   server: {
     port: 3000,
     strictPort: true,
-    cors: true,
-    hmr: {
-      timeout: 5000
-    }
+    cors: true
   },
   preview: {
     port: 3000,
@@ -77,7 +69,6 @@ export default defineConfig({
     cors: true
   },
   optimizeDeps: {
-    force: true,
     esbuildOptions: {
       define: {
         global: 'globalThis'

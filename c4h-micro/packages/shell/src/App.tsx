@@ -1,5 +1,5 @@
 // File: c4h-micro/packages/shell/src/App.tsx
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -75,88 +75,10 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 }
 
-// Preload microfrontends helper function
-const preloadMicrofrontend = async (url: string, scope: string) => {
-  try {
-    // Create and append a script element
-    const script = document.createElement('script');
-    script.src = url;
-    script.type = 'text/javascript';
-    script.async = true;
-    
-    // Create a promise that resolves when the script loads
-    const loaded = new Promise<void>((resolve, reject) => {
-      script.onload = () => resolve();
-      script.onerror = (err) => reject(new Error(`Failed to preload ${url}: ${err}`));
-    });
-    
-    // Append the script to the document
-    document.head.appendChild(script);
-    
-    // Wait for the script to load
-    await loaded;
-    
-    // Try to initialize the container if it has an init function
-    if (window[scope]?.init) {
-      await window[scope].init({
-        react: { 
-          '18.3.1': { 
-            get: () => Promise.resolve(() => require('react')),
-            loaded: true
-          } 
-        },
-        'react-dom': { 
-          '18.3.1': { 
-            get: () => Promise.resolve(() => require('react-dom')),
-            loaded: true
-          } 
-        }
-      });
-    }
-    
-    console.log(`✅ Preloaded ${scope} successfully`);
-    return true;
-  } catch (err) {
-    console.error(`❌ Failed to preload ${scope}:`, err);
-    return false;
-  }
-};
-
-// Main App component
+// Main App component - removed problematic preloading
 function App() {
   const drawerWidth = 240;
-  const [remotesLoaded, setRemotesLoaded] = useState(false);
   
-  // Preload all remote entries when the app starts
-  useEffect(() => {
-    const loadAllRemotes = async () => {
-      try {
-        console.log('Preloading remotes...');
-        
-        // Try to load all remotes in parallel
-        await Promise.all([
-          preloadMicrofrontend('http://localhost:3001/remoteEntry.js', 'configEditor'),
-          preloadMicrofrontend('http://localhost:3002/remoteEntry.js', 'yamlEditor'),
-          preloadMicrofrontend('http://localhost:3003/remoteEntry.js', 'configSelector'),
-          preloadMicrofrontend('http://localhost:3004/remoteEntry.js', 'jobManagement')
-        ]);
-        
-        setRemotesLoaded(true);
-        console.log('All remotes preloaded successfully!');
-      } catch (err) {
-        console.error('Error preloading remotes:', err);
-        // We'll continue anyway, the RemoteComponent will handle retries
-        setRemotesLoaded(true);
-      }
-    };
-    
-    loadAllRemotes();
-  }, []);
-
-  if (!remotesLoaded) {
-    return <Loading />;
-  }
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />

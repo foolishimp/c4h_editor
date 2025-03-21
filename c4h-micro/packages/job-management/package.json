@@ -6,7 +6,8 @@
   "scripts": {
     "start": "vite --port 3004 --strictPort",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 3004 --strictPort"
+    "preview": "vite preview --port 3004 --strictPort",
+    "serve": "node server.cjs"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
@@ -14,10 +15,10 @@
     "@mui/icons-material": "^5.15.14",
     "@mui/material": "^5.15.14",
     "axios": "^1.6.7",
+    "date-fns": "^3.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.22.3",
-    "date-fns": "^3.6.0",
     "shared": "*"
   },
   "devDependencies": {
@@ -25,6 +26,7 @@
     "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.3.4",
+    "express": "^4.21.2",
     "typescript": "^5.3.3",
     "vite": "^5.4.14"
   }

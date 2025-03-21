@@ -12,30 +12,26 @@ export default defineConfig({
     react(),
     federation({
       name: 'jobManagement',
-      filename: 'remoteEntry.js', // Changed to plain filename
+      filename: 'remoteEntry.js',
       exposes: {
         './JobManager': './src/JobManager.tsx',
       },
       shared: {
         react: { 
           singleton: true,
-          requiredVersion: '^18.0.0',
-          eager: true
+          requiredVersion: '^18.0.0'
         },
         'react-dom': { 
           singleton: true,
-          requiredVersion: '^18.0.0',
-          eager: true 
+          requiredVersion: '^18.0.0'
         },
         '@mui/material': {
           singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
+          requiredVersion: '^5.0.0'
         },
         '@mui/icons-material': {
           singleton: true, 
-          requiredVersion: '^5.0.0',
-          eager: true
+          requiredVersion: '^5.0.0'
         }
       }
     })
@@ -51,24 +47,20 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    assetsDir: 'assets',
+    outDir: 'dist',
     rollupOptions: {
       output: {
-        format: 'esm',
-        entryFileNames: '[name].js', // Removed assets/ prefix
-        chunkFileNames: '[name].js', // Removed assets/ prefix
-        assetFileNames: 'assets/[name].[ext]'
+        format: 'es',
+        entryFileNames: '[name].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[hash].[ext]'
       }
-    },
-    outDir: 'dist'
+    }
   },
   server: {
     port: 3004,
     strictPort: true,
     cors: true,
-    hmr: {
-      timeout: 5000
-    },
     headers: {
       "Access-Control-Allow-Origin": "*"
     }
@@ -78,15 +70,7 @@ export default defineConfig({
     strictPort: true,
     cors: true,
     headers: {
-      "Access-Control-Allow-Origin": "*",
-    }
-  },
-  optimizeDeps: {
-    force: true,
-    esbuildOptions: {
-      define: {
-        global: 'globalThis'
-      }
+      "Access-Control-Allow-Origin": "*"
     }
   }
 });
