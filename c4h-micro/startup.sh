@@ -1,6 +1,6 @@
 #!/bin/bash
 # File: c4h-micro/shell-job-startup.sh
-# This script builds and starts only the shell and job-management packages
+# This script only builds and starts the shell and job-management packages
 
 # Store the root directory
 ROOT_DIR=$(pwd)
@@ -9,6 +9,7 @@ ROOT_DIR=$(pwd)
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Function to check port availability
@@ -53,12 +54,6 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✅ Job Management built successfully${NC}"
 
-# Ensure remoteEntry.js is at root level
-if [ -f "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" ]; then
-  cp "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" "$ROOT_DIR/packages/job-management/dist/remoteEntry.js"
-  echo -e "${GREEN}✅ Copied remoteEntry.js to root level for job-management${NC}"
-fi
-
 # 4. Build shell
 echo -e "${YELLOW}🔨 Building Shell...${NC}"
 cd "$ROOT_DIR/packages/shell" && npm run build
@@ -70,13 +65,23 @@ echo -e "${GREEN}✅ Shell built successfully${NC}"
 
 cd "$ROOT_DIR" # Return to project root
 
-# 5. Start job-management server
+# Display start message
+echo -e "${CYAN}
+-----------------------------------------------
+IMPORTANT:
+Starting both servers to test Module Federation.
+The job-management server will use an express server 
+with proper CORS headers for federation.
+-----------------------------------------------
+${NC}"
+
+# 5. Start job-management server (using the improved express server)
 echo -e "${YELLOW}Starting Job Management server on port 3004...${NC}"
 cd "$ROOT_DIR/packages/job-management" && NODE_ENV=production node server.cjs &
 JOB_MGMT_PID=$!
 
-# Wait a bit for job server to start up
-sleep 3
+# Wait for job server to start up
+sleep 2
 
 # 6. Start shell server
 echo -e "${YELLOW}Starting Shell on port 3000...${NC}"
@@ -84,6 +89,10 @@ cd "$ROOT_DIR/packages/shell" && npm run preview &
 SHELL_PID=$!
 
 cd "$ROOT_DIR"  # Return to project root
+
+# Test if job-management server is responding correctly
+echo -e "${YELLOW}Testing job-management server response...${NC}"
+curl -s -I http://localhost:3004/remoteEntry.js | grep -i "content-type\|access-control" || echo "⚠️ Couldn't verify headers"
 
 # Register signal handler for cleanup
 trap 'echo -e "${YELLOW}Shutting down servers...${NC}"; kill $JOB_MGMT_PID $SHELL_PID 2>/dev/null' SIGINT SIGTERM

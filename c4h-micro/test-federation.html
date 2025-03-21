@@ -1,0 +1,133 @@
+<!-- File: c4h-micro/test-federation.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Federation Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    pre { background: #f5f5f5; padding: 10px; border-radius: 4px; }
+    .success { color: green; }
+    .error { color: red; }
+    button { padding: 8px 16px; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h2>Testing Module Federation</h2>
+  <div id="results"></div>
+
+  <button id="test-button">Test Federation</button>
+  <button id="test-import">Test Direct Import</button>
+
+  <script type="module">
+    const resultsDiv = document.getElementById('results');
+    
+    function log(message, type = 'info') {
+      const el = document.createElement('div');
+      el.className = type;
+      el.textContent = message;
+      resultsDiv.appendChild(el);
+      console.log(`[${type}] ${message}`);
+    }
+
+    // Test with script tag loading approach
+    document.getElementById('test-button').addEventListener('click', async () => {
+      resultsDiv.innerHTML = '';
+      log('Starting federation test with script tag approach...');
+      
+      try {
+        // First, check if we can reach the server
+        log('Checking if server is reachable...');
+        const response = await fetch('http://localhost:3004/remoteEntry.js', { 
+          method: 'HEAD',
+          mode: 'cors'
+        });
+        
+        if (response.ok) {
+          log('Server is reachable, status: ' + response.status, 'success');
+        } else {
+          log('Server returned status: ' + response.status, 'error');
+          return;
+        }
+        
+        // Create script tag to load remoteEntry.js
+        log('Creating script tag...');
+        const script = document.createElement('script');
+        script.type = 'module';
+        script.src = 'http://localhost:3004/remoteEntry.js';
+        
+        // Wait for script to load
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        
+        log('Script loaded successfully', 'success');
+        
+        // Check if container is registered
+        if (window.jobManagement) {
+          log('Container "jobManagement" found in window object', 'success');
+          log('Available methods: ' + Object.keys(window.jobManagement).join(', '));
+          
+          // Try to get the module
+          if (typeof window.jobManagement.get === 'function') {
+            log('Attempting to get "./JobManager" module...');
+            const factory = await window.jobManagement.get('./JobManager');
+            
+            if (factory) {
+              log('Module factory retrieved', 'success');
+              const module = await factory();
+              log('Module loaded: ' + (module.default ? 'Has default export' : 'No default export'));
+              log('Module keys: ' + Object.keys(module).join(', '));
+            } else {
+              log('Module factory not found', 'error');
+            }
+          } else {
+            log('Container does not have "get" method', 'error');
+          }
+        } else {
+          log('Container "jobManagement" not found in window object', 'error');
+          log('Available global objects: ' + Object.keys(window).filter(key => !key.startsWith('_')).join(', '));
+        }
+      } catch (err) {
+        log('Error: ' + err.message, 'error');
+        console.error(err);
+      }
+    });
+    
+    // Test direct import
+    document.getElementById('test-import').addEventListener('click', async () => {
+      resultsDiv.innerHTML = '';
+      log('Starting direct import test...');
+      
+      try {
+        log('Trying direct import...');
+        const remoteModule = await import('http://localhost:3004/remoteEntry.js');
+        
+        log('Import successful', 'success');
+        log('Module keys: ' + Object.keys(remoteModule).join(', '));
+        
+        if (remoteModule.get) {
+          log('Module has "get" method', 'success');
+          
+          try {
+            const factory = await remoteModule.get('./JobManager');
+            log('Factory retrieved', 'success');
+            
+            const component = await factory();
+            log('Component loaded', 'success');
+            log('Component keys: ' + Object.keys(component).join(', '));
+          } catch (err) {
+            log('Error getting component: ' + err.message, 'error');
+          }
+        } else {
+          log('Module does not have "get" method', 'error');
+        }
+      } catch (err) {
+        log('Import error: ' + err.message, 'error');
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>

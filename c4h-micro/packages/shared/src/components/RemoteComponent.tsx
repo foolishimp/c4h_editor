@@ -10,18 +10,12 @@ interface RemoteComponentProps {
   fallback?: React.ReactNode;
 }
 
-declare global {
-  interface Window {
-    [key: string]: any;
-  }
-}
-
 /**
- * Component for loading and rendering federated modules
+ * Component for loading and rendering Vite federated modules
  */
 const RemoteComponent: React.FC<RemoteComponentProps> = ({
   url,
-  scope,
+  scope, // Not used for Vite federation, but kept for API compatibility
   module,
   props = {},
   fallback
@@ -32,6 +26,62 @@ const RemoteComponent: React.FC<RemoteComponentProps> = ({
   const [retryCount, setRetryCount] = useState(0);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
 
+  const addDiagnostic = (message: string) => {
+    console.log(`[RemoteComponent] ${message}`);
+    setDiagnostics(prev => [...prev, message]);
+  };
+
+  // Load component using Vite's direct import approach
+  const loadComponent = async () => {
+    try {
+      addDiagnostic(`Loading remote module '${module}' from '${url}'`);
+      
+      // Use dynamic import
+      const container = await import(/* @vite-ignore */ url);
+      addDiagnostic(`Module imported successfully, exports: ${Object.keys(container).join(', ')}`);
+      
+      // Validate the container has the necessary methods
+      if (typeof container.get !== 'function') {
+        throw new Error('Remote module does not have a get method');
+      }
+      
+      // Get the factory function
+      addDiagnostic(`Getting module '${module}'...`);
+      const factory = await container.get(module);
+      
+      if (!factory) {
+        throw new Error(`Module '${module}' not found in remote container`);
+      }
+      
+      addDiagnostic('Factory function retrieved, loading component...');
+      const Module = await factory();
+      
+      // Get the component (could be default export or the module itself)
+      const Component = Module.default || Module;
+      
+      if (!Component) {
+        throw new Error('Component not found in module');
+      }
+      
+      addDiagnostic('Component loaded successfully');
+      setComponent(() => Component);
+      setLoading(false);
+    } catch (err: unknown) {
+      console.error('Error loading remote component:', err);
+      
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      addDiagnostic(`Error: ${errorMessage}`);
+      
+      // Check for CORS errors
+      if (errorMessage.includes('CORS') || errorMessage.includes('cross-origin')) {
+        addDiagnostic('CORS error detected, make sure server allows cross-origin requests');
+      }
+      
+      setError(errorMessage);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -39,57 +89,8 @@ const RemoteComponent: React.FC<RemoteComponentProps> = ({
     setDiagnostics([]);
     setComponent(null);
     
-    // Dynamic import approach - the most reliable for Vite federation
-    const loadComponent = async () => {
-      try {
-        addDiagnostic(`Loading remote module '${module}' from scope '${scope}' at URL '${url}'`);
-        
-        // For Vite Module Federation, we use dynamic import instead of script loading
-        const container = await import(/* @vite-ignore */ url);
-        
-        if (!container) {
-          throw new Error(`Failed to load remote container from '${url}'`);
-        }
-        
-        addDiagnostic(`Container loaded successfully`);
-        
-        // Get the specific module from the container
-        let Component;
-        
-        if (module.startsWith('./')) {
-          // Handle the path-style module references
-          const moduleName = module.replace('./', '');
-          Component = container[moduleName] || null;
-        } else {
-          Component = container[module] || null;
-        }
-        
-        if (!Component) {
-          throw new Error(`Module '${module}' not found in remote container`);
-        }
-        
-        addDiagnostic(`Module component loaded successfully`);
-        
-        setComponent(() => Component);
-        setLoading(false);
-      } catch (err) {
-        console.error('Failed to load remote component:', err);
-        
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        setError(errorMessage);
-        setRetryCount(prev => prev + 1);
-        addDiagnostic(`Error: ${errorMessage}`);
-        setLoading(false);
-      }
-    };
-    
     loadComponent();
-  }, [url, scope, module]);
-
-  const addDiagnostic = (message: string) => {
-    console.log(`[RemoteComponent] ${message}`);
-    setDiagnostics(prev => [...prev, message]);
-  };
+  }, [url, module]); // Removed scope dependency since it's not used
 
   const handleRetry = () => {
     setLoading(true);
@@ -97,45 +98,36 @@ const RemoteComponent: React.FC<RemoteComponentProps> = ({
     setDiagnostics([]);
     setRetryCount(prev => prev + 1);
     
-    // Use the import approach again
+    // Add cache busting to URL
+    const cacheBustUrl = `${url}?t=${Date.now()}`;
+    addDiagnostic(`Retrying with cache-busting URL: ${cacheBustUrl}`);
+    
+    // Load with the cache-busting URL
     const retryLoad = async () => {
       try {
-        addDiagnostic(`Retrying to load remote module '${module}' from '${url}'`);
+        const container = await import(/* @vite-ignore */ cacheBustUrl);
+        addDiagnostic(`Retry import successful, exports: ${Object.keys(container).join(', ')}`);
         
-        // Clear browser cache for this URL if possible
-        const cache = await caches.open('remote-components');
-        await cache.delete(url).catch(() => {});
-        
-        const container = await import(/* @vite-ignore */ `${url}?t=${Date.now()}`);
-        
-        if (!container) {
-          throw new Error(`Failed to load remote container from '${url}'`);
+        if (typeof container.get !== 'function') {
+          throw new Error('Remote module does not have a get method (retry)');
         }
         
-        addDiagnostic(`Container loaded successfully on retry`);
+        const factory = await container.get(module);
         
-        // Get the specific module from the container
-        let Component;
-        
-        if (module.startsWith('./')) {
-          const moduleName = module.replace('./', '');
-          Component = container[moduleName] || null;
-        } else {
-          Component = container[module] || null;
+        if (!factory) {
+          throw new Error(`Module '${module}' not found in remote container (retry)`);
         }
         
-        if (!Component) {
-          throw new Error(`Module '${module}' not found in remote container`);
-        }
+        const Module = await factory();
+        const Component = Module.default || Module;
         
+        addDiagnostic('Component loaded successfully on retry');
         setComponent(() => Component);
         setLoading(false);
-      } catch (err) {
-        console.error('Failed to load remote component on retry:', err);
-        
+      } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        setError(errorMessage);
         addDiagnostic(`Error on retry: ${errorMessage}`);
+        setError(errorMessage);
         setLoading(false);
       }
     };
@@ -169,12 +161,12 @@ const RemoteComponent: React.FC<RemoteComponentProps> = ({
             <li>The microfrontend server at <code>{url}</code> is not running</li>
             <li>The remoteEntry.js file is using a different federation format than expected</li>
             <li>There's a network issue preventing the connection</li>
-            <li>The module name or scope is incorrect</li>
+            <li>The module name is incorrect</li>
           </ul>
         </Box>
         
         {diagnostics.length > 0 && (
-          <Alert severity="info" sx={{ mb: 2, textAlign: 'left' }}>
+          <Alert severity="info" sx={{ mb: 2, textAlign: 'left', maxHeight: '300px', overflow: 'auto' }}>
             <Typography variant="subtitle2">Diagnostics:</Typography>
             <ul style={{ marginTop: 4, paddingLeft: 16 }}>
               {diagnostics.map((msg, idx) => (

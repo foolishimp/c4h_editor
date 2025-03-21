@@ -7,7 +7,6 @@ import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
-  base: '',
   plugins: [
     react(),
     federation({
@@ -17,7 +16,9 @@ export default defineConfig({
         './JobManager': './src/JobManager.tsx',
       },
       shared: {
+        // Use only properties from your federation.d.ts file
         react: { 
+          // These fields must match your FederationOptions type
           singleton: true,
           requiredVersion: '^18.0.0'
         },
@@ -30,7 +31,7 @@ export default defineConfig({
           requiredVersion: '^5.0.0'
         },
         '@mui/icons-material': {
-          singleton: true, 
+          singleton: true,
           requiredVersion: '^5.0.0'
         }
       }
@@ -47,13 +48,9 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
-    outDir: 'dist',
     rollupOptions: {
       output: {
-        format: 'es',
-        entryFileNames: '[name].js',
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]'
+        format: 'es'
       }
     }
   },
@@ -62,15 +59,8 @@ export default defineConfig({
     strictPort: true,
     cors: true,
     headers: {
-      "Access-Control-Allow-Origin": "*"
-    }
-  },
-  preview: {
-    port: 3004,
-    strictPort: true,
-    cors: true,
-    headers: {
-      "Access-Control-Allow-Origin": "*"
+      "Access-Control-Allow-Origin": "*",
+      "Content-Type": "application/javascript"
     }
   }
 });
