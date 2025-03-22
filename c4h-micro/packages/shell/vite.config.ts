@@ -1,4 +1,4 @@
-// File: c4h-micro/packages/shell/vite.config.ts
+// File: packages/shell/vite.config.ts
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
@@ -19,14 +19,20 @@ export default defineConfig({
         jobManagement: 'http://localhost:3004/remoteEntry.js'
       },
       shared: {
+        // Ensure React is properly shared - must match between host and remotes
         react: { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          strictVersion: true,
+          requiredVersion: '^18.0.0',
+          eager: true
         },
         'react-dom': { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          strictVersion: true,
+          requiredVersion: '^18.0.0',
+          eager: true
         },
+        // Remove jsx-runtime reference that's causing issues
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0'
@@ -34,6 +40,10 @@ export default defineConfig({
         '@mui/icons-material': {
           singleton: true,
           requiredVersion: '^5.0.0'
+        },
+        'react-router-dom': {
+          singleton: true,
+          requiredVersion: '^6.0.0'
         }
       }
     })
@@ -49,30 +59,41 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false,
     modulePreload: false,
+    sourcemap: true,
+    outDir: 'dist',
     rollupOptions: {
+      preserveEntrySignatures: 'strict',
       output: {
-        format: 'es',
-        entryFileNames: '[name].js',
-        chunkFileNames: 'assets/[name].[hash].js',
-        assetFileNames: 'assets/[name].[hash].[ext]'
+        format: 'esm',
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].[hash].js'
       }
     }
   },
   server: {
     port: 3000,
     strictPort: true,
-    cors: true
+    cors: true,
+    headers: {
+      "Access-Control-Allow-Origin": "*"
+    }
   },
   preview: {
     port: 3000,
     strictPort: true,
-    cors: true
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      define: {
-        global: 'globalThis'
-      }
+    cors: true,
+    headers: {
+      "Access-Control-Allow-Origin": "*"
     }
+  },
+  // Fix global access in Vite build
+  define: {
+    'process.env': {},
+    'global': 'window'
+  },
+  // Ensure React resolution is consistent
+  optimizeDeps: {
+    include: ['react', 'react-dom', '@mui/material', '@mui/icons-material', 'react-router-dom'],
+    exclude: ['shared']
   }
 });

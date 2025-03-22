@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remote Module Loading Diagnostic Tool</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f7fa;
+    }
+    .container {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    button {
+      background-color: #4299e1;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background-color: #3182ce;
+    }
+    .output {
+      background-color: #f8f9fa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 15px;
+      overflow: auto;
+      max-height: 400px;
+      margin-top: 10px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+    .log-entry {
+      margin: 5px 0;
+    }
+    .info {
+      color: #333;
+    }
+    .success {
+      color: #38a169;
+    }
+    .error {
+      color: #e53e3e;
+    }
+    .warning {
+      color: #d69e2e;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+    }
+    .tab.active {
+      border-bottom-color: #4299e1;
+      font-weight: bold;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Remote Module Loading Diagnostic Tool</h1>
+    
+    <div class="tabs">
+      <div class="tab active" data-tab="basic">Basic Test</div>
+      <div class="tab" data-tab="advanced">Advanced Test</div>
+      <div class="tab" data-tab="react">React Test</div>
+    </div>
+    
+    <div id="basic-tab" class="tab-content active">
+      <div class="section">
+        <h2>Test Module Federation Loading</h2>
+        <p>This tool helps diagnose issues with loading remote modules in Vite Module Federation.</p>
+        
+        <div class="form-group">
+          <label for="remoteUrl">Remote URL:</label>
+          <input type="text" id="remoteUrl" value="http://localhost:3004/remoteEntry.js" placeholder="e.g., http://localhost:3004/remoteEntry.js">
+        </div>
+        
+        <div class="form-group">
+          <label for="scope">Scope:</label>
+          <input type="text" id="scope" value="jobManagement" placeholder="e.g., jobManagement">
+        </div>
+        
+        <div class="form-group">
+          <label for="module">Module:</label>
+          <input type="text" id="module" value="./JobManager" placeholder="e.g., ./JobManager">
+        </div>
+        
+        <button id="testButton">Test Remote Module</button>
+        <button id="clearButton">Clear Log</button>
+      </div>
+      
+      <div class="section">
+        <h3>Log Output</h3>
+        <div id="output" class="output"></div>
+      </div>
+    </div>
+    
+    <div id="advanced-tab" class="tab-content">
+      <div class="section">
+        <h2>Advanced Testing</h2>
+        <p>Test specific aspects of the module federation setup.</p>
+        
+        <button id="testImport">Test Dynamic Import</button>
+        <button id="testGlobalScope">Check Global Scope</button>
+        <button id="testReactSingleton">Test React Singleton</button>
+        <button id="checkHeaders">Check CORS Headers</button>
+      </div>
+      
+      <div class="section">
+        <h3>Advanced Log Output</h3>
+        <div id="advancedOutput" class="output"></div>
+      </div>
+    </div>
+    
+    <div id="react-tab" class="tab-content">
+      <div class="section">
+        <h2>React Component Test</h2>
+        <p>Test mounting a remote React component.</p>
+        
+        <div class="form-group">
+          <label for="reactRemoteUrl">Remote URL:</label>
+          <input type="text" id="reactRemoteUrl" value="http://localhost:3004/remoteEntry.js" placeholder="e.g., http://localhost:3004/remoteEntry.js">
+        </div>
+        
+        <div class="form-group">
+          <label for="reactScope">Scope:</label>
+          <input type="text" id="reactScope" value="jobManagement" placeholder="e.g., jobManagement">
+        </div>
+        
+        <div class="form-group">
+          <label for="reactModule">Module:</label>
+          <input type="text" id="reactModule" value="./JobManager" placeholder="e.g., ./JobManager">
+        </div>
+        
+        <button id="mountComponent">Mount Component</button>
+        <button id="unmountComponent">Unmount Component</button>
+      </div>
+      
+      <div class="section">
+        <h3>Component Container</h3>
+        <div id="componentContainer" style="min-height: 200px; border: 1px dashed #ccc; padding: 20px;"></div>
+      </div>
+      
+      <div class="section">
+        <h3>React Test Log</h3>
+        <div id="reactOutput" class="output"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Tab switching logic
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Deactivate all tabs
+        tabs.forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Activate the clicked tab
+        tab.classList.add('active');
+        const tabId = tab.getAttribute('data-tab');
+        document.getElementById(`${tabId}-tab`).classList.add('active');
+      });
+    });
+
+    // Basic test functionality
+    const log = (message, type = 'info') => {
+      const output = document.getElementById('output');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = message;
+      output.appendChild(entry);
+      output.scrollTop = output.scrollHeight;
+    };
+    
+    const advancedLog = (message, type = 'info') => {
+      const output = document.getElementById('advancedOutput');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = message;
+      output.appendChild(entry);
+      output.scrollTop = output.scrollHeight;
+    };
+    
+    const reactLog = (message, type = 'info') => {
+      const output = document.getElementById('reactOutput');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = message;
+      output.appendChild(entry);
+      output.scrollTop = output.scrollHeight;
+    };
+
+    // Clear log button
+    document.getElementById('clearButton').addEventListener('click', () => {
+      document.getElementById('output').innerHTML = '';
+    });
+
+    // Test button
+    document.getElementById('testButton').addEventListener('click', async () => {
+      const remoteUrl = document.getElementById('remoteUrl').value;
+      const scope = document.getElementById('scope').value;
+      const module = document.getElementById('module').value;
+      
+      if (!remoteUrl) {
+        log('Please enter a remote URL', 'error');
+        return;
+      }
+      
+      log(`Testing remote module: ${module} from ${remoteUrl}`, 'info');
+      
+      try {
+        // Test fetching the remote entry
+        log('Fetching remote entry file...', 'info');
+        const response = await fetch(remoteUrl);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch remote entry: ${response.status} ${response.statusText}`);
+        }
+        
+        log(`Remote entry file fetched successfully (${response.status})`, 'success');
+        log(`Content-Type: ${response.headers.get('Content-Type')}`, 'info');
+        
+        // Try to import the remote entry
+        log('Dynamically importing remote entry...', 'info');
+        const remoteContainer = await import(/* @vite-ignore */ remoteUrl);
+        
+        log(`Remote container loaded! Available exports:`, 'success');
+        log(JSON.stringify(Object.keys(remoteContainer)), 'info');
+        
+        // Check if the 'get' method exists
+        if (typeof remoteContainer.get !== 'function') {
+          throw new Error('Remote container does not have a get() method');
+        }
+        
+        log(`Container has get() method`, 'success');
+        
+        // Try to get the module
+        log(`Getting module "${module}"...`, 'info');
+        const factory = await remoteContainer.get(module);
+        
+        if (!factory) {
+          throw new Error(`Module "${module}" not found in remote container`);
+        }
+        
+        log(`Module factory retrieved`, 'success');
+        
+        // Try to execute the factory
+        log('Executing factory function...', 'info');
+        const Component = await factory();
+        
+        log(`Factory executed successfully!`, 'success');
+        log(`Component type: ${typeof Component}`, 'info');
+        log(`Component exports: ${Object.keys(Component).join(', ')}`, 'info');
+        
+        // Check for default export
+        const FinalComponent = Component.default || Component;
+        
+        if (!FinalComponent) {
+          throw new Error('No component found in module exports');
+        }
+        
+        log(`Component loaded successfully!`, 'success');
+        log(`Component type: ${typeof FinalComponent}`, 'info');
+        
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+        console.error('Detailed error:', error);
+      }
+    });
+    
+    // Advanced testing
+    document.getElementById('testImport').addEventListener('click', async () => {
+      const remoteUrl = document.getElementById('remoteUrl').value;
+      advancedLog(`Testing dynamic import for: ${remoteUrl}`, 'info');
+      
+      try {
+        const startTime = performance.now();
+        const module = await import(/* @vite-ignore */ remoteUrl);
+        const endTime = performance.now();
+        
+        advancedLog(`Import successful! Took ${(endTime - startTime).toFixed(2)}ms`, 'success');
+        advancedLog(`Module type: ${typeof module}`, 'info');
+        advancedLog(`Module keys: ${Object.keys(module).join(', ')}`, 'info');
+      } catch (error) {
+        advancedLog(`Import failed: ${error.message}`, 'error');
+        console.error('Dynamic import error:', error);
+      }
+    });
+    
+    document.getElementById('testGlobalScope').addEventListener('click', () => {
+      const scope = document.getElementById('scope').value;
+      advancedLog(`Checking global scope for: ${scope}`, 'info');
+      
+      if (window[scope]) {
+        advancedLog(`Found global scope object: ${scope}`, 'success');
+        advancedLog(`Properties: ${Object.keys(window[scope]).join(', ')}`, 'info');
+      } else {
+        advancedLog(`No global scope object found for: ${scope}`, 'warning');
+        advancedLog('Note: Vite Module Federation may not register global objects like Webpack does', 'info');
+      }
+      
+      // Check for federation shared scope
+      if (window.__federation_shared__) {
+        advancedLog('Found __federation_shared__ object', 'success');
+        advancedLog(`Shared modules: ${Object.keys(window.__federation_shared__).join(', ')}`, 'info');
+      } else {
+        advancedLog('No __federation_shared__ object found', 'warning');
+      }
+    });
+    
+    document.getElementById('testReactSingleton').addEventListener('click', async () => {
+      advancedLog('Testing React singleton status...', 'info');
+      
+      // Get the current React instance
+      let localReact;
+      try {
+        advancedLog('Loading local React instance...', 'info');
+        localReact = await import('react');
+        advancedLog(`Local React version: ${localReact.version}`, 'success');
+      } catch (error) {
+        advancedLog(`Failed to load local React: ${error.message}`, 'error');
+        return;
+      }
+      
+      // Try to get React from a remote
+      const remoteUrl = document.getElementById('remoteUrl').value;
+      try {
+        advancedLog(`Loading remote module from: ${remoteUrl}`, 'info');
+        const remote = await import(/* @vite-ignore */ remoteUrl);
+        
+        if (typeof remote.get !== 'function') {
+          advancedLog('Remote does not have get() method', 'warning');
+          return;
+        }
+        
+        // Try to get the specified module
+        const module = document.getElementById('module').value;
+        const factory = await remote.get(module);
+        
+        if (!factory) {
+          advancedLog(`Module ${module} not found`, 'warning');
+          return;
+        }
+        
+        advancedLog('Loading remote component...', 'info');
+        const component = await factory();
+        
+        // Check if the component has access to React
+        advancedLog('Checking if remote component has React...', 'info');
+        if (component.__esModule) {
+          advancedLog('Component is an ES module', 'info');
+        }
+        
+        // Compare React instances
+        if (window.React && localReact) {
+          if (window.React === localReact) {
+            advancedLog('React singleton is working! All instances reference the same object', 'success');
+          } else {
+            advancedLog('WARNING: Multiple React instances detected!', 'error');
+            advancedLog('This will cause hooks to fail in remote components', 'error');
+          }
+        } else {
+          advancedLog('Could not compare React instances', 'warning');
+        }
+        
+      } catch (error) {
+        advancedLog(`Error testing React singleton: ${error.message}`, 'error');
+        console.error('React singleton test error:', error);
+      }
+    });
+    
+    document.getElementById('checkHeaders').addEventListener('click', async () => {
+      const remoteUrl = document.getElementById('remoteUrl').value;
+      advancedLog(`Checking CORS headers for: ${remoteUrl}`, 'info');
+      
+      try {
+        // First try a HEAD request
+        const headResponse = await fetch(remoteUrl, { method: 'HEAD' });
+        
+        advancedLog(`HEAD request status: ${headResponse.status}`, headResponse.ok ? 'success' : 'warning');
+        advancedLog('Response headers:', 'info');
+        
+        // Log all headers
+        headResponse.headers.forEach((value, key) => {
+          advancedLog(`${key}: ${value}`, 'info');
+        });
+        
+        // Check for CORS headers
+        const corsHeaders = [
+          'Access-Control-Allow-Origin',
+          'Access-Control-Allow-Methods',
+          'Access-Control-Allow-Headers'
+        ];
+        
+        let hasCorsHeaders = false;
+        
+        corsHeaders.forEach(header => {
+          const value = headResponse.headers.get(header);
+          if (value) {
+            hasCorsHeaders = true;
+            advancedLog(`✓ ${header}: ${value}`, 'success');
+          } else {
+            advancedLog(`✗ ${header} not present`, 'warning');
+          }
+        });
+        
+        if (!hasCorsHeaders) {
+          advancedLog('No CORS headers found! This may cause cross-origin issues', 'error');
+        }
+        
+        // Check for important content headers
+        const contentType = headResponse.headers.get('Content-Type');
+        if (contentType) {
+          if (contentType.includes('javascript')) {
+            advancedLog(`✓ Content-Type: ${contentType}`, 'success');
+          } else {
+            advancedLog(`✗ Content-Type is not JavaScript: ${contentType}`, 'error');
+            advancedLog('For Module Federation, Content-Type should be application/javascript', 'info');
+          }
+        } else {
+          advancedLog('✗ Content-Type header not present', 'warning');
+        }
+        
+      } catch (error) {
+        advancedLog(`Error checking headers: ${error.message}`, 'error');
+      }
+    });
+    
+    // React component testing
+    let mountedComponent = null;
+    
+    document.getElementById('mountComponent').addEventListener('click', async () => {
+      const remoteUrl = document.getElementById('reactRemoteUrl').value;
+      const scope = document.getElementById('reactScope').value;
+      const module = document.getElementById('reactModule').value;
+      const container = document.getElementById('componentContainer');
+      
+      reactLog(`Attempting to mount component from ${remoteUrl}`, 'info');
+      
+      try {
+        // Clear any existing content
+        container.innerHTML = '';
+        
+        // Load React and ReactDOM
+        reactLog('Loading React and ReactDOM...', 'info');
+        const React = await import('react');
+        const ReactDOM = await import('react-dom/client');
+        
+        reactLog(`Using React version: ${React.version}`, 'info');
+        
+        // Create a div for the component
+        const mountNode = document.createElement('div');
+        container.appendChild(mountNode);
+        
+        // Try to import the remote module
+        reactLog(`Importing remote module: ${module}`, 'info');
+        const remote = await import(/* @vite-ignore */ remoteUrl);
+        
+        if (typeof remote.get !== 'function') {
+          throw new Error('Remote module does not have a get() method');
+        }
+        
+        reactLog('Getting component factory...', 'info');
+        const factory = await remote.get(module);
+        
+        if (!factory) {
+          throw new Error(`Module ${module} not found`);
+        }
+        
+        reactLog('Executing component factory...', 'info');
+        const Component = await factory();
+        
+        // Get the default export or the module itself
+        const FinalComponent = Component.default || Component;
+        
+        if (!FinalComponent) {
+          throw new Error('No component found in module exports');
+        }
+        
+        reactLog(`Component loaded, type: ${typeof FinalComponent}`, 'success');
+        
+        // Create a root and render the component
+        reactLog('Creating React root and rendering component...', 'info');
+        mountedComponent = ReactDOM.createRoot(mountNode);
+        mountedComponent.render(React.createElement(FinalComponent));
+        
+        reactLog('Component mounted successfully!', 'success');
+        
+      } catch (error) {
+        reactLog(`Error mounting component: ${error.message}`, 'error');
+        console.error('Component mounting error:', error);
+      }
+    });
+    
+    document.getElementById('unmountComponent').addEventListener('click', () => {
+      if (mountedComponent) {
+        reactLog('Unmounting component...', 'info');
+        try {
+          mountedComponent.unmount();
+          mountedComponent = null;
+          document.getElementById('componentContainer').innerHTML = '';
+          reactLog('Component unmounted successfully', 'success');
+        } catch (error) {
+          reactLog(`Error unmounting component: ${error.message}`, 'error');
+        }
+      } else {
+        reactLog('No component is currently mounted', 'warning');
+      }
+    });
+  </script>
+</body>
+</html>
