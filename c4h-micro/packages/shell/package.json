@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "../../node_modules/.bin/vite --port 3004 --strictPort",
+    "start": "../../node_modules/.bin/vite --port 3000 --strictPort",
     "build": "../../node_modules/.bin/tsc && ../../node_modules/.bin/vite build",
-    "preview": "../../node_modules/.bin/vite preview --port 3004 --strictPort",
+    "preview": "../../node_modules/.bin/vite preview --port 3000 --strictPort",
     "serve": "node server.cjs"
   },
   "dependencies": {
