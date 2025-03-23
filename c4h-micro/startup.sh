@@ -1,6 +1,6 @@
 #!/bin/bash
-# File: c4h-micro/shell-job-startup.sh
-# This script builds and starts only the shell and job-management packages
+# File: start-federation.sh
+# This script builds and starts the shell and job-management packages with proper Module Federation setup
 
 # Store the root directory
 ROOT_DIR=$(pwd)
@@ -30,6 +30,16 @@ check_port() {
   fi
 }
 
+# Clean up any previous processes when exiting
+cleanup() {
+  echo -e "${YELLOW}Shutting down servers...${NC}"
+  kill $JOB_MGMT_PID $SHELL_PID 2>/dev/null
+  exit 0
+}
+
+# Register cleanup handler
+trap cleanup SIGINT SIGTERM
+
 # 1. Check ports
 echo -e "${YELLOW}Checking ports...${NC}"
 check_port 3000  # Shell
@@ -51,42 +61,35 @@ if [ $? -ne 0 ]; then
   echo -e "${RED}❌ Failed to build Job Management. Exiting.${NC}"
   exit 1
 fi
+
+# Explicitly ensure remoteEntry.js is available in both locations
+if [ -f "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" ]; then
+  echo -e "${YELLOW}Copying remoteEntry.js to root level for job-management...${NC}"
+  cp "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" "$ROOT_DIR/packages/job-management/dist/remoteEntry.js"
+  echo -e "${GREEN}✅ remoteEntry.js copied successfully${NC}"
+else
+  echo -e "${RED}⚠️ Could not find remoteEntry.js in assets folder${NC}"
+  # Try to find it elsewhere
+  find "$ROOT_DIR/packages/job-management/dist" -name "remoteEntry.js" -exec echo "Found at: {}" \;
+fi
+
 echo -e "${GREEN}✅ Job Management built successfully${NC}"
 
-# Ensure remoteEntry.js is at root level
-if [ -f "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" ]; then
-  cp "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" "$ROOT_DIR/packages/job-management/dist/remoteEntry.js"
-  echo -e "${GREEN}✅ Copied remoteEntry.js to root level for job-management${NC}"
-fi
-
-# 4. Build shell
-echo -e "${YELLOW}🔨 Building Shell...${NC}"
-cd "$ROOT_DIR/packages/shell" && npm run build
-if [ $? -ne 0 ]; then
-  echo -e "${RED}❌ Failed to build Shell. Exiting.${NC}"
-  exit 1
-fi
-echo -e "${GREEN}✅ Shell built successfully${NC}"
-
-cd "$ROOT_DIR" # Return to project root
-
-# 5. Start job-management server
-echo -e "${YELLOW}Starting Job Management server on port 3004...${NC}"
-cd "$ROOT_DIR/packages/job-management" && NODE_ENV=production node server.cjs &
+# 4. Start job-management in preview mode
+echo -e "${YELLOW}Starting Job Management preview on port 3004...${NC}"
+cd "$ROOT_DIR/packages/job-management" && npm run preview &
 JOB_MGMT_PID=$!
 
 # Wait a bit for job server to start up
+echo -e "${YELLOW}Waiting for Job Management server to initialize...${NC}"
 sleep 3
 
-# 6. Start shell server
-echo -e "${YELLOW}Starting Shell on port 3000...${NC}"
-cd "$ROOT_DIR/packages/shell" && npm run preview &
+# 5. Start shell in development mode
+echo -e "${YELLOW}Starting Shell in development mode on port 3000...${NC}"
+cd "$ROOT_DIR/packages/shell" && npm run start &
 SHELL_PID=$!
 
 cd "$ROOT_DIR"  # Return to project root
-
-# Register signal handler for cleanup
-trap 'echo -e "${YELLOW}Shutting down servers...${NC}"; kill $JOB_MGMT_PID $SHELL_PID 2>/dev/null' SIGINT SIGTERM
 
 echo -e "${GREEN}
 -----------------------------------------------
@@ -95,6 +98,15 @@ echo -e "${GREEN}
   - Job Management: http://localhost:3004
 -----------------------------------------------
 Press Ctrl+C to stop all servers
+${NC}"
+
+# Print reminder about Module Federation path
+echo -e "${YELLOW}
+💡 Module Federation Info:
+  - Make sure shell's vite.config.ts points to: http://localhost:3004/assets/remoteEntry.js
+  - If issues persist, verify both these files exist:
+    - packages/job-management/dist/assets/remoteEntry.js
+    - packages/job-management/dist/remoteEntry.js
 ${NC}"
 
 # Wait for all background processes
