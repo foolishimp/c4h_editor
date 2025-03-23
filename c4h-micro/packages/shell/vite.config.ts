@@ -1,4 +1,4 @@
-// File: /packages/shell/vite.config.ts
+// packages/shell/vite.config.ts
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
@@ -12,7 +12,6 @@ export default defineConfig({
     federation({
       name: 'shell',
       remotes: {
-        // Correctly point to the assets directory where remoteEntry.js files are located by default
         configEditor: 'http://localhost:3001/assets/remoteEntry.js',
         yamlEditor: 'http://localhost:3002/assets/remoteEntry.js',
         configSelector: 'http://localhost:3003/assets/remoteEntry.js',
@@ -39,8 +38,13 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,          // Use a different port than the microfrontends
-    strictPort: true,    // Fail if port is already in use
-    cors: true           // Enable CORS for federation
+    port: 3000,
+    strictPort: true,
+    cors: true
+  },
+  preview: {
+    port: 3000,
+    strictPort: true,
+    cors: true
   }
 });

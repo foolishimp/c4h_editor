@@ -27,6 +27,10 @@ export default defineConfig({
         '@mui/material': {
           singleton: true,
           requiredVersion: '^5.0.0'
+        },
+        '@mui/icons-material': {
+          singleton: true,
+          requiredVersion: '^5.0.0'
         }
       }
     })
@@ -36,6 +40,16 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false
+  },
+  server: {
+    port: 3003,
+    strictPort: true,
+    cors: true
+  },
+  preview: {
+    port: 3003,
+    strictPort: true,
+    cors: true
   },
   resolve: {
     alias: {

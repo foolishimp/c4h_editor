@@ -1,5 +1,5 @@
-// File: packages/config-selector/src/ConfigManager.tsx
-import React from 'react';
+// packages/config-selector/src/ConfigManager.tsx
+
 import { Box, Typography } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { ConfigProvider } from './contexts/ConfigContext';
@@ -11,8 +11,13 @@ interface ConfigManagerProps {
   configType?: string;
 }
 
-const ConfigManager: React.FC<ConfigManagerProps> = ({ configType: propConfigType }) => {
-  const { configType: paramConfigType, id } = useParams<{ configType?: string, id?: string }>();
+// Using regular function declaration instead of arrow function
+// to ensure React hooks work correctly across module boundaries
+function ConfigManager(props: ConfigManagerProps) {
+  const { configType: propConfigType } = props;
+  const params = useParams<{ configType?: string, id?: string }>();
+  const paramConfigType = params?.configType;
+  const id = params?.id;
   
   // Use the config type from props or URL params
   const configType = propConfigType || paramConfigType;
@@ -59,6 +64,6 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ configType: propConfigTyp
       </Box>
     </ConfigProvider>
   );
-};
+}
 
 export default ConfigManager;

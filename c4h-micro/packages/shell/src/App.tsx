@@ -85,10 +85,6 @@ function App() {
   
   // Make remotes globally available for better error handling
   useEffect(() => {
-    // Add remotes to window for easier access
-    window.__C4H_REMOTES__ = remotes;
-    
-    // Log available remotes for debugging
     console.log('Available remotes:', remotes);
   }, []);
   

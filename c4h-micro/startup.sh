@@ -63,18 +63,6 @@ build_package() {
     return 1
   fi
   
-  # Handle special case for remoteEntry.js (ensure it's available at root level)
-  if [ "$package" != "shared" ] && [ "$package" != "shell" ]; then
-    if [ -f "$dir/dist/assets/remoteEntry.js" ]; then
-      echo -e "${YELLOW}Copying remoteEntry.js to root level for $package...${NC}"
-      cp "$dir/dist/assets/remoteEntry.js" "$dir/dist/remoteEntry.js"
-    elif [ -f "$dir/dist/remoteEntry.js" ]; then
-      echo -e "${GREEN}remoteEntry.js already exists at root level${NC}"
-    else
-      echo -e "${YELLOW}⚠️ No remoteEntry.js found for $package, this might cause issues${NC}"
-    fi
-  fi
-  
   echo -e "${GREEN}✅ $package built successfully${NC}"
   return 0
 }
