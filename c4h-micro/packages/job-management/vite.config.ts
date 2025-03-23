@@ -1,4 +1,4 @@
-// packages/job-management/vite.config.ts
+// File: /packages/job-management/vite.config.ts
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
@@ -46,5 +46,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/dist')
     }
+  },
+  server: {
+    port: 3004,
+    strictPort: true,  // This ensures the server fails if port is in use
+    cors: true         // Required for Module Federation
+  },
+  preview: {
+    port: 3004,
+    strictPort: true,
+    cors: true
   }
 });

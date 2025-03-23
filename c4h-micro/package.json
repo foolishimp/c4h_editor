@@ -1,40 +1,29 @@
 {
-  "name": "c4h-editor",
+  "name": "c4h-micro",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "start": "concurrently -n \"yaml-editor,config-selector,job-management,config-editor,shell\" -c \"yellow,cyan,magenta,blue,green\" \"npm run start:yaml-editor\" \"npm run start:config-selector\" \"npm run start:job-management\" \"npm run start:config-editor\" \"wait-on http://localhost:3001 http://localhost:3002 http://localhost:3003 && npm run start:shell\"",
-    "start:shell": "npm run start -w packages/shell",
-    "start:config-editor": "npm run start -w packages/config-editor",
-    "dev:setup": "node scripts/setup-dev-environment.js",
-    "dev:direct": "node scripts/dev-direct.js",
-    "build": "npm run build:shared && npm run build:yaml-editor && npm run build:config-selector && npm run build:job-management && npm run build:config-editor && npm run build:shell",
-    "build:shared": "npm run build -w packages/shared",
-    "build:shell": "npm run build -w packages/shell",
-    "build:config-editor": "npm run build -w packages/config-editor",
-    "start:yaml-editor": "npm run start -w packages/yaml-editor",
-    "build:yaml-editor": "npm run build -w packages/yaml-editor",
-    "start:config-selector": "npm run start -w packages/config-selector",
-    "build:config-selector": "npm run build -w packages/config-selector",
-    "start:job-management": "npm run start -w packages/job-management",
-    "build:job-management": "npm run build -w packages/job-management",
-    "reset": "node scripts/reset-ports.js && rm -rf node_modules/.vite packages/*/node_modules/.vite",
-    "clean": "rm -rf node_modules/.vite packages/*/node_modules/.vite dist packages/*/dist",
-    "restart": "npm run clean && npm run reset && npm run build:shared && npm start",
-    "rebuild": "node scripts/rebuild-all.js",
-    "cleanup": "bash scripts/cleanup-redundant-files.sh"
+    "build:shared": "cd packages/shared && npm run build",
+    "build:config-editor": "cd packages/config-editor && npm run build",
+    "build:yaml-editor": "cd packages/yaml-editor && npm run build",
+    "build:config-selector": "cd packages/config-selector && npm run build",
+    "build:job-management": "cd packages/job-management && npm run build",
+    "preview:config-editor": "cd packages/config-editor && npm run preview",
+    "preview:yaml-editor": "cd packages/yaml-editor && npm run preview",
+    "preview:config-selector": "cd packages/config-selector && npm run preview",
+    "preview:job-management": "cd packages/job-management && npm run preview",
+    "dev:shell": "cd packages/shell && npm run start",
+    
+    "dev": "npm run build:shared && concurrently \"npm run build-and-preview:all\" \"npm run dev:shell\"",
+    "build-and-preview:all": "npm run build-and-preview:config-editor & npm run build-and-preview:yaml-editor & npm run build-and-preview:config-selector & npm run build-and-preview:job-management",
+    "build-and-preview:config-editor": "npm run build:config-editor && npm run preview:config-editor",
+    "build-and-preview:yaml-editor": "npm run build:yaml-editor && npm run preview:yaml-editor",
+    "build-and-preview:config-selector": "npm run build:config-selector && npm run preview:config-selector",
+    "build-and-preview:job-management": "npm run build:job-management && npm run preview:job-management"
   },
   "devDependencies": {
-    "@originjs/vite-plugin-federation": "^1.4.0",
-    "@types/node": "^22.13.10",
-    "@types/react": "^18.2.61",
-    "@types/react-dom": "^18.2.19",
-    "concurrently": "^8.2.2",
-    "glob": "^8.1.0",
-    "typescript": "^5.3.3",
-    "vite": "^6.2.2",
-    "wait-on": "^7.2.0"
+    "concurrently": "^8.2.2"
   }
 }

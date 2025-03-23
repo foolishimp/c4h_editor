@@ -1,11 +1,11 @@
-// File: c4h-micro/packages/shell/src/App.tsx
-import React, { Suspense } from 'react';
+// File: /packages/shell/src/App.tsx
+import React, { Suspense, useEffect } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import Navigation from './components/common/Navigation';
-import { RemoteComponent } from 'shared';
+import { RemoteComponent, remotes } from 'shared';
 import ConfigTypeSelector from './components/create/ConfigTypeSelector';
 
 // Create theme
@@ -75,9 +75,18 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
   }
 }
 
-// Main App component - removed problematic preloading
+// Main App component
 function App() {
   const drawerWidth = 240;
+  
+  // Make remotes globally available for better error handling
+  useEffect(() => {
+    // Add remotes to window for easier access in RemoteComponent
+    window.__C4H_REMOTES__ = remotes;
+    
+    // Log available remotes for debugging
+    console.log('Available remotes:', remotes);
+  }, []);
   
   return (
     <ThemeProvider theme={theme}>
@@ -98,7 +107,7 @@ function App() {
                     path="/configs/:configType" 
                     element={
                       <RemoteComponent
-                        url="http://localhost:3003/remoteEntry.js"
+                        url={remotes.configSelector}
                         scope="configSelector"
                         module="./ConfigManager"
                       />
@@ -108,7 +117,7 @@ function App() {
                     path="/configs/:configType/:id" 
                     element={
                       <RemoteComponent
-                        url="http://localhost:3003/remoteEntry.js"
+                        url={remotes.configSelector}
                         scope="configSelector"
                         module="./ConfigManager"
                       />
@@ -120,7 +129,7 @@ function App() {
                     path="/jobs" 
                     element={
                       <RemoteComponent
-                        url="http://localhost:3004/remoteEntry.js"
+                        url={remotes.jobManagement}
                         scope="jobManagement"
                         module="./JobManager"
                       />
@@ -130,7 +139,7 @@ function App() {
                     path="/jobs/:id" 
                     element={
                       <RemoteComponent
-                        url="http://localhost:3004/remoteEntry.js"
+                        url={remotes.jobManagement}
                         scope="jobManagement"
                         module="./JobManager"
                       />

@@ -1,6 +1,6 @@
 #!/bin/bash
-# File: start-federation.sh
-# This script builds and starts the shell and job-management packages with proper Module Federation setup
+# File: start-microfrontends.sh
+# Description: Builds and starts all C4H Editor microfrontends with Module Federation
 
 # Store the root directory
 ROOT_DIR=$(pwd)
@@ -9,7 +9,20 @@ ROOT_DIR=$(pwd)
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Microfrontend configuration using parallel arrays (compatible with older bash)
+PACKAGES=("shared" "config-editor" "yaml-editor" "config-selector" "job-management" "shell")
+PORTS=("0" "3001" "3002" "3003" "3004" "3000")
+
+# Array to track running PIDs
+PIDS=()
+
+# Function to print section header
+print_header() {
+  echo -e "\n${BLUE}========== $1 ==========${NC}"
+}
 
 # Function to check port availability
 check_port() {
@@ -23,91 +36,167 @@ check_port() {
       echo -e "${GREEN}✅ Process killed${NC}"
     else
       echo -e "${RED}❌ Cannot continue with port $port in use${NC}"
-      exit 1
+      return 1
     fi
   else
     echo -e "${GREEN}✅ Port $port is free${NC}"
   fi
+  return 0
 }
 
-# Clean up any previous processes when exiting
+# Function to build a package
+build_package() {
+  local package=$1
+  local dir="$ROOT_DIR/packages/$package"
+  
+  if [ ! -d "$dir" ]; then
+    echo -e "${RED}❌ Package directory not found: $dir${NC}"
+    return 1
+  fi
+  
+  cd "$dir"
+  echo -e "${YELLOW}🔨 Building $package...${NC}"
+  
+  npm run build
+  if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ Failed to build $package. Exiting.${NC}"
+    return 1
+  fi
+  
+  # Handle special case for remoteEntry.js (ensure it's available at root level)
+  if [ "$package" != "shared" ] && [ "$package" != "shell" ]; then
+    if [ -f "$dir/dist/assets/remoteEntry.js" ]; then
+      echo -e "${YELLOW}Copying remoteEntry.js to root level for $package...${NC}"
+      cp "$dir/dist/assets/remoteEntry.js" "$dir/dist/remoteEntry.js"
+    elif [ -f "$dir/dist/remoteEntry.js" ]; then
+      echo -e "${GREEN}remoteEntry.js already exists at root level${NC}"
+    else
+      echo -e "${YELLOW}⚠️ No remoteEntry.js found for $package, this might cause issues${NC}"
+    fi
+  fi
+  
+  echo -e "${GREEN}✅ $package built successfully${NC}"
+  return 0
+}
+
+# Function to start a service
+start_service() {
+  local package=$1
+  local port=${2:-0}
+  local dir="$ROOT_DIR/packages/$package"
+  
+  cd "$dir"
+  
+  if [ "$package" == "shell" ]; then
+    echo -e "${YELLOW}🚀 Starting $package in development mode on port $port...${NC}"
+    # Override the port in package.json by directly using vite command
+    ../../node_modules/.bin/vite --port $port --strictPort &
+  else
+    echo -e "${YELLOW}🚀 Starting $package in preview mode on port $port...${NC}"
+    # Override the port in package.json
+    ../../node_modules/.bin/vite preview --port $port --strictPort &
+  fi
+  
+  local pid=$!
+  PIDS+=($pid)
+  echo -e "${GREEN}✅ $package started with PID $pid${NC}"
+  return 0
+}
+
+# Function to clean up on exit
 cleanup() {
-  echo -e "${YELLOW}Shutting down servers...${NC}"
-  kill $JOB_MGMT_PID $SHELL_PID 2>/dev/null
+  print_header "SHUTTING DOWN"
+  echo -e "${YELLOW}Stopping all servers...${NC}"
+  
+  for pid in "${PIDS[@]}"; do
+    if ps -p $pid > /dev/null; then
+      echo -e "Killing process $pid"
+      kill $pid 2>/dev/null
+    fi
+  done
+  
+  echo -e "${GREEN}✅ All servers stopped${NC}"
   exit 0
 }
 
 # Register cleanup handler
 trap cleanup SIGINT SIGTERM
 
-# 1. Check ports
-echo -e "${YELLOW}Checking ports...${NC}"
-check_port 3000  # Shell
-check_port 3004  # Job Management
+# Main execution starts here
+print_header "STARTING C4H EDITOR WITH MICROFRONTENDS"
 
-# 2. Build shared package first (required dependency)
-echo -e "${YELLOW}🔨 Building shared package...${NC}"
-cd "$ROOT_DIR/packages/shared" && npm run build
-if [ $? -ne 0 ]; then
-  echo -e "${RED}❌ Failed to build shared package. Exiting.${NC}"
-  exit 1
-fi
-echo -e "${GREEN}✅ Shared package built successfully${NC}"
+# Check all ports first
+print_header "CHECKING PORTS"
+for i in "${!PACKAGES[@]}"; do
+  package=${PACKAGES[$i]}
+  port=${PORTS[$i]}
+  if [ "$port" != "0" ]; then
+    check_port $port || exit 1
+  fi
+done
 
-# 3. Build job-management
-echo -e "${YELLOW}🔨 Building Job Management...${NC}"
-cd "$ROOT_DIR/packages/job-management" && npm run build
-if [ $? -ne 0 ]; then
-  echo -e "${RED}❌ Failed to build Job Management. Exiting.${NC}"
-  exit 1
-fi
+# Build shared package first (dependency for all)
+print_header "BUILDING PACKAGES"
+build_package "shared" || exit 1
 
-# Explicitly ensure remoteEntry.js is available in both locations
-if [ -f "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" ]; then
-  echo -e "${YELLOW}Copying remoteEntry.js to root level for job-management...${NC}"
-  cp "$ROOT_DIR/packages/job-management/dist/assets/remoteEntry.js" "$ROOT_DIR/packages/job-management/dist/remoteEntry.js"
-  echo -e "${GREEN}✅ remoteEntry.js copied successfully${NC}"
-else
-  echo -e "${RED}⚠️ Could not find remoteEntry.js in assets folder${NC}"
-  # Try to find it elsewhere
-  find "$ROOT_DIR/packages/job-management/dist" -name "remoteEntry.js" -exec echo "Found at: {}" \;
-fi
+# Build all microfrontends before starting any servers
+for i in "${!PACKAGES[@]}"; do
+  package=${PACKAGES[$i]}
+  if [ "$package" != "shared" ]; then
+    build_package "$package" || exit 1
+  fi
+done
 
-echo -e "${GREEN}✅ Job Management built successfully${NC}"
+# Start all services in reverse order (remote microfrontends first, shell last)
+print_header "STARTING SERVICES"
 
-# 4. Start job-management in preview mode
-echo -e "${YELLOW}Starting Job Management preview on port 3004...${NC}"
-cd "$ROOT_DIR/packages/job-management" && npm run preview &
-JOB_MGMT_PID=$!
+# Start microfrontends first (all except shell and shared)
+for i in "${!PACKAGES[@]}"; do
+  package=${PACKAGES[$i]}
+  port=${PORTS[$i]}
+  if [ "$package" != "shell" ] && [ "$package" != "shared" ]; then
+    start_service "$package" "$port"
+    # Give some time for service to initialize
+    sleep 2
+  fi
+done
 
-# Wait a bit for job server to start up
-echo -e "${YELLOW}Waiting for Job Management server to initialize...${NC}"
-sleep 3
+# Start shell last
+shell_index=0
+for i in "${!PACKAGES[@]}"; do
+  if [ "${PACKAGES[$i]}" == "shell" ]; then
+    shell_index=$i
+    break
+  fi
+done
+start_service "shell" "${PORTS[$shell_index]}"
 
-# 5. Start shell in development mode
-echo -e "${YELLOW}Starting Shell in development mode on port 3000...${NC}"
-cd "$ROOT_DIR/packages/shell" && npm run start &
-SHELL_PID=$!
+# Return to project root
+cd "$ROOT_DIR"
 
-cd "$ROOT_DIR"  # Return to project root
+# All servers are now running
+print_header "SERVERS RUNNING"
+echo -e "${GREEN}All servers are now running:${NC}"
+for i in "${!PACKAGES[@]}"; do
+  package=${PACKAGES[$i]}
+  port=${PORTS[$i]}
+  if [ "$port" != "0" ]; then
+    echo -e "  - ${BLUE}$package:${NC} http://localhost:$port"
+  fi
+done
+echo -e "\n${YELLOW}Press Ctrl+C to stop all servers${NC}"
 
-echo -e "${GREEN}
------------------------------------------------
-🚀 Servers are running:
-  - Shell: http://localhost:3000
-  - Job Management: http://localhost:3004
------------------------------------------------
-Press Ctrl+C to stop all servers
-${NC}"
-
-# Print reminder about Module Federation path
-echo -e "${YELLOW}
-💡 Module Federation Info:
-  - Make sure shell's vite.config.ts points to: http://localhost:3004/assets/remoteEntry.js
-  - If issues persist, verify both these files exist:
-    - packages/job-management/dist/assets/remoteEntry.js
-    - packages/job-management/dist/remoteEntry.js
-${NC}"
+# Print debugging info
+print_header "MODULE FEDERATION INFO"
+echo -e "${YELLOW}💡 Remotes Configuration:${NC}"
+echo -e "  - Make sure shell's vite.config.ts has these remotes:"
+for i in "${!PACKAGES[@]}"; do
+  package=${PACKAGES[$i]}
+  port=${PORTS[$i]}
+  if [ "$package" != "shell" ] && [ "$package" != "shared" ] && [ "$port" != "0" ]; then
+    echo -e "    ${BLUE}$package:${NC} http://localhost:$port/assets/remoteEntry.js"
+  fi
+done
 
 # Wait for all background processes
 wait

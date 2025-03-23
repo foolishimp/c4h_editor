@@ -12,7 +12,7 @@ export default defineConfig({
     federation({
       name: 'shell',
       remotes: {
-        // Simply point to where Vite actually puts the remoteEntry.js files by default
+        // Correctly point to the assets directory where remoteEntry.js files are located by default
         configEditor: 'http://localhost:3001/assets/remoteEntry.js',
         yamlEditor: 'http://localhost:3002/assets/remoteEntry.js',
         configSelector: 'http://localhost:3003/assets/remoteEntry.js',
@@ -27,15 +27,20 @@ export default defineConfig({
     })
   ],
   build: {
-    modulePreload: false,
-    target: 'esnext',
-    minify: false,
-    cssCodeSplit: false
+    modulePreload: false,  // Important for Vite federation
+    target: 'esnext',      // Required for proper federation
+    minify: false,         // Helpful for debugging
+    cssCodeSplit: false    // Prevents CSS splitting issues
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/dist')
     }
+  },
+  server: {
+    port: 3000,          // Use a different port than the microfrontends
+    strictPort: true,    // Fail if port is already in use
+    cors: true           // Enable CORS for federation
   }
 });
