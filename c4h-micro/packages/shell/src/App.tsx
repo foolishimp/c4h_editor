@@ -1,12 +1,16 @@
 // File: /packages/shell/src/App.tsx
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 import Navigation from './components/common/Navigation';
-import { RemoteComponent, remotes } from 'shared';
+import { remotes } from 'shared';
 import ConfigTypeSelector from './components/create/ConfigTypeSelector';
+
+// Lazy load remote components
+const ConfigManager = lazy(() => import('configSelector/ConfigManager'));
+const JobManager = lazy(() => import('jobManagement/JobManager'));
 
 // Create theme
 const theme = createTheme({
@@ -81,7 +85,7 @@ function App() {
   
   // Make remotes globally available for better error handling
   useEffect(() => {
-    // Add remotes to window for easier access in RemoteComponent
+    // Add remotes to window for easier access
     window.__C4H_REMOTES__ = remotes;
     
     // Log available remotes for debugging
@@ -105,45 +109,21 @@ function App() {
                   <Route path="/configs/create" element={<ConfigTypeSelector />} />
                   <Route 
                     path="/configs/:configType" 
-                    element={
-                      <RemoteComponent
-                        url={remotes.configSelector}
-                        scope="configSelector"
-                        module="./ConfigManager"
-                      />
-                    } 
+                    element={<ConfigManager />} 
                   />
                   <Route 
                     path="/configs/:configType/:id" 
-                    element={
-                      <RemoteComponent
-                        url={remotes.configSelector}
-                        scope="configSelector"
-                        module="./ConfigManager"
-                      />
-                    } 
+                    element={<ConfigManager />} 
                   />
                   
                   {/* Job management routes */}
                   <Route 
                     path="/jobs" 
-                    element={
-                      <RemoteComponent
-                        url={remotes.jobManagement}
-                        scope="jobManagement"
-                        module="./JobManager"
-                      />
-                    } 
+                    element={<JobManager />} 
                   />
                   <Route 
                     path="/jobs/:id" 
-                    element={
-                      <RemoteComponent
-                        url={remotes.jobManagement}
-                        scope="jobManagement"
-                        module="./JobManager"
-                      />
-                    } 
+                    element={<JobManager />} 
                   />
                   
                   {/* Fallback for unknown routes */}

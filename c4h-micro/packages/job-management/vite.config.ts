@@ -49,8 +49,8 @@ export default defineConfig({
   },
   server: {
     port: 3004,
-    strictPort: true,  // This ensures the server fails if port is in use
-    cors: true         // Required for Module Federation
+    strictPort: true,
+    cors: true
   },
   preview: {
     port: 3004,

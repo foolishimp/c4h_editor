@@ -1,4 +1,4 @@
-// File: c4h-micro/packages/job-management/src/JobManager.tsx
+// File: /packages/job-management/src/JobManager.tsx
 import { useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { JobProvider } from './contexts/JobContext';
