@@ -1,4 +1,4 @@
-// File: packages/config-selector/src/contexts/ConfigContext.tsx
+// File: /packages/config-selector/src/contexts/ConfigContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import { configTypes, apiService } from 'shared';
@@ -79,6 +79,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   
   // Load a specific config
   const loadConfig = useCallback(async (id: string) => {
+    // Special case for "new" - don't load from API
+    if (id === 'new') {
+      console.log("ConfigContext: Skipping API load for new config");
+      createNewConfig();
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     
@@ -132,6 +139,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     }
     
     setError(null);
+    setLoading(false);
   }, [configType]);
   
   // Update YAML content

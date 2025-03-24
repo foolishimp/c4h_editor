@@ -1,4 +1,4 @@
-// File: packages/config-selector/src/components/ConfigEditor.tsx
+// File: /packages/config-selector/src/components/ConfigEditor.tsx
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import {
   Box,
@@ -44,6 +44,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   const [hasChanges, setHasChanges] = useState(false);
   const [configIdInput, setConfigIdInput] = useState('');
   const [yamlEditorError, setYamlEditorError] = useState<string | null>(null);
+  const [editorInitialized, setEditorInitialized] = useState(false);
   
   // Config name from registry
   const configName = configTypes[configType]?.name || configType;
@@ -55,18 +56,27 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   
   // Load config or create new one
   useEffect(() => {
-    if (configId === 'new') {
-      createNewConfig();
-      setConfigIdInput('');
-    } else {
-      loadConfig(configId);
+    console.log("ConfigEditor: Processing configId:", configId);
+    
+    // Prevent duplicate initialization
+    if (!editorInitialized) {
+      if (configId === 'new') {
+        console.log("ConfigEditor: Creating new config");
+        createNewConfig();
+        setConfigIdInput('');
+        setEditorInitialized(true);
+      } else {
+        console.log("ConfigEditor: Loading existing config:", configId);
+        loadConfig(configId);
+        setEditorInitialized(true);
+      }
     }
-  }, [configId, loadConfig, createNewConfig]);
+  }, [configId, loadConfig, createNewConfig, editorInitialized]);
   
   // Update configIdInput when currentConfig changes
   useEffect(() => {
     if (currentConfig) {
-      setConfigIdInput(currentConfig.id);
+      setConfigIdInput(currentConfig.id || '');
     }
   }, [currentConfig]);
   
@@ -93,6 +103,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   // Handle discard dialog confirm
   const handleDiscardConfirm = () => {
     setShowDiscardDialog(false);
+    setEditorInitialized(false); // Reset for next load
     if (onBack) {
       onBack();
     } else {
@@ -107,11 +118,9 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   
   // Handle save
   const handleSave = async () => {
-    if (configId === 'new' && !configIdInput.trim()) {
-      // Update the current config with the entered ID
-      if (currentConfig) {
-        currentConfig.id = configIdInput;
-      }
+    // For new configs, update the ID before saving
+    if (configId === 'new' && currentConfig) {
+      currentConfig.id = configIdInput;
     }
     
     const savedConfig = await saveConfig();
@@ -119,6 +128,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
     if (savedConfig) {
       // Navigate to the config page if this was a new config
       if (configId === 'new') {
+        setEditorInitialized(false); // Reset for next load
         handleNavigate(`/configs/${configType}/${savedConfig.id}`);
       }
     }

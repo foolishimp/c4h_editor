@@ -1,4 +1,4 @@
-// File: packages/config-selector/src/ConfigManager.tsx
+// File: /packages/config-selector/src/ConfigManager.tsx
 import { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -46,17 +46,20 @@ function ConfigManager(props: ConfigManagerProps) {
   });
   
   useEffect(() => {
-    // Reset view when configType changes
+    // Reset view when configId changes
     if (configId) {
       setView('editor');
       setCurrentConfigId(configId);
     } else {
-      setView('list');
-      setCurrentConfigId(undefined);
+      // Only reset to list if we're not already in editor view with a currentConfigId
+      // This prevents losing editor state when props/params don't have configId yet
+      if (view === 'editor' && !currentConfigId) {
+        setView('list');
+      }
     }
     
     setLoading(false);
-  }, [propConfigType, propConfigId, params, configType, configId]);
+  }, [configId]);
   
   // Handle navigation
   const handleEditConfig = (configId: string) => {
@@ -73,6 +76,7 @@ function ConfigManager(props: ConfigManagerProps) {
     if (navigate) {
       navigate(`/configs/${configType}/new`);
     } else {
+      // Directly set the view and ID even without navigation
       setView('editor');
       setCurrentConfigId('new');
     }
