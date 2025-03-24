@@ -1,7 +1,6 @@
-// packages/config-selector/src/ConfigManager.tsx
-
-import { useState } from 'react';
-import { Box, Typography } from '@mui/material';
+// File: packages/config-selector/src/ConfigManager.tsx
+import { useState, useEffect } from 'react';
+import { Box, Typography, CircularProgress } from '@mui/material';
 import { useParams } from 'react-router-dom';
 import { ConfigProvider } from './contexts/ConfigContext';
 import ConfigList from './components/ConfigList';
@@ -13,33 +12,42 @@ interface ConfigManagerProps {
   configId?: string;
 }
 
-// Using regular function declaration instead of arrow function
-// to ensure React hooks work correctly across module boundaries
 function ConfigManager(props: ConfigManagerProps) {
   const { configType: propConfigType, configId: propConfigId } = props;
   const params = useParams<{ configType?: string, id?: string }>();
-  const paramConfigType = params?.configType;
-  const paramConfigId = params?.id;
   
   // Use the config type from props or URL params
-  const configType = propConfigType || paramConfigType;
+  const configType = propConfigType || params?.configType;
   // Use the config ID from props or URL params
-  const id = propConfigId || paramConfigId;
+  const configId = propConfigId || params?.id;
   
   // State to track UI view
-  const [view, setView] = useState<'list' | 'editor'>(id ? 'editor' : 'list');
-  const [currentConfigId, setCurrentConfigId] = useState<string | undefined>(id);
+  const [view, setView] = useState<'list' | 'editor'>(configId ? 'editor' : 'list');
+  const [currentConfigId, setCurrentConfigId] = useState<string | undefined>(configId);
+  const [loading, setLoading] = useState<boolean>(true);
   
-  console.log('ConfigManager received:', { 
-    propConfigType, 
-    paramConfigType, 
-    configType,
-    propConfigId,
-    paramConfigId,
-    id,
-    view,
-    currentConfigId
-  });
+  useEffect(() => {
+    // Log received props for debugging
+    console.log('ConfigManager mounted with:', { 
+      propConfigType, 
+      propConfigId,
+      params,
+      configType,
+      configId,
+      view
+    });
+    
+    // Reset view when configType changes
+    if (configId) {
+      setView('editor');
+      setCurrentConfigId(configId);
+    } else {
+      setView('list');
+      setCurrentConfigId(undefined);
+    }
+    
+    setLoading(false);
+  }, [propConfigType, propConfigId, params, configType, configId]);
   
   // Handle navigation without React Router
   const handleEditConfig = (configId: string) => {
@@ -56,6 +64,14 @@ function ConfigManager(props: ConfigManagerProps) {
     setView('list');
     setCurrentConfigId(undefined);
   };
+  
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
   
   if (!configType) {
     return (

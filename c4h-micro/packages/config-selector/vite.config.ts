@@ -1,4 +1,4 @@
-// packages/config-selector/vite.config.ts
+// File: packages/config-selector/vite.config.ts
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
@@ -18,11 +18,13 @@ export default defineConfig({
       shared: {
         react: { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          requiredVersion: '^18.0.0',
+          eager: true
         },
         'react-dom': { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          requiredVersion: '^18.0.0',
+          eager: true
         },
         '@mui/material': {
           singleton: true,
@@ -39,7 +41,14 @@ export default defineConfig({
     modulePreload: false,
     target: 'esnext',
     minify: false,
-    cssCodeSplit: false
+    cssCodeSplit: false,
+    rollupOptions: {
+      output: {
+        format: 'esm',
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js'
+      }
+    }
   },
   server: {
     port: 3003,

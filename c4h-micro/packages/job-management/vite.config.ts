@@ -1,4 +1,4 @@
-// File: /packages/job-management/vite.config.ts
+// File: packages/job-management/vite.config.ts
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
@@ -13,16 +13,16 @@ export default defineConfig({
       name: 'jobManagement',
       filename: 'remoteEntry.js',
       exposes: {
-        './JobManager': './src/JobManager.tsx'
+        './JobManager': './src/JobManager.tsx',
       },
       shared: {
         react: { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          requiredVersion: '^18.0.0' 
         },
         'react-dom': { 
           singleton: true,
-          requiredVersion: '^18.0.0'
+          requiredVersion: '^18.0.0' 
         },
         '@mui/material': {
           singleton: true,
@@ -41,12 +41,6 @@ export default defineConfig({
     minify: false,
     cssCodeSplit: false
   },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
-    }
-  },
   server: {
     port: 3004,
     strictPort: true,
@@ -56,5 +50,11 @@ export default defineConfig({
     port: 3004,
     strictPort: true,
     cors: true
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      'shared': path.resolve(__dirname, '../shared/dist')
+    }
   }
 });

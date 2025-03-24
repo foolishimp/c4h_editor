@@ -1,4 +1,4 @@
-// File: /packages/shared/src/config/remotes.ts
+// File: packages/shared/src/config/remotes.ts
 /**
  * Module Federation Remotes Registry
  * 

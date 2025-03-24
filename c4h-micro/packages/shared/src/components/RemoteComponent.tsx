@@ -1,4 +1,4 @@
-// packages/shared/src/components/RemoteComponent.tsx
+// File: packages/shared/src/components/RemoteComponent.tsx
 import React, { useEffect, useState } from 'react';
 
 interface RemoteComponentProps {
@@ -25,66 +25,94 @@ const RemoteComponent: React.FC<RemoteComponentProps> = ({
       return;
     }
 
-    const scriptId = `remote-${scope}-${module}`;
-    if (document.getElementById(scriptId)) {
-      // Script already loaded, try to get the component
+    // Initialize the shared scope
+    // @ts-ignore
+    if (!window.__FEDERATION__) {
+      // @ts-ignore
+      window.__FEDERATION__ = { shared: {} };
+    }
+
+    const scriptId = `remote-${scope}-${module.replace(/[/.]/g, '-')}`;
+    
+    // Check if component is already loaded in global registry
+    // @ts-ignore
+    if (window[scope]) {
       try {
-        // @ts-ignore - Accessing window objects dynamically
+        // @ts-ignore
         const container = window[scope];
-        if (container) {
-          const factory = container.get(module.replace(/^\.\//, ''));
-          const RemoteComponent = factory();
-          setComponent(() => RemoteComponent.default || RemoteComponent);
+        // Handle both formats - with or without ./ prefix
+        const moduleName = module.replace(/^\.\//, '');
+        const factory = container.get(moduleName);
+        if (factory) {
+          const Component = factory();
+          setComponent(() => Component.default || Component);
+          return;
         }
       } catch (err) {
         console.error(`Error accessing existing remote component ${scope}/${module}:`, err);
-        setError(err instanceof Error ? err : new Error(String(err)));
       }
-      return;
     }
 
-    // Load the remote entry
-    const script = document.createElement('script');
-    script.src = url;
-    script.id = scriptId;
-    script.type = 'text/javascript';
-    script.async = true;
-    
-    script.onload = () => {
-      // @ts-ignore - Federation types not available
-      window[scope].init(__webpack_share_scopes__.default);
+    // Load the remote entry if not already loaded
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.src = url;
+      script.id = scriptId;
+      script.type = 'text/javascript';
+      script.async = true;
       
-      try {
-        // @ts-ignore - Accessing window objects dynamically
-        const container = window[scope];
-        const factory = container.get(module.replace(/^\.\//, ''));
-        const RemoteComponent = factory();
-        setComponent(() => RemoteComponent.default || RemoteComponent);
-      } catch (err) {
-        console.error(`Error loading remote component ${scope}/${module}:`, err);
-        setError(err instanceof Error ? err : new Error(String(err)));
-      }
-    };
-    
-    script.onerror = (err) => {
-      console.error(`Error loading remote entry from ${url}:`, err);
-      setError(new Error(`Failed to load script from ${url}`));
-    };
+      script.onload = () => {
+        try {
+          // @ts-ignore
+          if (window[scope]) {
+            // Initialize the container properly
+            // @ts-ignore
+            if (typeof window[scope].init === 'function') {
+              // @ts-ignore
+              window[scope].init(window.__FEDERATION__.shared);
+            }
+            
+            // Get the component factory
+            // @ts-ignore
+            const container = window[scope];
+            const moduleName = module.replace(/^\.\//, '');
+            const factory = container.get(moduleName);
+            
+            if (factory) {
+              const Component = factory();
+              setComponent(() => Component.default || Component);
+            } else {
+              throw new Error(`Module "${moduleName}" not found in remote "${scope}"`);
+            }
+          } else {
+            throw new Error(`Remote container "${scope}" not found after loading script`);
+          }
+        } catch (err) {
+          console.error(`Error loading remote component ${scope}/${module}:`, err);
+          setError(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
+      
+      script.onerror = (err) => {
+        console.error(`Error loading remote entry from ${url}:`, err);
+        setError(new Error(`Failed to load script from ${url}`));
+      };
 
-    document.head.appendChild(script);
+      document.head.appendChild(script);
 
-    return () => {
-      if (document.getElementById(scriptId)) {
-        document.head.removeChild(script);
-      }
-    };
+      return () => {
+        if (document.getElementById(scriptId)) {
+          document.head.removeChild(script);
+        }
+      };
+    }
   }, [url, scope, module]);
 
   if (error) {
-    console.error('Error in RemoteComponent:', error);
+    console.error('Remote component error:', error);
     return (
-      <div style={{ padding: '16px', color: '#f44336' }}>
-        Error loading component: {error.message}
+      <div style={{ padding: '16px', color: '#f44336', border: '1px solid #f44336', borderRadius: '4px', margin: '8px 0' }}>
+        <strong>Error loading component:</strong> {error.message}
       </div>
     );
   }
