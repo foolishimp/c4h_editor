@@ -1,6 +1,5 @@
 // File: packages/config-selector/src/components/ConfigEditor.tsx
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -22,10 +21,10 @@ import { RemoteComponent } from 'shared';
 
 interface ConfigEditorProps {
   configId: string;
+  onBack?: () => void;
 }
 
-const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
-  const navigate = useNavigate();
+const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   const { 
     configType,
     currentConfig, 
@@ -45,6 +44,11 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
   
   // Config name from registry
   const configName = configTypes[configType]?.name || configType;
+  
+  // Custom navigation handler that doesn't rely on React Router
+  const handleNavigate = (path: string) => {
+    window.location.href = path;
+  };
   
   // Load config or create new one
   useEffect(() => {
@@ -75,14 +79,22 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
     if (hasChanges) {
       setShowDiscardDialog(true);
     } else {
-      navigate(`/configs/${configType}`);
+      if (onBack) {
+        onBack();
+      } else {
+        handleNavigate(`/configs/${configType}`);
+      }
     }
   };
   
   // Handle discard dialog confirm
   const handleDiscardConfirm = () => {
     setShowDiscardDialog(false);
-    navigate(`/configs/${configType}`);
+    if (onBack) {
+      onBack();
+    } else {
+      handleNavigate(`/configs/${configType}`);
+    }
   };
   
   // Handle discard dialog cancel
@@ -104,7 +116,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
     if (savedConfig) {
       // Navigate to the config page if this was a new config
       if (configId === 'new') {
-        navigate(`/configs/${configType}/${savedConfig.id}`);
+        handleNavigate(`/configs/${configType}/${savedConfig.id}`);
       }
     }
   };
@@ -165,7 +177,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId }) => {
       
       {/* YAML Editor using RemoteComponent */}
       <RemoteComponent
-        url="http://localhost:3002/remoteEntry.js"
+        url="http://localhost:3002/assets/remoteEntry.js"
         scope="yamlEditor"
         module="./YamlEditor"
         props={{

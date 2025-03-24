@@ -1,8 +1,8 @@
-// File: /packages/shell/src/App.tsx
+// File: packages/shell/src/App.tsx
 import React, { Suspense, lazy, useEffect } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 
 import Navigation from './components/common/Navigation';
 import { remotes } from 'shared';
@@ -11,6 +11,12 @@ import ConfigTypeSelector from './components/create/ConfigTypeSelector';
 // Lazy load remote components
 const ConfigManager = lazy(() => import('configSelector/ConfigManager'));
 const JobManager = lazy(() => import('jobManagement/JobManager'));
+
+// Wrapper component to capture and pass URL params
+const ConfigManagerWrapper = () => {
+  const { configType, id } = useParams();
+  return <ConfigManager configType={configType} configId={id} />;
+};
 
 // Create theme
 const theme = createTheme({
@@ -105,11 +111,11 @@ function App() {
                   <Route path="/configs/create" element={<ConfigTypeSelector />} />
                   <Route 
                     path="/configs/:configType" 
-                    element={<ConfigManager />} 
+                    element={<ConfigManagerWrapper />} 
                   />
                   <Route 
                     path="/configs/:configType/:id" 
-                    element={<ConfigManager />} 
+                    element={<ConfigManagerWrapper />} 
                   />
                   
                   {/* Job management routes */}

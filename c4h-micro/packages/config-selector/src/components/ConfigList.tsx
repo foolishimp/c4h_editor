@@ -1,6 +1,5 @@
 // File: packages/config-selector/src/components/ConfigList.tsx
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -35,13 +34,17 @@ import {
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes, TimeAgo } from 'shared';
 
-const ConfigList: React.FC = () => {
-  const navigate = useNavigate();
+// Props interface to accept navigation functions from parent
+interface ConfigListProps {
+  onEdit?: (id: string) => void;
+  onCreateNew?: () => void;
+}
+
+const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const { 
     configType, 
     configs, 
     loadConfigs, 
-    createNewConfig,
     archiveConfig,
     cloneConfig,
     deleteConfig,
@@ -64,6 +67,11 @@ const ConfigList: React.FC = () => {
   // Config name from registry
   const configName = configTypes[configType]?.name || configType;
   
+  // Custom navigation handler that doesn't rely on React Router
+  const handleNavigate = (path: string) => {
+    window.location.href = path;
+  };
+  
   // Load configs on mount and when configType changes
   useEffect(() => {
     loadConfigs();
@@ -71,7 +79,7 @@ const ConfigList: React.FC = () => {
   
   // Filter configs based on search term and archived status
   useEffect(() => {
-    let filtered = configs;
+    let filtered = configs || [];
     
     // Filter by archived status
     filtered = filtered.filter(config => 
@@ -92,13 +100,20 @@ const ConfigList: React.FC = () => {
   
   // Handle create new config
   const handleCreateNew = () => {
-    createNewConfig();
-    navigate(`/${configType}/new`);
+    if (onCreateNew) {
+      onCreateNew();
+    } else {
+      handleNavigate(`/configs/${configType}/new`);
+    }
   };
   
   // Handle edit config
   const handleEdit = (id: string) => {
-    navigate(`/${configType}/${id}`);
+    if (onEdit) {
+      onEdit(id);
+    } else {
+      handleNavigate(`/configs/${configType}/${id}`);
+    }
   };
   
   // Handle menu open
@@ -302,7 +317,9 @@ const ConfigList: React.FC = () => {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={handleArchiveToggle}>
-          {configs.find(c => c.id === selectedConfigId)?.metadata?.archived ? 'Unarchive' : 'Archive'}
+          {configs && selectedConfigId && configs.find(c => c.id === selectedConfigId)?.metadata?.archived 
+            ? 'Unarchive' 
+            : 'Archive'}
         </MenuItem>
         <MenuItem onClick={handleCloneClick}>Clone</MenuItem>
         <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>Delete</MenuItem>
