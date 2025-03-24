@@ -100,9 +100,12 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   
   // Handle create new config
   const handleCreateNew = () => {
+    console.log('ConfigList: Create new button clicked for type:', configType);
     if (onCreateNew) {
+      console.log('ConfigList: Using onCreateNew callback');
       onCreateNew();
     } else {
+      console.log('ConfigList: Using direct navigation');
       handleNavigate(`/configs/${configType}/new`);
     }
   };

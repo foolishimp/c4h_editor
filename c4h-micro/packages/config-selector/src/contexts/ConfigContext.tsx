@@ -1,7 +1,7 @@
 // File: packages/config-selector/src/contexts/ConfigContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
-import { api, configTypes } from 'shared';
+import { configTypes, apiService } from 'shared';
 
 // Context state interface
 interface ConfigContextState {
@@ -23,22 +23,33 @@ interface ConfigContextState {
   cloneConfig: (id: string, newId: string) => Promise<void>;
 }
 
+// Default context state
+const defaultContextState: ConfigContextState = {
+  configType: '',
+  configs: [],
+  currentConfig: null,
+  yaml: '',
+  loading: false,
+  error: null,
+  saved: false,
+  
+  loadConfigs: async () => {},
+  loadConfig: async () => {},
+  createNewConfig: () => {},
+  updateYaml: () => {},
+  saveConfig: async () => null,
+  deleteConfig: async () => {},
+  archiveConfig: async () => {},
+  cloneConfig: async () => {}
+};
+
 // Create the context
-const ConfigContext = createContext<ConfigContextState | undefined>(undefined);
+const ConfigContext = createContext<ConfigContextState>(defaultContextState);
 
 // Provider props
 interface ConfigProviderProps {
   children: ReactNode;
   configType: string;
-}
-
-// Define interfaces for API responses
-interface ConfigResponse {
-  data: any[];
-}
-
-interface SingleConfigResponse {
-  data: any;
 }
 
 // Provider component
@@ -50,33 +61,21 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<boolean>(false);
   
-  // Get the API endpoints for this config type
-  const apiEndpoints = configTypes[configType]?.apiEndpoints || {
-    list: `/api/v1/configs/${configType}`,
-    get: (id: string) => `/api/v1/configs/${configType}/${id}`,
-    create: `/api/v1/configs/${configType}`,
-    update: (id: string) => `/api/v1/configs/${configType}/${id}`,
-    delete: (id: string) => `/api/v1/configs/${configType}/${id}`,
-    archive: (id: string) => `/api/v1/configs/${configType}/${id}/archive`,
-    unarchive: (id: string) => `/api/v1/configs/${configType}/${id}/unarchive`,
-    clone: (id: string) => `/api/v1/configs/${configType}/${id}/clone`
-  };
-  
   // Load all configs
   const loadConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await api.get<ConfigResponse>(apiEndpoints.list);
-      setConfigs(response.data);
+      const response = await apiService.getConfigs(configType);
+      setConfigs(response as any[]);
     } catch (err: any) {
       setError(err.message || 'Failed to load configurations');
       console.error('Error loading configurations:', err);
     } finally {
       setLoading(false);
     }
-  }, [configType, apiEndpoints]);
+  }, [configType]);
   
   // Load a specific config
   const loadConfig = useCallback(async (id: string) => {
@@ -84,12 +83,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     
     try {
-      const response = await api.get<SingleConfigResponse>(apiEndpoints.get(id));
-      setCurrentConfig(response.data);
+      const response = await apiService.getConfig(configType, id);
+      const config = response as any;
+      setCurrentConfig(config);
       
       // Convert to YAML
       try {
-        const yamlString = yamlDump(response.data.content);
+        const yamlString = yamlDump(config.content);
         setYaml(yamlString);
       } catch (yamlErr: any) {
         console.error('Error converting to YAML:', yamlErr);
@@ -101,13 +101,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [configType, apiEndpoints]);
+  }, [configType]);
   
   // Create a new config
   const createNewConfig = useCallback(() => {
+    const defaultContent = configTypes[configType]?.defaultContent || {};
+    
     const emptyConfig = {
       id: '',
-      content: {},
+      content: defaultContent,
       metadata: {
         author: 'Current User',
         created_at: new Date().toISOString(),
@@ -117,10 +119,20 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       }
     };
     
+    console.log('Creating new empty config:', emptyConfig);
     setCurrentConfig(emptyConfig);
-    setYaml(yamlDump({}));
+    
+    // Set initial YAML
+    try {
+      const initialYaml = yamlDump(defaultContent);
+      setYaml(initialYaml);
+    } catch (yamlErr) {
+      console.error('Error converting default content to YAML:', yamlErr);
+      setYaml('');
+    }
+    
     setError(null);
-  }, []);
+  }, [configType]);
   
   // Update YAML content
   const updateYaml = useCallback((newYaml: string) => {
@@ -139,7 +151,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       setLoading(false);
       return null;
     }
-    
+
     try {
       // Parse YAML to object
       let content;
@@ -151,44 +163,46 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
         return null;
       }
       
-      // Prepare request data
-      const isNew = !currentConfig.id;
-      const endpoint = isNew ? apiEndpoints.create : apiEndpoints.update(currentConfig.id);
-      const requestData = isNew ? {
-        id: currentConfig.id || `${configType}-${new Date().getTime()}`,
-        content,
-        metadata: currentConfig.metadata,
-        commit_message: "Initial creation",
-        author: currentConfig.metadata.author || "system"
-      } : {
-        content,
-        metadata: currentConfig.metadata,
-        commit_message: "Updated via editor",
-        author: currentConfig.metadata.author || "system"
-      };
+      // Check if this is a new config or update
+      const isNew = !currentConfig.id || currentConfig.id === 'new';
       
-      try {
-        const response = await api.post<SingleConfigResponse>(endpoint, requestData);
-        setCurrentConfig(response.data);
-        setSaved(true);
-        
-        // Refresh the configs list
-        await loadConfigs();
-        
-        return response.data;
-      } catch (err: any) {
-        setError(err.message || 'Failed to save configuration');
-        console.error('Error saving configuration:', err);
-        return null;
-      } finally {
-        setLoading(false);
+      console.log(`Saving ${isNew ? 'new' : 'existing'} config of type ${configType}:`, { 
+        id: currentConfig.id,
+        content, 
+        metadata: currentConfig.metadata 
+      });
+      
+      let response;
+      
+      if (isNew) {
+        // For new config, create with content and metadata
+        response = await apiService.createConfig(configType, {
+          ...currentConfig,
+          content
+        });
+      } else {
+        // For existing config, update with content and metadata
+        response = await apiService.updateConfig(configType, currentConfig.id, {
+          content,
+          metadata: currentConfig.metadata
+        });
       }
+      
+      setCurrentConfig(response);
+      setSaved(true);
+      
+      // Refresh the configs list
+      await loadConfigs();
+      
+      return response;
     } catch (err: any) {
       setError(err.message || 'An error occurred while saving');
-      setLoading(false);
+      console.error('Error saving configuration:', err);
       return null;
+    } finally {
+      setLoading(false);
     }
-  }, [currentConfig, yaml, configType, apiEndpoints, loadConfigs]);
+  }, [currentConfig, yaml, configType, loadConfigs]);
   
   // Delete a config
   const deleteConfig = useCallback(async (id: string) => {
@@ -196,7 +210,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     
     try {
-      await api.delete(`${apiEndpoints.delete(id)}?commit_message=Deleted&author=system`);
+      await apiService.deleteConfig(configType, id, 'Deleted via UI', 'Current User');
       await loadConfigs();
       
       // Clear current config if it was deleted
@@ -210,7 +224,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [currentConfig, apiEndpoints, loadConfigs]);
+  }, [currentConfig, configType, loadConfigs]);
   
   // Archive/unarchive a config
   const archiveConfig = useCallback(async (id: string, archive: boolean) => {
@@ -218,8 +232,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     
     try {
-      const endpoint = archive ? apiEndpoints.archive(id) : apiEndpoints.unarchive(id);
-      await api.post(endpoint);
+      if (archive) {
+        await apiService.archiveConfig(configType, id);
+      } else {
+        await apiService.unarchiveConfig(configType, id);
+      }
       await loadConfigs();
       
       // Reload current config if it was archived/unarchived
@@ -232,7 +249,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [currentConfig, apiEndpoints, loadConfigs, loadConfig]);
+  }, [currentConfig, configType, loadConfigs, loadConfig]);
   
   // Clone a config
   const cloneConfig = useCallback(async (id: string, newId: string) => {
@@ -240,7 +257,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     
     try {
-      await api.post(apiEndpoints.clone(id), { new_id: newId });
+      await apiService.cloneConfig(configType, id, newId);
       await loadConfigs();
       
       // Load the new cloned config
@@ -251,7 +268,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [apiEndpoints, loadConfigs, loadConfig]);
+  }, [configType, loadConfigs, loadConfig]);
   
   // Prepare context value
   const contextValue: ConfigContextState = {
@@ -281,12 +298,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
 };
 
 // Custom hook to use the context
-export const useConfigContext = () => {
+export const useConfigContext = (): ConfigContextState => {
   const context = useContext(ConfigContext);
-  
-  if (context === undefined) {
-    throw new Error('useConfigContext must be used within a ConfigProvider');
-  }
-  
   return context;
 };

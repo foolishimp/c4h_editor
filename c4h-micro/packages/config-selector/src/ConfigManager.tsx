@@ -1,7 +1,7 @@
 // File: packages/config-selector/src/ConfigManager.tsx
 import { useState, useEffect } from 'react';
 import { Box, Typography, CircularProgress } from '@mui/material';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ConfigProvider } from './contexts/ConfigContext';
 import ConfigList from './components/ConfigList';
 import ConfigEditor from './components/ConfigEditor';
@@ -16,6 +16,14 @@ function ConfigManager(props: ConfigManagerProps) {
   const { configType: propConfigType, configId: propConfigId } = props;
   const params = useParams<{ configType?: string, id?: string }>();
   
+  // Use navigate if available (inside Router context)
+  let navigate: ReturnType<typeof useNavigate>;
+  try {
+    navigate = useNavigate();
+  } catch (e) {
+    // Navigation is handled through direct props in non-Router context
+  }
+  
   // Use the config type from props or URL params
   const configType = propConfigType || params?.configType;
   // Use the config ID from props or URL params
@@ -26,17 +34,18 @@ function ConfigManager(props: ConfigManagerProps) {
   const [currentConfigId, setCurrentConfigId] = useState<string | undefined>(configId);
   const [loading, setLoading] = useState<boolean>(true);
   
+  // Debug log
+  console.log('ConfigManager mounted with:', { 
+    propConfigType, 
+    propConfigId,
+    params,
+    configType,
+    configId,
+    view,
+    currentConfigId
+  });
+  
   useEffect(() => {
-    // Log received props for debugging
-    console.log('ConfigManager mounted with:', { 
-      propConfigType, 
-      propConfigId,
-      params,
-      configType,
-      configId,
-      view
-    });
-    
     // Reset view when configType changes
     if (configId) {
       setView('editor');
@@ -49,20 +58,33 @@ function ConfigManager(props: ConfigManagerProps) {
     setLoading(false);
   }, [propConfigType, propConfigId, params, configType, configId]);
   
-  // Handle navigation without React Router
+  // Handle navigation
   const handleEditConfig = (configId: string) => {
-    setView('editor');
-    setCurrentConfigId(configId);
+    if (navigate) {
+      navigate(`/configs/${configType}/${configId}`);
+    } else {
+      setView('editor');
+      setCurrentConfigId(configId);
+    }
   };
   
   const handleCreateNew = () => {
-    setView('editor');
-    setCurrentConfigId('new');
+    console.log('Creating new config of type:', configType);
+    if (navigate) {
+      navigate(`/configs/${configType}/new`);
+    } else {
+      setView('editor');
+      setCurrentConfigId('new');
+    }
   };
   
   const handleBackToList = () => {
-    setView('list');
-    setCurrentConfigId(undefined);
+    if (navigate) {
+      navigate(`/configs/${configType}`);
+    } else {
+      setView('list');
+      setCurrentConfigId(undefined);
+    }
   };
   
   if (loading) {
@@ -107,9 +129,9 @@ function ConfigManager(props: ConfigManagerProps) {
           {configTypes[configType].name} Management
         </Typography>
         
-        {view === 'editor' && currentConfigId ? (
+        {view === 'editor' ? (
           <ConfigEditor 
-            configId={currentConfigId} 
+            configId={currentConfigId || 'new'} 
             onBack={handleBackToList} 
           />
         ) : (
