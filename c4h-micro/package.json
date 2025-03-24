@@ -6,22 +6,19 @@
   ],
   "scripts": {
     "build:shared": "cd packages/shared && npm run build",
-    "build:config-editor": "cd packages/config-editor && npm run build",
     "build:yaml-editor": "cd packages/yaml-editor && npm run build",
     "build:config-selector": "cd packages/config-selector && npm run build",
     "build:job-management": "cd packages/job-management && npm run build",
-    "preview:config-editor": "cd packages/config-editor && npm run preview",
+    "build:shell": "cd packages/shell && npm run build",
+    
     "preview:yaml-editor": "cd packages/yaml-editor && npm run preview",
     "preview:config-selector": "cd packages/config-selector && npm run preview",
     "preview:job-management": "cd packages/job-management && npm run preview",
-    "dev:shell": "cd packages/shell && npm run start",
     
-    "dev": "npm run build:shared && concurrently \"npm run build-and-preview:all\" \"npm run dev:shell\"",
-    "build-and-preview:all": "npm run build-and-preview:config-editor & npm run build-and-preview:yaml-editor & npm run build-and-preview:config-selector & npm run build-and-preview:job-management",
-    "build-and-preview:config-editor": "npm run build:config-editor && npm run preview:config-editor",
-    "build-and-preview:yaml-editor": "npm run build:yaml-editor && npm run preview:yaml-editor",
-    "build-and-preview:config-selector": "npm run build:config-selector && npm run preview:config-selector",
-    "build-and-preview:job-management": "npm run build:job-management && npm run preview:job-management"
+    "start:shell": "cd packages/shell && npm run start",
+    
+    "start": "./startup.sh",
+    "build-all": "npm run build:shared && npm run build:yaml-editor && npm run build:config-selector && npm run build:job-management && npm run build:shell"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

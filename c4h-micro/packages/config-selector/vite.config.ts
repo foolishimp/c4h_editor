@@ -15,6 +15,9 @@ export default defineConfig({
       exposes: {
         './ConfigManager': './src/ConfigManager.tsx'
       },
+      remotes: {
+        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js'
+      },
       shared: {
         react: { 
           singleton: true,
@@ -28,11 +31,17 @@ export default defineConfig({
         },
         '@mui/material': {
           singleton: true,
-          requiredVersion: '^5.0.0'
+          requiredVersion: '^5.0.0',
+          eager: true
         },
         '@mui/icons-material': {
           singleton: true,
-          requiredVersion: '^5.0.0'
+          requiredVersion: '^5.0.0',
+          eager: true
+        },
+        'shared': {
+          singleton: true,
+          eager: true
         }
       }
     })

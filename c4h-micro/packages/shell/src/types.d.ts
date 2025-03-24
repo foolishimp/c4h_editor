@@ -1,29 +1,43 @@
-// File: /packages/shell/src/types.d.ts
+// File: packages/shell/src/types.d.ts
 
-// ConfigEditor microfrontend
-declare module 'configEditor/ConfigEditor' {
+// YamlEditor microfrontend
+declare module 'yamlEditor/YamlEditor' {
     import React from 'react';
-    const ConfigEditor: React.FC<any>;
-    export default ConfigEditor;
-  }
-  
-  // YamlEditor microfrontend
-  declare module 'yamlEditor/YamlEditor' {
-    import React from 'react';
-    const YamlEditor: React.FC<any>;
+    
+    interface YamlEditorProps {
+      yaml: string;
+      onChange: (yaml: string) => void;
+      onSave: () => Promise<void>;
+      readOnly?: boolean;
+      title?: string;
+      description?: string;
+    }
+    
+    const YamlEditor: React.FC<YamlEditorProps>;
     export default YamlEditor;
   }
   
   // ConfigSelector microfrontend
   declare module 'configSelector/ConfigManager' {
     import React from 'react';
-    const ConfigManager: React.FC<any>;
+    
+    interface ConfigManagerProps {
+      configType?: string;
+      configId?: string;
+    }
+    
+    const ConfigManager: React.FC<ConfigManagerProps>;
     export default ConfigManager;
   }
   
   // JobManagement microfrontend
   declare module 'jobManagement/JobManager' {
     import React from 'react';
-    const JobManager: React.FC<any>;
+    
+    interface JobManagerProps {
+      showJobCreator?: boolean;
+    }
+    
+    const JobManager: React.FC<JobManagerProps>;
     export default JobManager;
   }

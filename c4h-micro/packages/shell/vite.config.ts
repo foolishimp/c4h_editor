@@ -29,11 +29,13 @@ export default defineConfig({
         },
         '@mui/material': { 
           singleton: true, 
-          requiredVersion: '^5.0.0' 
+          requiredVersion: '^5.0.0',
+          eager: true
         },
         '@mui/icons-material': { 
           singleton: true, 
-          requiredVersion: '^5.0.0' 
+          requiredVersion: '^5.0.0',
+          eager: true
         },
         'shared': {
           singleton: true,

@@ -1,5 +1,5 @@
 // File: packages/config-selector/src/components/ConfigEditor.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import {
   Box,
   Button,
@@ -17,7 +17,9 @@ import {
 } from '@mui/material';
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes } from 'shared';
-import { RemoteComponent } from 'shared';
+
+// Lazy load YamlEditor component
+const YamlEditor = lazy(() => import('yamlEditor/YamlEditor'));
 
 interface ConfigEditorProps {
   configId: string;
@@ -41,6 +43,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [configIdInput, setConfigIdInput] = useState('');
+  const [yamlEditorError, setYamlEditorError] = useState<string | null>(null);
   
   // Config name from registry
   const configName = configTypes[configType]?.name || configType;
@@ -127,6 +130,12 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
     setHasChanges(true);
   };
   
+  // Error boundary for YamlEditor
+  const handleYamlEditorError = (error: Error) => {
+    console.error('YamlEditor error:', error);
+    setYamlEditorError(error.message);
+  };
+  
   if (loading && !currentConfig) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -175,24 +184,41 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
         />
       )}
       
-      {/* YAML Editor using RemoteComponent */}
-      <RemoteComponent
-        url="http://localhost:3002/assets/remoteEntry.js"
-        scope="yamlEditor"
-        module="./YamlEditor"
-        props={{
-          yaml: yaml,
-          onChange: handleYamlChange,
-          onSave: handleSave,
-          title: `${configName} Configuration`,
-          description: `Edit the ${configName.toLowerCase()} configuration in YAML format. Changes will only be applied when you save.`
-        }}
-        fallback={
+      {/* YAML Editor */}
+      {yamlEditorError ? (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" color="error">YAML Editor failed to load</Typography>
+          <Typography variant="body1">{yamlEditorError}</Typography>
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            Fallback: You can edit the YAML directly in this text field:
+          </Typography>
+          <TextField
+            multiline
+            fullWidth
+            minRows={10}
+            maxRows={20}
+            value={yaml}
+            onChange={(e) => handleYamlChange(e.target.value)}
+            sx={{ mt: 2 }}
+          />
+        </Paper>
+      ) : (
+        <Suspense fallback={
           <Paper sx={{ p: 3, height: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <CircularProgress />
           </Paper>
-        }
-      />
+        }>
+          <ErrorBoundary onError={handleYamlEditorError}>
+            <YamlEditor
+              yaml={yaml}
+              onChange={handleYamlChange}
+              onSave={handleSave}
+              title={`${configName} Configuration`}
+              description={`Edit the ${configName.toLowerCase()} configuration in YAML format. Changes will only be applied when you save.`}
+            />
+          </ErrorBoundary>
+        </Suspense>
+      )}
       
       {/* Error message */}
       {error && (
@@ -226,5 +252,33 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
     </Box>
   );
 };
+
+// Simple error boundary component
+class ErrorBoundary extends React.Component<{
+  children: React.ReactNode;
+  onError: (error: Error) => void;
+}, {
+  hasError: boolean;
+}> {
+  constructor(props: { children: React.ReactNode; onError: (error: Error) => void }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return null;
+    }
+    return this.props.children;
+  }
+}
 
 export default ConfigEditor;

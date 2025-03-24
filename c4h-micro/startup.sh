@@ -1,5 +1,5 @@
 #!/bin/bash
-# File: start-microfrontends.sh
+# File: startup.sh
 # Description: Builds and starts all C4H Editor microfrontends with Module Federation
 
 # Store the root directory
@@ -12,9 +12,9 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Microfrontend configuration using parallel arrays (compatible with older bash)
-PACKAGES=("shared" "config-editor" "yaml-editor" "config-selector" "job-management" "shell")
-PORTS=("0" "3001" "3002" "3003" "3004" "3000")
+# Microfrontend configuration
+PACKAGES=("shared" "yaml-editor" "config-selector" "job-management" "shell")
+PORTS=(0 3002 3003 3004 3000)
 
 # Array to track running PIDs
 PIDS=()
@@ -77,12 +77,10 @@ start_service() {
   
   if [ "$package" == "shell" ]; then
     echo -e "${YELLOW}🚀 Starting $package in development mode on port $port...${NC}"
-    # Override the port in package.json by directly using vite command
-    ../../node_modules/.bin/vite --port $port --strictPort &
+    npm run start &
   else
     echo -e "${YELLOW}🚀 Starting $package in preview mode on port $port...${NC}"
-    # Override the port in package.json
-    ../../node_modules/.bin/vite preview --port $port --strictPort &
+    npm run preview &
   fi
   
   local pid=$!
@@ -150,14 +148,12 @@ for i in "${!PACKAGES[@]}"; do
 done
 
 # Start shell last
-shell_index=0
 for i in "${!PACKAGES[@]}"; do
   if [ "${PACKAGES[$i]}" == "shell" ]; then
-    shell_index=$i
+    start_service "shell" "${PORTS[$i]}"
     break
   fi
 done
-start_service "shell" "${PORTS[$shell_index]}"
 
 # Return to project root
 cd "$ROOT_DIR"
@@ -172,19 +168,8 @@ for i in "${!PACKAGES[@]}"; do
     echo -e "  - ${BLUE}$package:${NC} http://localhost:$port"
   fi
 done
-echo -e "\n${YELLOW}Press Ctrl+C to stop all servers${NC}"
 
-# Print debugging info
-print_header "MODULE FEDERATION INFO"
-echo -e "${YELLOW}💡 Remotes Configuration:${NC}"
-echo -e "  - Make sure shell's vite.config.ts has these remotes:"
-for i in "${!PACKAGES[@]}"; do
-  package=${PACKAGES[$i]}
-  port=${PORTS[$i]}
-  if [ "$package" != "shell" ] && [ "$package" != "shared" ] && [ "$port" != "0" ]; then
-    echo -e "    ${BLUE}$package:${NC} http://localhost:$port/assets/remoteEntry.js"
-  fi
-done
+echo -e "\n${YELLOW}Press Ctrl+C to stop all servers${NC}"
 
 # Wait for all background processes
 wait
