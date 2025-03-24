@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-# Import only the routes we need - removing legacy routes
+# Import only the routes needed for generic config API
 from backend.api.routes.configs import router as configs_router
 from backend.api.routes.jobs import router as jobs_router
 from backend.services.config_repository import ConfigRepository
@@ -82,7 +82,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers - only using the new generic ones
+# Include routers - only using the generic ones
 app.include_router(configs_router)
 app.include_router(jobs_router)
 

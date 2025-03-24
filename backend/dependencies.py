@@ -1,19 +1,14 @@
 # File: backend/dependencies.py
 """
 Dependency injection functions for FastAPI endpoints.
-Focused on configuration management and C4H service access.
+Focused on generic configuration management and C4H service access.
 """
 
 from fastapi import Depends
 from pathlib import Path
-from typing import Dict, Optional
 import logging
 
-# Import services - remove lineage tracker
 from backend.services.config_repository import ConfigRepository
-from backend.services.workorder_repository_v2 import WorkOrderRepository
-from backend.services.teamconfig_repository import TeamConfigRepository
-from backend.services.runtimeconfig_repository import RuntimeConfigRepository
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config.config_types import get_config_types
@@ -35,36 +30,13 @@ def get_config_repository(config_type: str) -> ConfigRepository:
         if repo_path:
             path = Path(repo_path)
             path.parent.mkdir(exist_ok=True)
-            
-            if config_type == "workorder":
-                _repositories[config_type] = WorkOrderRepository(str(path))
-                logger.info(f"Created WorkOrderRepository at {path}")
-            elif config_type == "teamconfig":
-                _repositories[config_type] = TeamConfigRepository(str(path))
-                logger.info(f"Created TeamConfigRepository at {path}")
-            elif config_type == "runtimeconfig":
-                _repositories[config_type] = RuntimeConfigRepository(str(path))
-                logger.info(f"Created RuntimeConfigRepository at {path}")
-            else:
-                _repositories[config_type] = ConfigRepository(config_type, str(path))
-                logger.info(f"Created generic ConfigRepository for {config_type} at {path}")
+            _repositories[config_type] = ConfigRepository(config_type, str(path))
+            logger.info(f"Created ConfigRepository for {config_type} at {path}")
         else:
             _repositories[config_type] = ConfigRepository(config_type)
-            logger.info(f"Created generic ConfigRepository for {config_type} with default path")
+            logger.info(f"Created ConfigRepository for {config_type} with default path")
             
     return _repositories[config_type]
-
-def get_workorder_repository():
-    """Get or create a workorder repository instance."""
-    return get_config_repository("workorder")
-
-def get_teamconfig_repository():
-    """Get or create a team config repository instance."""
-    return get_config_repository("teamconfig")
-
-def get_runtimeconfig_repository():
-    """Get or create a runtime config repository instance."""
-    return get_config_repository("runtimeconfig")
 
 def get_job_repository():
     """Get or create a job repository instance."""

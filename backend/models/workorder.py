@@ -1,15 +1,12 @@
-# backend/models/workorder.py
+# File: backend/models/workorder.py
 """
 WorkOrder model for defining refactoring tasks.
-Updated to be compatible with the base Configuration model.
+Contains only the content models necessary for generic Configuration support.
 """
 
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, validator
 from enum import Enum
-
-from backend.models.configuration import Configuration, ConfigurationMetadata, ConfigurationVersion
 
 class ParameterType(str, Enum):
     """Types of parameters that can be used in a workorder template."""
@@ -41,7 +38,6 @@ class WorkOrderConfig(BaseModel):
     frequency_penalty: Optional[float] = Field(None, ge=0.0, le=2.0)
     presence_penalty: Optional[float] = Field(None, ge=0.0, le=2.0)
     stop_sequences: List[str] = Field(default_factory=list)
-    # Additional configuration for work order processing
     service_id: Optional[str] = Field(None, description="Target C4H service ID")
     workflow_id: Optional[str] = Field(None, description="Workflow ID for processing")
     max_runtime: Optional[int] = Field(None, description="Maximum runtime in seconds")
@@ -97,87 +93,6 @@ class WorkOrderContent(BaseModel):
             rendered = rendered.replace(f"{{{name}}}", str(value))
             
         return rendered
-
-# Legacy model for backward compatibility
-class WorkOrderMetadata(ConfigurationMetadata):
-    """Metadata associated with a workorder."""
-    # Extended metadata for work orders
-    asset: Optional[str] = Field(None, description="Asset being worked on")
-    intent: Optional[str] = Field(None, description="User's intent for the work")
-    goal: Optional[str] = Field(None, description="Goal of the work order")
-    priority: Optional[str] = Field(None, description="Priority of the work order")
-    due_date: Optional[datetime] = Field(None, description="Due date for the work order")
-    assignee: Optional[str] = Field(None, description="Person assigned to the work order")
-
-# Legacy model for backward compatibility
-class WorkOrder(Configuration):
-    """
-    Complete workorder definition.
-    This class provides compatibility between the legacy WorkOrder model
-    and the new Configuration-based architecture.
-    """
-    config_type: str = "workorder"
-    content: WorkOrderContent
-    metadata: WorkOrderMetadata
-    
-    def render(self, parameters: Dict[str, Any]) -> str:
-        """Renders the workorder template with the provided parameters."""
-        return self.content.render(parameters)
-
-    def to_submission_payload(self) -> Dict[str, Any]:
-        """Convert the work order to a submission payload for the C4H service."""
-        # Render the workorder with any default parameters
-        try:
-            rendered_prompt = self.render({})
-        except ValueError:
-            # If required params are missing, just use the template text
-            rendered_prompt = self.content.template.text
-        
-        # Build the submission payload
-        payload = {
-            "id": self.id,
-            "prompt": rendered_prompt,
-            "metadata": self.metadata.dict(),
-            "config": self.content.template.config.dict() if self.content.template.config else {}
-        }
-        
-        return payload
-    
-    @classmethod
-    def from_legacy(cls, legacy_workorder):
-        """Create a new WorkOrder from a legacy WorkOrder model."""
-        # Convert legacy template to new content format
-        content = WorkOrderContent(
-            template=legacy_workorder.template
-        )
-        
-        return cls(
-            id=legacy_workorder.id,
-            config_type="workorder",
-            content=content,
-            metadata=legacy_workorder.metadata,
-            parent_id=legacy_workorder.parent_id,
-            lineage=legacy_workorder.lineage
-        )
-    
-    @classmethod
-    def create(cls, id: str, template: WorkOrderTemplate, metadata: Optional[WorkOrderMetadata] = None):
-        """Create a new WorkOrder."""
-        if metadata is None:
-            metadata = WorkOrderMetadata(author="system")
-            
-        content = WorkOrderContent(template=template)
-        
-        return cls(
-            id=id,
-            config_type="workorder",
-            content=content,
-            metadata=metadata
-        )
-
-class WorkOrderVersion(ConfigurationVersion):
-    """Information about a specific version of a workorder."""
-    configuration: WorkOrder
 
 class WorkOrderTestCase(BaseModel):
     """Test case for a workorder with inputs and expected outputs."""
