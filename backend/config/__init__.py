@@ -21,11 +21,6 @@ DEFAULT_CONFIG = {
         "path": "./data/prompt_repository",
         "backup_path": "./data/backups",
     },
-    "lineage": {
-        "enabled": True,
-        "backend": "file",
-        "file_path": "./data/lineage",
-    },
     "api": {
         "cors_origins": ["*"],
     },
