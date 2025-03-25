@@ -1,4 +1,3 @@
-# File: backend/main.py
 """
 Main application entry point for the C4H Backend.
 Sets up FastAPI, routes, and middleware.
@@ -6,8 +5,13 @@ Focused on configuration management and C4H service access.
 """
 
 import logging
+import json
 import os
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -20,6 +24,7 @@ from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config import load_config
 from backend.config.config_types import load_config_types, get_config_types
+from backend.api.middleware import RequestLoggingMiddleware, APIErrorLoggingMiddleware
 from backend.dependencies import get_job_repository, get_c4h_service
 
 # Configure logging
@@ -28,6 +33,34 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Create API request logger
+api_logger = logging.getLogger("api.requests")
+api_logger.setLevel(logging.INFO)
+
+# Configure a formatter for structured logging
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            "timestamp": self.formatTime(record, "%Y-%m-%d %H:%M:%S"),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage()
+        }
+
+        # Add exception info if available
+        if record.exc_info:
+            log_record["exception"] = {
+                "type": record.exc_info[0].__name__,
+                "message": str(record.exc_info[1])
+            }
+
+        return json.dumps(log_record)
+
+# Add handler with the JSON formatter to the API logger
+api_handler = logging.StreamHandler()
+api_handler.setFormatter(JsonFormatter())
+api_logger.addHandler(api_handler)
 
 # Load configuration
 config_path = os.environ.get("CONFIG_PATH", "./config.yaml")
@@ -81,6 +114,59 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request and error logging middleware
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(APIErrorLoggingMiddleware)
+
+# Add global exception handlers
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Get correlation ID if available
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    
+    # Log the validation error
+    error_details = exc.errors()
+    
+    error_log = {
+        "correlation_id": correlation_id,
+        "error": {
+            "type": "RequestValidationError",
+            "details": error_details,
+            "path": str(request.url.path),
+            "method": request.method,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    }
+    
+    api_logger.error(f"Validation Error: {json.dumps(error_log)}")
+    
+    # Return the standard FastAPI validation error response
+    return await request_validation_exception_handler(request, exc)
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Get correlation ID if available
+    correlation_id = getattr(request.state, "correlation_id", "unknown")
+    
+    # Log the HTTP exception
+    error_log = {
+        "correlation_id": correlation_id,
+        "error": {
+            "type": "HTTPException",
+            "status_code": exc.status_code,
+            "detail": exc.detail,
+            "path": str(request.url.path),
+            "method": request.method,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+    }
+    
+    log_level = logging.ERROR if exc.status_code >= 500 else logging.WARNING
+    api_logger.log(log_level, f"HTTP Exception: {json.dumps(error_log)}")
+    
+    # Call the original HTTP exception handler
+    return await http_exception_handler(request, exc)
 
 # Include routers - only using the generic ones
 app.include_router(configs_router)
