@@ -1,4 +1,4 @@
-// File: /packages/config-selector/src/contexts/ConfigContext.tsx
+// File: packages/config-selector/src/contexts/ConfigContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import { configTypes, apiService } from 'shared';
@@ -17,7 +17,7 @@ interface ConfigContextState {
   loadConfig: (id: string) => Promise<void>;
   createNewConfig: () => void;
   updateYaml: (yaml: string) => void;
-  saveConfig: () => Promise<any | null>;
+  saveConfig: (configId?: string) => Promise<any | null>;
   deleteConfig: (id: string) => Promise<void>;
   archiveConfig: (id: string, archive: boolean) => Promise<void>;
   cloneConfig: (id: string, newId: string) => Promise<void>;
@@ -149,7 +149,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   }, []);
   
   // Save the current config
-  const saveConfig = useCallback(async () => {
+  const saveConfig = useCallback(async (configId?: string) => {
     setLoading(true);
     setError(null);
     setSaved(false);
@@ -172,10 +172,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       }
       
       // Check if this is a new config or update
-      const isNew = !currentConfig.id || currentConfig.id === 'new';
+      const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === '';
+      
+      // Use the provided configId if available, otherwise use the current one
+      const effectiveId = configId || currentConfig.id;
       
       console.log(`Saving ${isNew ? 'new' : 'existing'} config of type ${configType}:`, { 
-        id: currentConfig.id,
+        id: effectiveId,
         content, 
         metadata: currentConfig.metadata 
       });
@@ -185,12 +188,13 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       if (isNew) {
         // For new config, create with content and metadata
         response = await apiService.createConfig(configType, {
-          ...currentConfig,
-          content
+          id: effectiveId,
+          content,
+          metadata: currentConfig.metadata
         });
       } else {
         // For existing config, update with content and metadata
-        response = await apiService.updateConfig(configType, currentConfig.id, {
+        response = await apiService.updateConfig(configType, effectiveId, {
           content,
           metadata: currentConfig.metadata
         });

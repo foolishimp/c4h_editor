@@ -200,14 +200,26 @@ class ApiService {
     
     // Use mock data for development
     console.log(`API: Fetching config ${id} of type ${configType}`);
+    
+    // Initialize the type if not already present
+    if (!this.mockData[configType]) {
+      this.mockData[configType] = [];
+    }
+    
     const config = this.mockData[configType]?.find(c => c.id === id);
     if (!config) {
+      // Improved error message with debugging information
+      console.error(`Config not found in mockData:`, {
+        requestedId: id,
+        configType,
+        availableIds: this.mockData[configType]?.map(c => c.id) || []
+      });
       throw new Error(`Config ${id} of type ${configType} not found`);
     }
     return config;
   }
 
-  async createConfig(configType: string, data: any) {
+  async createConfig(configType: string, data: any): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.create;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     
@@ -229,11 +241,21 @@ class ApiService {
     }
     
     // Use mock data for development
-    console.log(`API: Creating config of type ${configType}:`, data);
+    console.log(`API: Creating config of type ${configType} with ID ${data.id}:`, data);
     
     // Initialize the type if not already present
     if (!this.mockData[configType]) {
       this.mockData[configType] = [];
+    }
+    
+    // Check if ID already exists and throw error if it does
+    const existing = this.mockData[configType].find(c => c.id === data.id);
+    if (existing) {
+      console.log(`Config with ID ${data.id} already exists, updating instead`);
+      return this.updateConfig(configType, data.id, {
+        content: data.content,
+        metadata: data.metadata
+      });
     }
     
     // Add to mock data
@@ -241,24 +263,33 @@ class ApiService {
     return data;
   }
 
-  async updateConfig(configType: string, id: string, data: any) {
+  async updateConfig(configType: string, id: string, data: any): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     
     // Use mock data for development
     console.log(`API: Updating config ${id} of type ${configType}:`, data);
     
+    // Initialize the type if not already present
+    if (!this.mockData[configType]) {
+      this.mockData[configType] = [];
+    }
+    
     // Find and update in mock data
     const index = this.mockData[configType]?.findIndex(c => c.id === id) ?? -1;
     if (index === -1) {
       // Create new if doesn't exist
-      return this.createConfig(configType, data);
+      return this.createConfig(configType, {
+        id,
+        ...data
+      });
     }
     
     // Update and return
     this.mockData[configType][index] = {
       ...this.mockData[configType][index],
       ...data,
+      id, // Ensure ID is preserved
       metadata: {
         ...this.mockData[configType][index].metadata,
         ...data.metadata,

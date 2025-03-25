@@ -1,4 +1,4 @@
-// File: /packages/config-selector/src/components/ConfigEditor.tsx
+// File: packages/config-selector/src/components/ConfigEditor.tsx
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import {
   Box,
@@ -118,12 +118,16 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   
   // Handle save
   const handleSave = async () => {
-    // For new configs, update the ID before saving
-    if (configId === 'new' && currentConfig) {
-      currentConfig.id = configIdInput;
+    if (configId === 'new') {
+      if (!configIdInput.trim()) {
+        // Show validation error
+        return;
+      }
+      console.log(`Saving new config with ID: ${configIdInput}`);
     }
     
-    const savedConfig = await saveConfig();
+    // Save with the configIdInput for new configs
+    const savedConfig = await saveConfig(configId === 'new' ? configIdInput : undefined);
     
     if (savedConfig) {
       // Navigate to the config page if this was a new config
