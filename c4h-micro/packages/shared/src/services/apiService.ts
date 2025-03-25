@@ -176,26 +176,14 @@ class ApiService {
     return this.mockData[configType] || [];
   }
 
-  async getConfig(configType: string, id: string) {
+  async getConfig(configType: string, id: string): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.get(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     
     // Handle special case for 'new'
     if (id === 'new') {
       console.log(`API: Creating new empty config of type ${configType}`);
-      const defaultContent = configTypes[configType]?.defaultContent || {};
-      return {
-        id: '',
-        content: defaultContent,
-        metadata: {
-          author: "Current User",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          description: "",
-          tags: [],
-          version: "1.0.0"
-        }
-      };
+      return this.createEmptyConfig(configType, '');
     }
     
     // Use mock data for development
@@ -214,9 +202,30 @@ class ApiService {
         configType,
         availableIds: this.mockData[configType]?.map(c => c.id) || []
       });
-      throw new Error(`Config ${id} of type ${configType} not found`);
+      
+      // Instead of throwing error, create an empty configuration with the requested ID
+      // This handles the case when a user navigates directly to an ID that doesn't exist yet
+      console.log(`Creating new config with requested ID: ${id}`);
+      return this.createEmptyConfig(configType, id);
     }
     return config;
+  }
+  
+  // Helper method to create an empty config
+  private createEmptyConfig(configType: string, id: string): any {
+    const defaultContent = configTypes[configType]?.defaultContent || {};
+    return {
+      id: id,
+      content: defaultContent,
+      metadata: {
+        author: "Current User",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        description: "",
+        tags: [],
+        version: "1.0.0"
+      }
+    };
   }
 
   async createConfig(configType: string, data: any): Promise<any> {

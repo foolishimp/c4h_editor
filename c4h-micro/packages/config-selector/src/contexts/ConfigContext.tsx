@@ -92,6 +92,16 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     try {
       const response = await apiService.getConfig(configType, id);
       const config = response as any;
+      
+      // If the ID is empty, this is a new config but with preset ID
+      const isNewConfig = !config.id || config.id === 'new';
+      
+      console.log(`Loaded config:`, {
+        id: config.id,
+        isNewConfig: isNewConfig,
+        type: configType
+      });
+      
       setCurrentConfig(config);
       
       // Convert to YAML
