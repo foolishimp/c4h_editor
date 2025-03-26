@@ -1,3 +1,5 @@
+// File: packages/shared/src/services/apiService.ts
+
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { configTypes, ConfigTypeMetadata } from '../config/configTypes';
 
@@ -88,14 +90,24 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.create;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Creating config of type ${configType} with ID ${data.id} at ${endpoint}`);
+    
+    // Add missing required fields
+    const requestData = {
+      ...data,
+      commit_message: data.commit_message || `Create new ${configType}`,
+      author: data.author || data.metadata?.author || "Current User"
+    };
+    
     try {
-      return this.post<any>(endpoint, data);
+      return this.post<any>(endpoint, requestData);
     } catch (error: any) {
       if (error.response?.status === 409) {
         console.log(`Config with ID ${data.id} already exists, updating instead`);
         return this.updateConfig(configType, data.id, {
           content: data.content,
-          metadata: data.metadata
+          metadata: data.metadata,
+          commit_message: requestData.commit_message,
+          author: requestData.author
         });
       }
       throw error;
@@ -106,8 +118,16 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Updating config ${id} of type ${configType} at ${endpoint}`);
+    
+    // Add missing required fields
+    const requestData = {
+      ...data,
+      commit_message: data.commit_message || `Update ${configType}`,
+      author: data.author || data.metadata?.author || "Current User"
+    };
+    
     try {
-      return this.put<any>(endpoint, data);
+      return this.put<any>(endpoint, requestData);
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.log(`Config ${id} not found, creating new`);

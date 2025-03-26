@@ -1,4 +1,3 @@
-// File: packages/shared/src/types/config.ts
 /**
  * Generic Configuration types
  */
@@ -65,6 +64,37 @@ export enum ConfigSection {
 }
 
 // TeamConfig specific types
+export interface RoleConfig {
+  name: string;
+  description?: string;
+  capabilities: string[];
+  model?: string;
+  config: Record<string, any>;
+}
+
+export interface AgentConfig {
+  id: string;
+  name: string;
+  role: string;
+  description?: string;
+  config: Record<string, any>;
+}
+
+export interface TeamDefinition {
+  name: string;
+  description?: string;
+  agents: AgentConfig[];
+  workflow?: Record<string, any>;
+}
+
+export interface TeamConfigContent {
+  roles: RoleConfig[];
+  teams: TeamDefinition[];
+  default_team?: string;
+  global_config: Record<string, any>;
+}
+
+// Legacy TeamConfig types for backward compatibility
 export interface LLMConfig {
   providers: ProviderConfig[];
   default_provider: string;
@@ -81,18 +111,6 @@ export interface ProviderConfig {
 export interface OrchestrationConfig {
   enabled: boolean;
   teams: TeamDefinition[];
-}
-
-export interface TeamDefinition {
-  name: string;
-  agents: AgentConfig[];
-}
-
-export interface AgentConfig {
-  name: string;
-  role: string;
-  model: string;
-  provider: string;
 }
 
 // RuntimeConfig specific types

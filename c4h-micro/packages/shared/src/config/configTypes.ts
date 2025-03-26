@@ -1,4 +1,3 @@
-// File: packages/shared/src/config/configTypes.ts
 /**
  * Configuration Type Registry
  * 
@@ -59,14 +58,6 @@ const configTypes: Record<string, ConfigTypeMetadata> = {
           max_tokens: 1000,
           stop_sequences: []
         }
-      },
-      metadata: {
-        author: "Current User",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        description: "",
-        tags: [],
-        version: "1.0.0"
       }
     }
   },
@@ -89,22 +80,21 @@ const configTypes: Record<string, ConfigTypeMetadata> = {
       history: (id: string) => `/api/v1/configs/teamconfig/${id}/history`
     },
     defaultContent: {
-      llm_config: {
-        providers: [],
-        default_provider: "",
-        default_model: ""
-      },
-      orchestration: {
-        enabled: true,
-        teams: []
-      },
-      metadata: {
-        author: "Current User",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        description: "",
-        tags: [],
-        version: "1.0.0"
+      roles: [
+        {
+          name: "Default Role",
+          description: "Default role with basic capabilities",
+          capabilities: ["chat", "research"],
+          config: {}
+        }
+      ],
+      teams: [],
+      default_team: "",
+      global_config: {
+        llm_settings: {
+          default_model: "",
+          default_provider: ""
+        }
       }
     }
   },
@@ -138,14 +128,6 @@ const configTypes: Record<string, ConfigTypeMetadata> = {
       backup: {
         enabled: true,
         path: "./backups"
-      },
-      metadata: {
-        author: "Current User",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        description: "",
-        tags: [],
-        version: "1.0.0"
       }
     }
   },
@@ -177,15 +159,7 @@ const configTypes: Record<string, ConfigTypeMetadata> = {
           next: null
         }
       ],
-      entry_point: "step1",
-      metadata: {
-        author: "Current User",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        description: "",
-        tags: [],
-        version: "1.0.0"
-      }
+      entry_point: "step1"
     }
   }
 };

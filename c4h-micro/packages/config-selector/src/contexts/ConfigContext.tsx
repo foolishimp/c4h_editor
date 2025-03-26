@@ -159,6 +159,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   }, []);
   
   // Save the current config
+
   const saveConfig = useCallback(async (configId?: string) => {
     setLoading(true);
     setError(null);
@@ -200,13 +201,19 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
         response = await apiService.createConfig(configType, {
           id: effectiveId,
           content,
-          metadata: currentConfig.metadata
+          metadata: currentConfig.metadata,
+          // Add these required fields
+          commit_message: `Initial creation of ${configType} ${effectiveId}`,
+          author: currentConfig.metadata.author || "Current User"
         });
       } else {
         // For existing config, update with content and metadata
         response = await apiService.updateConfig(configType, effectiveId, {
           content,
-          metadata: currentConfig.metadata
+          metadata: currentConfig.metadata,
+          // Add these required fields
+          commit_message: `Update ${configType} ${effectiveId}`,
+          author: currentConfig.metadata.author || "Current User"
         });
       }
       
@@ -224,8 +231,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [currentConfig, yaml, configType, loadConfigs]);
-  
+  }, [currentConfig, yaml, configType, loadConfigs]); 
+
   // Delete a config
   const deleteConfig = useCallback(async (id: string) => {
     setLoading(true);
