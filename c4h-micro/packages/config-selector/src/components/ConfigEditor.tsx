@@ -76,6 +76,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   // Update configIdInput when currentConfig changes
   useEffect(() => {
     if (currentConfig) {
+      console.log('ConfigEditor: Updating inputs from currentConfig', currentConfig);
       setConfigIdInput(currentConfig.id || '');
       setDescriptionInput(currentConfig.metadata?.description || '');
     }
@@ -84,9 +85,17 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   // Track changes
   useEffect(() => {
     setHasChanges(configId === 'new' || 
-      (currentConfig && (configIdInput !== currentConfig.id))
+      (currentConfig && (configIdInput !== currentConfig.id || descriptionInput !== currentConfig.metadata?.description))
     );
   }, [configId, currentConfig, configIdInput, yaml]);
+
+  // Update description in currentConfig when it changes
+  useEffect(() => {
+    if (currentConfig && currentConfig.metadata) {
+      console.log('ConfigEditor: Updating description in currentConfig', descriptionInput);
+      currentConfig.metadata.description = descriptionInput;
+    }
+  }, [currentConfig, descriptionInput]);
   
   // Handle back button click
   const handleBack = () => {
@@ -119,12 +128,13 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   
   // Handle save
   const handleSave = async () => {
-    // Update description in currentConfig before saving
-    if (currentConfig && currentConfig.metadata) {
-      currentConfig.metadata.description = descriptionInput;
-    }
-
     if (configId === 'new') {
+      // For new configs, update both id and description
+      if (currentConfig && currentConfig.metadata) {
+        console.log(`ConfigEditor: Saving new config with ID: ${configIdInput} and description: ${descriptionInput}`);
+      } else {
+        console.log('ConfigEditor: Warning - currentConfig or metadata is undefined');
+      }
       if (!configIdInput.trim()) {
         // Show validation error
         return;
@@ -188,9 +198,22 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
         </Box>
       </Box>
       
+      {/* Description field for all configs */}
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          label={`${configName} Description`}
+          fullWidth
+          value={descriptionInput}
+          onChange={(e) => setDescriptionInput(e.target.value)}
+          margin="normal"
+          variant="outlined"
+          helperText={`Description for this ${configName.toLowerCase()}`}
+        />
+      </Box>
+      
       {/* ID field for new configs */}
       {configId === 'new' && (
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ mb: 3 }}>
           <TextField
             label={`${configName} ID`}
             fullWidth
@@ -201,15 +224,6 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
             required
             error={!configIdInput.trim()}
             helperText={!configIdInput.trim() ? `${configName} ID is required` : `Unique identifier for this ${configName.toLowerCase()}`}
-          />
-          <TextField
-            label={`${configName} Description`}
-            fullWidth
-            value={descriptionInput}
-            onChange={(e) => setDescriptionInput(e.target.value)}
-            margin="normal"
-            variant="outlined"
-            helperText={`Description for this ${configName.toLowerCase()}`}
           />
         </Box>
       )}

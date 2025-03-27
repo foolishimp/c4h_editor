@@ -1,5 +1,3 @@
-// File: packages/shared/src/services/apiService.ts
-
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { configTypes, ConfigTypeMetadata } from '../config/configTypes';
 
@@ -48,6 +46,8 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.list;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Fetching configs for type: ${configType} from ${endpoint}`);
+    const response = await this.get<any[]>(endpoint);
+    console.log(`API: Received ${response.length} configs from server`);
     return this.get<any[]>(endpoint);
   }
 
@@ -59,6 +59,7 @@ class ApiService {
       return this.createEmptyConfig(configType, '');
     }
     console.log(`API: Fetching config ${id} of type ${configType} from ${endpoint}`);
+    
     try {
       return this.get<any>(endpoint);
     } catch (error: any) {
@@ -72,14 +73,16 @@ class ApiService {
 
   private createEmptyConfig(configType: string, id: string): any {
     const defaultContent = configTypes[configType]?.defaultContent || {};
+    console.log(`API: Creating empty config of type ${configType} with ID ${id || 'empty'}`);
+    
     return {
       id: id,
       content: defaultContent,
       metadata: {
+        description: "", // Explicitly initialize description
         author: "Current User",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        description: "",
         tags: [],
         version: "1.0.0"
       }
@@ -97,6 +100,9 @@ class ApiService {
       commit_message: data.commit_message || `Create new ${configType}`,
       author: data.author || data.metadata?.author || "Current User"
     };
+    console.log(`API: Submitting config create request:`, {
+      id: data.id, endpoint, description: data.metadata?.description
+    });
     
     try {
       return this.post<any>(endpoint, requestData);
@@ -108,6 +114,7 @@ class ApiService {
           metadata: data.metadata,
           commit_message: requestData.commit_message,
           author: requestData.author
+          // Make sure we pass the description through
         });
       }
       throw error;
@@ -125,6 +132,9 @@ class ApiService {
       commit_message: data.commit_message || `Update ${configType}`,
       author: data.author || data.metadata?.author || "Current User"
     };
+    console.log(`API: Submitting config update request:`, {
+      id, endpoint, description: data.metadata?.description
+    });
     
     try {
       return this.put<any>(endpoint, requestData);

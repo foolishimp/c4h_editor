@@ -1,4 +1,3 @@
-// File: packages/config-selector/src/contexts/ConfigContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import { configTypes, apiService } from 'shared';
@@ -120,6 +119,16 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     }
   }, [configType]);
   
+  // Make sure metadata is properly initialized when creating a new config
+  const ensureMetadata = (config: any) => {
+    if (!config.metadata) {
+      config.metadata = {
+        author: 'Current User',
+        tags: []
+      };
+    }
+  };
+
   // Create a new config
   const createNewConfig = useCallback(() => {
     const defaultContent = configTypes[configType]?.defaultContent || {};
@@ -137,6 +146,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     };
     
     console.log('Creating new empty config:', emptyConfig);
+    // Ensure metadata is initialized
+    ensureMetadata(emptyConfig);
     setCurrentConfig(emptyConfig);
     
     // Set initial YAML
@@ -155,7 +166,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   // Update YAML content
   const updateYaml = useCallback((newYaml: string) => {
     setYaml(newYaml);
-    setSaved(false);
+    // Only mark as unsaved if we actually changed something
+    newYaml !== yaml && setSaved(false);
   }, []);
   
   // Save the current config
@@ -165,6 +177,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     setSaved(false);
     
+    console.log('ConfigContext: Saving config, current state:', {
+      currentConfig, configId, yaml
+    });
     if (!currentConfig) {
       setError('No configuration to save');
       setLoading(false);
@@ -187,11 +202,23 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       
       // Use the provided configId if available, otherwise use the current one
       const effectiveId = configId || currentConfig.id;
+
+      // Ensure metadata is properly initialized
+      ensureMetadata(currentConfig);
+      
+      // Update metadata timestamps
+      if (currentConfig.metadata) {
+        if (isNew && !currentConfig.metadata.created_at) {
+          currentConfig.metadata.created_at = new Date().toISOString();
+        }
+        currentConfig.metadata.updated_at = new Date().toISOString();
+      }
       
       console.log(`Saving ${isNew ? 'new' : 'existing'} config of type ${configType}:`, { 
         id: effectiveId,
         content, 
-        metadata: currentConfig.metadata 
+        metadata: currentConfig.metadata,
+        description: currentConfig.metadata?.description
       });
       
       let response;

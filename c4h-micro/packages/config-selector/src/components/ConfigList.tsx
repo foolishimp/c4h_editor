@@ -1,4 +1,3 @@
-// File: packages/config-selector/src/components/ConfigList.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -75,6 +74,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   // Load configs on mount and when configType changes
   useEffect(() => {
     loadConfigs();
+    console.log('ConfigList: Loading configs for type:', configType);
   }, [configType, loadConfigs]);
   
   // Filter configs based on search term and archived status
@@ -269,8 +269,19 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 <TableRow key={config.id}>
                   <TableCell>{config.id}</TableCell>
                   <TableCell>
-                    <Typography variant="body2">
-                      {config.metadata?.description || 'No description'}
+                    <Typography variant="body2" sx={{ fontStyle: config.metadata?.description ? 'normal' : 'italic' }}>
+                      {(() => {
+                        // Debug log to check metadata state
+                        if (config.id && !config.metadata) {
+                          console.log(`ConfigList: Missing metadata for config ${config.id}`);
+                          return 'No description [Missing metadata]';
+                        } else if (config.metadata?.description === undefined) {
+                          console.log(`ConfigList: Description undefined for config ${config.id}`);
+                          return 'No description [Undefined]';
+                        } else {
+                          return config.metadata?.description || 'No description';
+                        }
+                      })()}
                     </Typography>
                     {config.metadata?.tags && config.metadata.tags.length > 0 && (
                       <Box sx={{ mt: 1 }}>
