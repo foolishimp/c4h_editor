@@ -1,4 +1,3 @@
-// File: packages/job-management/src/contexts/JobContext.tsx
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { api } from 'shared';
 import { Job, JobStatus } from 'shared';
@@ -128,8 +127,14 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
+      // Format the configurations as expected by the API
+      const configurations = Object.entries(configs).reduce((acc, [type, id]) => {
+        acc[type] = { id }; // Format each config as an object with id property
+        return acc;
+      }, {} as Record<string, { id: string }>);
+      
       const requestData = {
-        configurations: configs,
+        configurations,
         user_id: 'current-user', // This would come from auth context in a real app
         job_configuration: {
           max_runtime: 3600,
@@ -142,7 +147,23 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
       // Reload jobs after submission
       await loadJobs();
     } catch (err: any) {
-      setError(err.message || 'Failed to submit job');
+      // Extract more detailed error information if available
+      const errorDetail = err.response?.data?.detail;
+      let errorMessage = 'Failed to submit job';
+      
+      if (errorDetail) {
+        // If the API returned validation errors, format them for display
+        if (Array.isArray(errorDetail)) {
+          errorMessage = errorDetail.map(err => err.msg || err.message || JSON.stringify(err)).join(', ');
+        } else if (typeof errorDetail === 'string') {
+          errorMessage = errorDetail;
+        } else {
+          errorMessage = JSON.stringify(errorDetail);
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
       console.error('Error submitting job:', err);
     } finally {
       setLoading(false);

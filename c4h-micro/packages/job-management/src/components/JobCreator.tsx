@@ -6,11 +6,11 @@ import {
   Card, 
   CardContent, 
   FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
+  InputLabel,
   CircularProgress,
-  Alert
+  Alert,
+  Select, 
+  MenuItem
 } from '@mui/material';
 import { configTypes, apiService } from 'shared';
 import { useJobContext } from '../contexts/JobContext';
@@ -51,13 +51,10 @@ const JobCreator: React.FC = () => {
         try {
           // Use apiService's getConfigs method which handles endpoints correctly
           const configs = await apiService.getConfigs(configType);
-          
           if (Array.isArray(configs)) {
             options[configType] = configs.map(item => {
               // Handle different response structures safely
-              const description = item.description || 
-                (item.metadata && item.metadata.description) || 
-                'No description';
+              const description = item.metadata?.description || item.description || 'No description';
               return { id: item.id, description };
             });
           }
