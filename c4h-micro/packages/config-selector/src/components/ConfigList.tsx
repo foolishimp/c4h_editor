@@ -65,6 +65,12 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   
   // Config name from registry
   const configName = configTypes[configType]?.name || configType;
+
+  // Helper function to get description from config
+  const getDescription = (config: any): string => {
+    // Check for both metadata.description and title field (API returns description as title in list response)
+    return (config.metadata?.description?.trim() || config.title || '').trim() || 'No description';
+  };
   
   // Custom navigation handler that doesn't rely on React Router
   const handleNavigate = (path: string) => {
@@ -90,8 +96,8 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(config => 
-        config.id.toLowerCase().includes(term) ||
-        (config.metadata?.description && config.metadata.description.toLowerCase().includes(term))
+        config.id.toLowerCase().includes(term) || 
+        getDescription(config).toLowerCase().includes(term)
       );
     }
     
@@ -269,19 +275,11 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 <TableRow key={config.id}>
                   <TableCell>{config.id}</TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontStyle: config.metadata?.description?.trim() ? 'normal' : 'italic' }}>
-                      {(() => {
-                        // Debug log to check metadata state
-                        if (config.id && !config.metadata) {
-                          console.log(`ConfigList: Missing metadata for config ${config.id}`);
-                          return 'No description';
-                        } else if (!config.metadata?.description?.trim()) {
-                          console.log(`ConfigList: Empty description for config ${config.id}`);
-                          return 'No description';
-                        } else {
-                          return config.metadata?.description || 'No description';
-                        }
-                      })()}
+                    <Typography 
+                      variant="body2" 
+                      sx={{ fontStyle: getDescription(config) === 'No description' ? 'italic' : 'normal' }}
+                    >
+                      {getDescription(config)}
                     </Typography>
                     {config.metadata?.tags && config.metadata.tags.length > 0 && (
                       <Box sx={{ mt: 1 }}>

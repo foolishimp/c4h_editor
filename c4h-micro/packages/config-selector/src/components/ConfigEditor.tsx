@@ -215,6 +215,18 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
         </Box>
       )}
       
+      {/* Display the Config ID for existing configs */}
+      {configId !== 'new' && currentConfig?.id && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            {`${configName} ID: `}
+            <Box component="span" fontWeight="bold">
+              {currentConfig.id}
+            </Box>
+          </Typography>
+        </Box>
+      )}
+      
       {/* Description field for all configs */}
       <Box sx={{ mb: 3 }}>
         <TextField
