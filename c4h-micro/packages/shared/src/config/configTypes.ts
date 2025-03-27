@@ -131,45 +131,13 @@ const configTypes: Record<string, ConfigTypeMetadata> = {
       }
     }
   },
-  workflow: {
-    type: "workflow",
-    name: "Workflow",
-    description: "Defines the workflow steps and execution path",
-    supportsVersioning: true,
-    requiredForJob: false,
-    icon: "AccountTree",
-    apiEndpoints: {
-      list: "/api/v1/configs/workflow",
-      get: (id: string) => `/api/v1/configs/workflow/${id}`,
-      create: "/api/v1/configs/workflow",
-      update: (id: string) => `/api/v1/configs/workflow/${id}`,
-      delete: (id: string) => `/api/v1/configs/workflow/${id}`,
-      archive: (id: string) => `/api/v1/configs/workflow/${id}/archive`,
-      unarchive: (id: string) => `/api/v1/configs/workflow/${id}/unarchive`,
-      clone: (id: string) => `/api/v1/configs/workflow/${id}/clone`,
-      history: (id: string) => `/api/v1/configs/workflow/${id}/history`
-    },
-    defaultContent: {
-      steps: [
-        {
-          id: "step1",
-          name: "Initial Step",
-          description: "First step in the workflow",
-          type: "task",
-          next: null
-        }
-      ],
-      entry_point: "step1"
-    }
-  }
 };
 
 // Backward compatibility with existing API endpoints
 const backwardCompatibilityAliases: Record<string, string> = {
   workorders: "workorder",
   teamconfigs: "teamconfig",
-  runtimeconfigs: "runtimeconfig",
-  workflows: "workflow"
+  runtimeconfigs: "runtimeconfig"
 };
 
 // Export the config types registry
