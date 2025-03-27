@@ -1,4 +1,3 @@
-// File: packages/job-management/src/components/JobCreator.tsx
 import React, { useState, useEffect } from 'react';
 import { 
   Box, 
@@ -13,23 +12,18 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
+import { configTypes, apiService } from 'shared';
 import { useJobContext } from '../contexts/JobContext';
-import { configTypes } from 'shared';
-import { api } from 'shared';
 
 interface ConfigOption {
   id: string;
   description: string;
 }
 
-interface ConfigResponse {
-  data: Array<{
-    id: string;
-    metadata?: {
-      description?: string;
-    };
-  }>;
-}
+// Filter to only include config types required for jobs
+const requiredConfigTypes = Object.entries(configTypes)
+  .filter(([_, config]) => config.requiredForJob !== false)
+  .map(([type]) => type);
 
 const JobCreator: React.FC = () => {
   const { submitJob, loading, error } = useJobContext();
@@ -48,18 +42,28 @@ const JobCreator: React.FC = () => {
     const loadConfigOptions = async () => {
       const options: Record<string, ConfigOption[]> = {};
       
-      for (const [configType, config] of Object.entries(configTypes)) {
+      // Initialize all options with empty arrays
+      requiredConfigTypes.forEach(type => {
+        options[type] = [];
+      });
+      
+      for (const configType of requiredConfigTypes) {
         try {
-          const response = await api.get<ConfigResponse>(config.apiEndpoints.list);
+          // Use apiService's getConfigs method which handles endpoints correctly
+          const configs = await apiService.getConfigs(configType);
           
-          // Map response data to ConfigOption array
-          options[configType] = response.data.map((item) => ({
-            id: item.id,
-            description: item.metadata?.description || 'No description'
-          }));
+          if (Array.isArray(configs)) {
+            options[configType] = configs.map(item => {
+              // Handle different response structures safely
+              const description = item.description || 
+                (item.metadata && item.metadata.description) || 
+                'No description';
+              return { id: item.id, description };
+            });
+          }
         } catch (err) {
           console.error(`Error loading ${configType} options:`, err);
-          options[configType] = [];
+          // Already initialized to empty array above
         }
       }
       
@@ -72,7 +76,7 @@ const JobCreator: React.FC = () => {
   // Validate form
   useEffect(() => {
     // Check if all required config types have a selection
-    const requiredTypes = Object.keys(configTypes);
+    const requiredTypes = requiredConfigTypes;
     const isValid = requiredTypes.every(type => selectedConfigs[type]);
     
     setIsFormValid(isValid);
@@ -107,7 +111,7 @@ const JobCreator: React.FC = () => {
         )}
         
         <Box>
-          {Object.entries(configTypes).map(([configType, config]) => (
+          {requiredConfigTypes.map(configType => (
             <FormControl 
               key={configType} 
               fullWidth 
@@ -115,16 +119,16 @@ const JobCreator: React.FC = () => {
               disabled={loading}
             >
               <InputLabel id={`${configType}-label`}>
-                {config.name}
+                {configTypes[configType].name}
               </InputLabel>
               <Select
                 labelId={`${configType}-label`}
                 value={selectedConfigs[configType] || ''}
-                label={config.name}
+                label={configTypes[configType].name}
                 onChange={(e) => handleConfigSelect(configType, e.target.value as string)}
               >
                 <MenuItem value="">
-                  <em>Select a {config.name.toLowerCase()}</em>
+                  <em>Select a {configTypes[configType].name.toLowerCase()}</em>
                 </MenuItem>
                 {configOptions[configType]?.map((option) => (
                   <MenuItem key={option.id} value={option.id}>
