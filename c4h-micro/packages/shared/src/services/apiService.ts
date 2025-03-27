@@ -147,11 +147,11 @@ class ApiService {
     }
   }
 
-  async deleteConfig(configType: string, id: string, commitMessage: string, author: string) {
+  async deleteConfig(configType: string, id: string, commitMessage: string = "Deleted via UI", author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Deleting config ${id} of type ${configType} at ${endpoint}`);
-    // Pass commit_message and author as query parameters
+    // Pass parameters as query params
     return this.delete<{ message: string }>(endpoint, { 
       params: { 
         commit_message: commitMessage,

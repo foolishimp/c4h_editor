@@ -136,6 +136,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
     setMenuAnchorEl(event.currentTarget);
     setSelectedConfigId(id);
+    console.log(`Menu opened for config: ${id}`);
   };
   
   // Handle menu close
@@ -147,9 +148,20 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   // Handle archive/unarchive
   const handleArchiveToggle = async () => {
     if (selectedConfigId) {
-      const isArchived = configs.find(c => c.id === selectedConfigId)?.metadata?.archived || false;
-      await archiveConfig(selectedConfigId, !isArchived);
-      handleMenuClose();
+      try {
+        const isArchived = configs.find(c => c.id === selectedConfigId)?.metadata?.archived || false;
+        console.log(`Toggling archive state for ${selectedConfigId} from ${isArchived} to ${!isArchived}`);
+        
+        await archiveConfig(selectedConfigId, !isArchived);
+        console.log(`Archive operation completed for ${selectedConfigId}`);
+        
+        // Force reload configs after archive operation
+        await loadConfigs();
+        
+        handleMenuClose();
+      } catch (err) {
+        console.error(`Archive toggle error:`, err);
+      }
     }
   };
   
@@ -158,6 +170,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     if (selectedConfigId) {
       setNewConfigId(`${selectedConfigId}-copy`);
       setShowCloneDialog(true);
+      console.log(`Showing clone dialog for ${selectedConfigId}`);
       handleMenuClose();
     }
   };
@@ -165,9 +178,17 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   // Handle clone confirm
   const handleCloneConfirm = async () => {
     if (selectedConfigId && newConfigId) {
-      await cloneConfig(selectedConfigId, newConfigId);
-      setShowCloneDialog(false);
-      setNewConfigId('');
+      try {
+        console.log(`Cloning ${selectedConfigId} to ${newConfigId}`);
+        await cloneConfig(selectedConfigId, newConfigId);
+        console.log(`Clone operation completed`);
+        setShowCloneDialog(false);
+        setNewConfigId('');
+        // Force reload configs after clone operation
+        await loadConfigs();
+      } catch (err) {
+        console.error(`Clone error:`, err);
+      }
     }
   };
   
@@ -180,6 +201,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   // Handle delete dialog open
   const handleDeleteClick = () => {
     if (selectedConfigId) {
+      console.log(`Showing delete dialog for ${selectedConfigId}`);
       setShowDeleteDialog(true);
       handleMenuClose();
     }
@@ -188,8 +210,16 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   // Handle delete confirm
   const handleDeleteConfirm = async () => {
     if (selectedConfigId) {
-      await deleteConfig(selectedConfigId);
-      setShowDeleteDialog(false);
+      try {
+        console.log(`Deleting ${selectedConfigId}`);
+        await deleteConfig(selectedConfigId);
+        console.log(`Delete operation completed`);
+        setShowDeleteDialog(false);
+        // Force reload configs after delete operation
+        await loadConfigs();
+      } catch (err) {
+        console.error(`Delete error:`, err);
+      }
     }
   };
   
