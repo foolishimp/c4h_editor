@@ -135,7 +135,7 @@ class ApiService {
     console.log(`API: Submitting config update request:`, {
       id, endpoint, description: data.metadata?.description
     });
-    
+
     try {
       return this.put<any>(endpoint, requestData);
     } catch (error: any) {

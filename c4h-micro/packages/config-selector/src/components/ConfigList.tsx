@@ -269,15 +269,15 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 <TableRow key={config.id}>
                   <TableCell>{config.id}</TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontStyle: config.metadata?.description ? 'normal' : 'italic' }}>
+                    <Typography variant="body2" sx={{ fontStyle: config.metadata?.description?.trim() ? 'normal' : 'italic' }}>
                       {(() => {
                         // Debug log to check metadata state
                         if (config.id && !config.metadata) {
                           console.log(`ConfigList: Missing metadata for config ${config.id}`);
-                          return 'No description [Missing metadata]';
-                        } else if (config.metadata?.description === undefined) {
-                          console.log(`ConfigList: Description undefined for config ${config.id}`);
-                          return 'No description [Undefined]';
+                          return 'No description';
+                        } else if (!config.metadata?.description?.trim()) {
+                          console.log(`ConfigList: Empty description for config ${config.id}`);
+                          return 'No description';
                         } else {
                           return config.metadata?.description || 'No description';
                         }

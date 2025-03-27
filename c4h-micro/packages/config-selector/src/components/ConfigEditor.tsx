@@ -198,19 +198,6 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
         </Box>
       </Box>
       
-      {/* Description field for all configs */}
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          label={`${configName} Description`}
-          fullWidth
-          value={descriptionInput}
-          onChange={(e) => setDescriptionInput(e.target.value)}
-          margin="normal"
-          variant="outlined"
-          helperText={`Description for this ${configName.toLowerCase()}`}
-        />
-      </Box>
-      
       {/* ID field for new configs */}
       {configId === 'new' && (
         <Box sx={{ mb: 3 }}>
@@ -227,6 +214,19 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
           />
         </Box>
       )}
+      
+      {/* Description field for all configs */}
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          label={`${configName} Description`}
+          fullWidth
+          value={descriptionInput}
+          onChange={(e) => setDescriptionInput(e.target.value)}
+          margin="normal"
+          variant="outlined"
+          helperText={`Description for this ${configName.toLowerCase()}`}
+          />
+        </Box>
       
       {/* YAML Editor */}
       {yamlEditorError ? (

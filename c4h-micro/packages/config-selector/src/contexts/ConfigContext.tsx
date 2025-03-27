@@ -124,8 +124,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     if (!config.metadata) {
       config.metadata = {
         author: 'Current User',
+        description: '',
         tags: []
       };
+    } else if (config.metadata.description === undefined) {
+      config.metadata.description = '';
     }
   };
 
