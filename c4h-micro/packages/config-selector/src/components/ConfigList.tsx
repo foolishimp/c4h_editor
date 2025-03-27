@@ -1,3 +1,4 @@
+// File: /packages/config-selector/src/components/ConfigList.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -33,8 +34,6 @@ import {
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes, TimeAgo } from 'shared';
 
-const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
-
 // Props interface to accept navigation functions from parent
 interface ConfigListProps {
   onEdit?: (id: string) => void;
@@ -62,6 +61,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [newConfigId, setNewConfigId] = useState('');
+  const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
   
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
