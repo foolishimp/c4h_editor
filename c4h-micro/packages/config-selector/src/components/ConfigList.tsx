@@ -33,6 +33,8 @@ import {
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes, TimeAgo } from 'shared';
 
+const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
+
 // Props interface to accept navigation functions from parent
 interface ConfigListProps {
   onEdit?: (id: string) => void;
@@ -165,26 +167,28 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     }
   };
   
-  // Handle clone dialog open
+  // Modify the handleCloneClick function
   const handleCloneClick = () => {
     if (selectedConfigId) {
-      setNewConfigId(`${selectedConfigId}-copy`);
+      const configToClone = selectedConfigId;
+      setNewConfigId(`${configToClone}-copy`);
       setShowCloneDialog(true);
-      console.log(`Showing clone dialog for ${selectedConfigId}`);
+      setCloneSourceId(configToClone); // Save ID for later use
+      console.log(`Showing clone dialog for ${configToClone}`);
       handleMenuClose();
     }
   };
-  
-  // Handle clone confirm
+
+  // Update handleCloneConfirm to use cloneSourceId instead of selectedConfigId
   const handleCloneConfirm = async () => {
-    if (selectedConfigId && newConfigId) {
+    if (cloneSourceId && newConfigId) { // Use cloneSourceId here instead of selectedConfigId
       try {
-        console.log(`Cloning ${selectedConfigId} to ${newConfigId}`);
-        await cloneConfig(selectedConfigId, newConfigId);
+        console.log(`Cloning ${cloneSourceId} to ${newConfigId}`);
+        await cloneConfig(cloneSourceId, newConfigId);
         console.log(`Clone operation completed`);
         setShowCloneDialog(false);
         setNewConfigId('');
-        // Force reload configs after clone operation
+        setCloneSourceId(null); // Reset after use
         await loadConfigs();
       } catch (err) {
         console.error(`Clone error:`, err);

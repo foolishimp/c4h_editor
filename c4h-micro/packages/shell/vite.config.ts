@@ -19,12 +19,12 @@ export default defineConfig({
       shared: {
         react: { 
           singleton: true, 
-          requiredVersion: '^18.0.0',
+          requiredVersion: '*',  // Change from '^18.0.0' to '*'
           eager: true
         },
         'react-dom': { 
           singleton: true, 
-          requiredVersion: '^18.0.0',
+          requiredVersion: '*',  // Change from '^18.0.0' to '*'
           eager: true
         },
         '@mui/material': { 
