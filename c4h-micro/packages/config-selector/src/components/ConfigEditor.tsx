@@ -1,4 +1,3 @@
-// File: packages/config-selector/src/components/ConfigEditor.tsx
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import {
   Box,
@@ -43,6 +42,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [configIdInput, setConfigIdInput] = useState('');
+  const [descriptionInput, setDescriptionInput] = useState('');
   const [yamlEditorError, setYamlEditorError] = useState<string | null>(null);
   const [editorInitialized, setEditorInitialized] = useState(false);
   
@@ -77,6 +77,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   useEffect(() => {
     if (currentConfig) {
       setConfigIdInput(currentConfig.id || '');
+      setDescriptionInput(currentConfig.metadata?.description || '');
     }
   }, [currentConfig]);
   
@@ -118,6 +119,11 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   
   // Handle save
   const handleSave = async () => {
+    // Update description in currentConfig before saving
+    if (currentConfig && currentConfig.metadata) {
+      currentConfig.metadata.description = descriptionInput;
+    }
+
     if (configId === 'new') {
       if (!configIdInput.trim()) {
         // Show validation error
@@ -184,18 +190,28 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
       
       {/* ID field for new configs */}
       {configId === 'new' && (
-        <TextField
-          label={`${configName} ID`}
-          fullWidth
-          value={configIdInput}
-          onChange={(e) => setConfigIdInput(e.target.value)}
-          margin="normal"
-          variant="outlined"
-          required
-          error={!configIdInput.trim()}
-          helperText={!configIdInput.trim() ? `${configName} ID is required` : `Unique identifier for this ${configName.toLowerCase()}`}
-          sx={{ mb: 3 }}
-        />
+        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <TextField
+            label={`${configName} ID`}
+            fullWidth
+            value={configIdInput}
+            onChange={(e) => setConfigIdInput(e.target.value)}
+            margin="normal"
+            variant="outlined"
+            required
+            error={!configIdInput.trim()}
+            helperText={!configIdInput.trim() ? `${configName} ID is required` : `Unique identifier for this ${configName.toLowerCase()}`}
+          />
+          <TextField
+            label={`${configName} Description`}
+            fullWidth
+            value={descriptionInput}
+            onChange={(e) => setDescriptionInput(e.target.value)}
+            margin="normal"
+            variant="outlined"
+            helperText={`Description for this ${configName.toLowerCase()}`}
+          />
+        </Box>
       )}
       
       {/* YAML Editor */}
