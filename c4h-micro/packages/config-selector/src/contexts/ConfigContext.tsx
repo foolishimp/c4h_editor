@@ -292,9 +292,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     
     try {
       if (archive) {
-        await apiService.archiveConfig(configType, id);
+        await apiService.archiveConfig(configType, id, "Current User");
       } else {
-        await apiService.unarchiveConfig(configType, id);
+        await apiService.unarchiveConfig(configType, id, "Current User");
       }
       await loadConfigs();
       
@@ -315,13 +315,17 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setLoading(true);
     setError(null);
     
+    console.log(`ConfigContext: Cloning config ${id} to ${newId}`);
+    
     try {
-      await apiService.cloneConfig(configType, id, newId);
+      const response = await apiService.cloneConfig(configType, id, newId);
+      console.log(`ConfigContext: Clone response:`, response);
       await loadConfigs();
       
       // Load the new cloned config
       await loadConfig(newId);
     } catch (err: any) {
+      console.error(`ConfigContext: Clone error:`, err);
       setError(err.message || `Failed to clone configuration: ${id}`);
       console.error('Error cloning configuration:', err);
     } finally {

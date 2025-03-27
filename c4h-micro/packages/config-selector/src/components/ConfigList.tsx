@@ -69,7 +69,14 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   // Helper function to get description from config
   const getDescription = (config: any): string => {
     // Check for both metadata.description and title field (API returns description as title in list response)
-    return (config.metadata?.description?.trim() || config.title || '').trim() || 'No description';
+    const description = (config.metadata?.description?.trim() || config.title || '').trim() || 'No description';
+    console.log('ConfigList: Config description:', {
+      config_id: config.id,
+      metadata_description: config.metadata?.description,
+      title: config.title,
+      final_description: description
+    });
+    return description;
   };
   
   // Custom navigation handler that doesn't rely on React Router

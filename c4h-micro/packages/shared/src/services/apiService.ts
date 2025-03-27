@@ -151,35 +151,39 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Deleting config ${id} of type ${configType} at ${endpoint}`);
-    const config: AxiosRequestConfig = {
-      params: {
+    // Pass commit_message and author as query parameters
+    return this.delete<{ message: string }>(endpoint, { 
+      params: { 
         commit_message: commitMessage,
-        author
+        author 
       }
-    };
-    return this.delete<{ message: string }>(endpoint, config);
+    });
   }
 
-  async archiveConfig(configType: string, id: string) {
+  // File: /packages/shared/src/services/apiService.ts
+
+  async archiveConfig(configType: string, id: string, author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.archive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Archiving config ${id} of type ${configType} at ${endpoint}`);
-    return this.post<{ message: string }>(endpoint, {});
+    // Pass author as a query parameter
+    return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
-
-  async unarchiveConfig(configType: string, id: string) {
+  
+  async unarchiveConfig(configType: string, id: string, author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.unarchive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Unarchiving config ${id} of type ${configType} at ${endpoint}`);
-    return this.post<{ message: string }>(endpoint, {});
+    // Pass author as a query parameter
+    return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
 
-  async cloneConfig(configType: string, id: string, newId?: string) {
+  async cloneConfig(configType: string, id: string, newId: string) {
     const endpoint = configTypes[configType]?.apiEndpoints.clone(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Cloning config ${id} of type ${configType} to ${newId} at ${endpoint}`);
-    const requestData = newId ? { new_id: newId } : {};
-    return this.post<any>(endpoint, requestData);
+    // Pass new_id as a query parameter
+    return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
   }
 
   async getConfigHistory(configType: string, id: string) {
