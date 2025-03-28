@@ -1,12 +1,12 @@
-// File: packages/shell/src/components/common/Navigation.tsx
+// File: /packages/shell/src/components/common/Navigation.tsx
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Drawer,
   AppBar,
   Toolbar,
-  Typography,
   Box,
+  Typography,
   List,
   ListItem,
   ListItemButton,
@@ -60,9 +60,14 @@ const Navigation: React.FC<NavigationProps> = ({ drawerWidth }) => {
         }}
       >
         <Toolbar>
-          <Typography variant="h6" noWrap component="div">
-            C4H Editor
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+            <Typography variant="h5" noWrap component="div">
+              Visual Prompt Studio
+            </Typography>
+            <Typography variant="subtitle1" noWrap component="div">
+              C4H Editor
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
 

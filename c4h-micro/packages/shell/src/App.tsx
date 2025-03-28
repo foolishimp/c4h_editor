@@ -1,4 +1,3 @@
-// File: packages/shell/src/App.tsx
 import React, { Suspense, lazy, useEffect } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress } from '@mui/material';
 import { createTheme } from '@mui/material/styles';

@@ -54,7 +54,7 @@ const JobCreator: React.FC = () => {
           if (Array.isArray(configs)) {
             options[configType] = configs.map(item => {
               // Handle different response structures safely
-              const description = item.metadata?.description || item.description || 'No description';
+              const description = (item.metadata?.description?.trim() || item.title || item.description || '').trim() || 'No description';
               return { id: item.id, description };
             });
           }

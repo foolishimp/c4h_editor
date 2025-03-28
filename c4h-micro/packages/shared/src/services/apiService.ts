@@ -48,7 +48,7 @@ class ApiService {
     console.log(`API: Fetching configs for type: ${configType} from ${endpoint}`);
     const response = await this.get<any[]>(endpoint);
     console.log(`API: Received ${response.length} configs from server`);
-    return this.get<any[]>(endpoint);
+    return response;
   }
 
   async getConfig(configType: string, id: string): Promise<any> {
