@@ -1,4 +1,3 @@
-# File: backend/config/__init__.py
 """
 Configuration management for the prompt editor backend.
 Follows the Config Design Principles with hierarchical structure.
@@ -27,8 +26,10 @@ DEFAULT_CONFIG = {
     "c4h_service": {
         "api_base": "https://api.c4h.example.com",
         "api_version": "v1",
+        "host": "localhost",
+        "port": 5500,
         "api_key_env": "C4H_API_KEY",
-        "default_config": {
+        "job_config": {
             "max_runtime": 3600,
             "notify_on_completion": True
         }

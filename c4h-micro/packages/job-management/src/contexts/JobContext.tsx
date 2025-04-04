@@ -14,6 +14,11 @@ interface JobContextState {
   submitJob: (configs: Record<string, string>) => Promise<void>;
   cancelJob: (id: string) => Promise<void>;
   pollJobStatus: (id: string) => Promise<void>;
+  
+  // New method with explicit parameters
+  submitJobTuple: (
+    params: {workorder: string, teamconfig: string, runtimeconfig: string}
+  ) => Promise<void>;
 }
 
 // Create the context
@@ -169,6 +174,61 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
       setLoading(false);
     }
   }, [loadJobs]);
+
+  // New method to submit job with explicit tuple parameters
+  const submitJobTuple = useCallback(async (
+    params: {workorder: string, teamconfig: string, runtimeconfig: string}
+  ) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Validate required parameters
+      if (!params.workorder) {
+        throw new Error("Workorder configuration is required");
+      }
+      if (!params.teamconfig) {
+        throw new Error("Team configuration is required");
+      }
+      if (!params.runtimeconfig) {
+        throw new Error("Runtime configuration is required");
+      }
+      
+      // Format the configurations as expected by the API (tuple structure)
+      const requestData = {
+        configurations: {
+          workorder: { id: params.workorder },
+          teamconfig: { id: params.teamconfig },
+          runtimeconfig: { id: params.runtimeconfig }
+        },
+        user_id: 'current-user', // This would come from auth context in a real app
+        job_configuration: {
+          max_runtime: 3600,
+          notify_on_completion: true
+        }
+      };
+      
+      console.log("JobContext: Submitting job tuple:", requestData);
+      await api.post('/api/v1/jobs', requestData);
+      
+      // Reload jobs after submission
+      await loadJobs();
+    } catch (err: any) {
+      // Extract more detailed error information if available
+      const errorDetail = err.response?.data?.detail;
+      let errorMessage = 'Failed to submit job';
+      
+      if (errorDetail) {
+        errorMessage = typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail);
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+      console.error('Error submitting job tuple:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadJobs]);
   
   // Cancel a job
   const cancelJob = useCallback(async (id: string) => {
@@ -213,7 +273,8 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     loadJob,
     submitJob,
     cancelJob,
-    pollJobStatus
+    pollJobStatus,
+    submitJobTuple
   };
   
   return (

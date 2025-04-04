@@ -1,4 +1,3 @@
-# backend/api/routes/jobs.py
 """API routes for job management with multiple configurations."""
 
 from typing import List, Dict, Any, Optional
@@ -6,7 +5,7 @@ from datetime import datetime
 import logging
 import traceback
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.models.job import Job, JobStatus, JobResult, ConfigReference
 from backend.services.config_repository import ConfigRepository, get_config_repository
@@ -24,17 +23,30 @@ router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
 
 # Request/Response Models
 class JobConfigReference(BaseModel):
-    id: str
+    """Reference to a configuration used in a job"""
+    id: str = Field(..., description="Configuration ID")
+    config_type: str = Field(..., description="Configuration type (workorder, team, runtime)")
+    name: Optional[str] = Field(None, description="Optional display name")
     version: Optional[str] = None
 
 
-class JobSubmitRequest(BaseModel):
+class JobSubmitRequest(BaseModel):  # Legacy request format
     configurations: Dict[str, JobConfigReference]
     user_id: Optional[str] = None
     job_configuration: Optional[Dict[str, Any]] = None
 
 
-class JobResponse(BaseModel):
+class JobTupleRequest(BaseModel):
+    """C4H Services API compatible job request with required configuration tuple"""
+    workorder: JobConfigReference = Field(..., description="Work order configuration")
+    team: JobConfigReference = Field(..., description="Team configuration")
+    runtime: JobConfigReference = Field(..., description="Runtime configuration")
+    user_id: Optional[str] = Field(None, description="User ID")
+    job_configuration: Optional[Dict[str, Any]] = Field(None, description="Job-specific configuration")
+
+
+class JobResponse(BaseModel):  
+    """Job response model"""
     id: str
     configurations: Dict[str, Dict[str, str]]
     status: str
@@ -55,6 +67,119 @@ class JobListResponse(BaseModel):
     limit: int
 
 
+# Primary job submission endpoint - uses the tuple-based API
+@router.post("", response_model=JobResponse)
+async def submit_job_tuple(
+    request: JobTupleRequest,
+    background_tasks: BackgroundTasks,
+    job_repo: JobRepository = Depends(get_job_repository),
+    c4h_service: C4HService = Depends(get_c4h_service)
+): 
+    """Submit a job with required configuration tuple (workorder, team, runtime) to the C4H service."""
+    try:
+        # Format configurations for job repository
+        configurations = {
+            request.workorder.config_type: {"id": request.workorder.id, "version": request.workorder.version or "latest"},
+            request.team.config_type: {"id": request.team.id, "version": request.team.version or "latest"},
+            request.runtime.config_type: {"id": request.runtime.id, "version": request.runtime.version or "latest"}
+        }
+        
+        # Validate configuration types
+        required_types = ["workorder", "teamconfig", "runtimeconfig"]
+        config_types = [request.workorder.config_type, request.team.config_type, request.runtime.config_type]
+        
+        # Check that we have all required types
+        for required_type in required_types:
+            if required_type not in config_types:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Missing required configuration type: {required_type}"
+                )
+        
+        # Create job record
+        job = job_repo.create_job(
+            configurations=configurations,
+            user_id=request.user_id,
+            configuration=request.job_configuration
+        )
+        
+        # Submit to C4H service asynchronously
+        async def submit_and_update():
+            try:
+                # Load configurations
+                workorder_config = get_config_repository(request.workorder.config_type).get_config(
+                    request.workorder.id, request.workorder.version
+                )
+                team_config = get_config_repository(request.team.config_type).get_config(
+                    request.team.id, request.team.version
+                )
+                runtime_config = get_config_repository(request.runtime.config_type).get_config(
+                    request.runtime.id, request.runtime.version
+                )
+                
+                # Submit to service with correct configuration tuple
+                submission = await c4h_service.submit_job(
+                    workorder=workorder_config,
+                    team=team_config, 
+                    runtime=runtime_config 
+                )
+                
+                # Update job record with service response
+                if submission.status == "error":
+                    job.update_status(JobStatus.FAILED) 
+                    job.result = JobResult(
+                        error=submission.message or "Failed to submit job to service"
+                    )
+                else:
+                    job.service_job_id = submission.job_id
+                    job.update_status(JobStatus.SUBMITTED)
+                
+                logger.info(f"Job {job.id} submitted to service, status: {submission.status}")
+            except Exception as e:
+                logger.error(f"Error in submit_and_update for job {job.id}: {str(e)}")
+                logger.error(traceback.format_exc())
+                
+                # Update job with error
+                job.update_status(JobStatus.FAILED)
+                job.result = JobResult(
+                    error=f"Error submitting job: {str(e)}"
+                )
+                job_repo.update_job(job)
+        
+        # Add submission to background tasks
+        background_tasks.add_task(submit_and_update)
+        
+        # Format response
+        configurations_response = {}
+        for config_type, config_ref in job.configurations.items():
+            configurations_response[config_type] = {
+                "id": config_ref.id,
+                "version": config_ref.version
+            }
+        
+        # Return the job record
+        return JobResponse(
+            id=job.id,
+            configurations=configurations_response,
+            status=job.status.value,
+            service_job_id=job.service_job_id,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+            submitted_at=job.submitted_at,
+            completed_at=job.completed_at,
+            user_id=job.user_id,
+            job_configuration=job.configuration,
+            result=job.result.dict() if job.result else None
+        )
+    except ValueError as e:
+        logger.error(f"Value error submitting job: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error submitting job: {e}")
+        logger.error(traceback.format_exc()) 
+        raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
+
+
 @router.post("", response_model=JobResponse)
 async def submit_job(
     request: JobSubmitRequest,
@@ -62,11 +187,15 @@ async def submit_job(
     job_repo: JobRepository = Depends(get_job_repository),
     c4h_service: C4HService = Depends(get_c4h_service)
 ):
-    """Submit a job with multiple configurations to the C4H service."""
-    try:
+    """[DEPRECATED] Submit a job with multiple configurations to the C4H service."""
+    try: 
         # Validate configuration types
         config_types = get_config_types()
         for config_type in request.configurations.keys():
+            # Log warning - old method is deprecated
+            logger.warning(f"Using deprecated job submission API - please migrate to the tuple-based API")
+            
+            # Check if config type is valid
             if config_type not in config_types:
                 raise HTTPException(
                     status_code=400, 
@@ -84,37 +213,58 @@ async def submit_job(
         # Create job record
         job = job_repo.create_job(
             configurations=configurations,
-            user_id=request.user_id,
-            configuration=request.job_configuration
+            user_id=request.user_id, 
+            configuration=request.job_configuration 
         )
         
         # Submit to C4H service asynchronously
         async def submit_and_update():
             try:
-                # Load configurations
-                configs = {}
-                for config_type, config_ref in job.configurations.items():
-                    repo = get_config_repository(config_type)
-                    config = repo.get_config(config_ref.id, config_ref.version)
-                    configs[config_type] = config
-                
-                # Submit to service
-                submission = await c4h_service.submit_job(configs)
-                
-                # Update job record with service response
-                if submission.status == "error":
-                    job.update_status(JobStatus.FAILED)
-                    job.result = JobResult(
-                        error=submission.message or "Failed to submit job to service"
+                try:
+                    # Map old format to new format to maintain backward compatibility
+                    workorder = get_config_repository("workorder").get_config(
+                        job.configurations["workorder"].id, job.configurations["workorder"].version
+                    ) if "workorder" in job.configurations else None
+                    
+                    team = get_config_repository("teamconfig").get_config(
+                        job.configurations["teamconfig"].id, job.configurations["teamconfig"].version
+                    ) if "teamconfig" in job.configurations else None
+                    
+                    runtime = get_config_repository("runtimeconfig").get_config(
+                        job.configurations["runtimeconfig"].id, job.configurations["runtimeconfig"].version
+                    ) if "runtimeconfig" in job.configurations else None
+                    
+                    # Verify we have all required configs
+                    if not workorder or not team or not runtime:
+                        raise ValueError("Missing required configuration(s). Need workorder, teamconfig, and runtimeconfig.")
+                        
+                    # Submit to service
+                    submission = await c4h_service.submit_job(
+                        workorder=workorder,
+                        team=team, 
+                        runtime=runtime
                     )
-                else:
-                    job.service_job_id = submission.job_id
-                    job.update_status(JobStatus.SUBMITTED)
-                
-                # Save updated job
-                job_repo.update_job(job)
-                
-                logger.info(f"Job {job.id} submitted to service, status: {submission.status}")
+                    
+                    # Update job record with service response
+                    if submission.status == "error":
+                        job.update_status(JobStatus.FAILED)
+                        job.result = JobResult(
+                            error=submission.message or "Failed to submit job to service"
+                        )
+                    # Accept both running and processing as active states
+                    elif submission.status in ["running", "processing"]:
+                        job.update_status(JobStatus.RUNNING)
+                    elif submission.status == "cancelled":
+                        job.update_status(JobStatus.CANCELLED)
+                    else:
+                        job.service_job_id = submission.job_id
+                        job.update_status(JobStatus.SUBMITTED)
+                        
+                    logger.info(f"Job {job.id} submitted to service, status: {submission.status}")
+                except ValueError as ve:
+                    job.update_status(JobStatus.FAILED)
+                    job.result = JobResult(error=str(ve))
+                    job_repo.update_job(job)
             except Exception as e:
                 logger.error(f"Error in submit_and_update for job {job.id}: {str(e)}")
                 logger.error(traceback.format_exc())

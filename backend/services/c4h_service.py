@@ -1,4 +1,3 @@
-# File: backend/services/c4h_service.py
 """Service client for interacting with the C4H API with support for multiple configurations."""
 
 import os
@@ -41,11 +40,19 @@ class C4HService:
     def __init__(self, config_path: Optional[str] = None):
         """Initialize the C4H service client."""
         self.config = load_config(config_path)
-        self.c4h_config = self.config.get("c4h_service", {})
+        self.c4h_config = self.config.get("c4h_service", {}) 
         
-        # API configuration
-        self.api_base = self.c4h_config.get("api_base", "https://api.c4h.example.com")
+        # API configuration - build from host and port if provided
+        host = self.c4h_config.get("host", "localhost")
+        port = self.c4h_config.get("port", 5500)
+        self.api_base = self.c4h_config.get("api_base", f"http://{host}:{port}")
         self.api_version = self.c4h_config.get("api_version", "v1")
+        
+        # Default job configuration
+        self.default_job_config = self.c4h_config.get("job_config", {
+            "max_runtime": 3600,
+            "notify_on_completion": True
+        })
         
         # API key from environment
         self.api_key_env = self.c4h_config.get("api_key_env", "C4H_API_KEY")
@@ -59,37 +66,56 @@ class C4HService:
         
         logger.info(f"C4H service client initialized with API base: {self.api_base}")
     
-    async def submit_job(self, configurations: Dict[str, Configuration]) -> JobSubmissionResponse:
+    async def submit_job(self, workorder: Configuration = None, team: Configuration = None, runtime: Configuration = None) -> JobSubmissionResponse:
         """
         Submit a job with multiple configurations to the C4H service.
         
         Args:
-            configurations: Dict mapping config_type to Configuration objects
-            
+            workorder: Workorder configuration object
+            team: Team configuration object
+            runtime: Runtime configuration object
+
         Returns:
             Job submission response
+
+        Raises:
+            ValueError: If required configurations are missing or C4H API key is not found
         """
         if not self.api_key:
             raise ValueError(f"C4H API key not found in environment variable {self.api_key_env}")
         
-        # Build submission payload with all configurations
-        payload = {
-            "configurations": {}
+        if not workorder:
+            raise ValueError("Workorder configuration is required")
+        if not team:
+            raise ValueError("Team configuration is required")
+        if not runtime:
+            raise ValueError("Runtime configuration is required")
+        
+        def serialize_config(config):
+            if hasattr(config.content, "dict"):
+                return config.content.dict()
+            return config.content
+        
+        payload["workorder"] = {
+            "id": workorder.id, 
+            "content": serialize_config(workorder)
         }
         
-        # Add each configuration to the payload
-        for config_type, config in configurations.items():
-            # For each configuration type, add serialized content
-            if hasattr(config.content, "dict"):
-                content = config.content.dict()
-            else:
-                content = config.content
-                
-            payload["configurations"][config_type] = {
-                "id": config.id,
-                "content": content,
-                "metadata": config.metadata.dict()
-            }
+        payload = {}
+        payload["workorder"] = {
+            "id": workorder.id, 
+            "content": serialize_config(workorder)
+        }
+        
+        payload["team"] = {
+            "id": team.id,
+            "content": serialize_config(team)
+        }
+        
+        payload["runtime"] = {
+            "id": runtime.id,
+            "content": serialize_config(runtime)
+        }
         
         # Prepare request
         url = f"{self.api_base}/{self.api_version}/jobs"
@@ -100,7 +126,7 @@ class C4HService:
         }
         
         # Log submission
-        logger.info(f"Submitting job with configurations: {list(configurations.keys())}")
+        logger.info(f"Submitting job with workorder: {workorder.id}, team: {team.id}, runtime: {runtime.id} to {url}")
         
         # Send request
         try:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
+  Alert,
   Box, 
   Typography, 
   Button, 
@@ -8,7 +9,6 @@ import {
   FormControl, 
   InputLabel,
   CircularProgress,
-  Alert,
   Select, 
   MenuItem
 } from '@mui/material';
@@ -21,15 +21,16 @@ interface ConfigOption {
 }
 
 // Filter to only include config types required for jobs
-const requiredConfigTypes = Object.entries(configTypes)
-  .filter(([_, config]) => config.requiredForJob !== false)
-  .map(([type]) => type);
+// We specifically need workorder, teamconfig, and runtimeconfig
+const REQUIRED_CONFIG_TYPES = ['workorder', 'teamconfig', 'runtimeconfig'];
 
 const JobCreator: React.FC = () => {
-  const { submitJob, loading, error } = useJobContext();
+  const { submitJobTuple, loading, error } = useJobContext();
   
-  // State for selected config IDs
-  const [selectedConfigs, setSelectedConfigs] = useState<Record<string, string>>({});
+  // State for selected config IDs - with strict typing for required configs
+  const [workorderId, setWorkorderId] = useState<string>("");
+  const [teamconfigId, setTeamconfigId] = useState<string>("");
+  const [runtimeconfigId, setRuntimeconfigId] = useState<string>("");
   
   // State for available configs by type
   const [configOptions, setConfigOptions] = useState<Record<string, ConfigOption[]>>({});
@@ -40,21 +41,23 @@ const JobCreator: React.FC = () => {
   // Load available configs for each type
   useEffect(() => {
     const loadConfigOptions = async () => {
+      // Initialize options with empty arrays for all required config types
       const options: Record<string, ConfigOption[]> = {};
       
       // Initialize all options with empty arrays
-      requiredConfigTypes.forEach(type => {
+      REQUIRED_CONFIG_TYPES.forEach(type => {
         options[type] = [];
       });
       
-      for (const configType of requiredConfigTypes) {
+      for (const configType of REQUIRED_CONFIG_TYPES) {
         try {
           // Use apiService's getConfigs method which handles endpoints correctly
           const configs = await apiService.getConfigs(configType);
           if (Array.isArray(configs)) {
             options[configType] = configs.map(item => {
-              // Handle different response structures safely
-              const description = (item.metadata?.description?.trim() || item.title || item.description || '').trim() || 'No description';
+              // Handle different response structures safely - checking all possible locations for descriptions
+              const description = (item.metadata?.description?.trim() || item.title?.trim() || 
+                                 item.description?.trim() || '').trim() || 'No description';
               return { id: item.id, description };
             });
           }
@@ -72,25 +75,20 @@ const JobCreator: React.FC = () => {
   
   // Validate form
   useEffect(() => {
-    // Check if all required config types have a selection
-    const requiredTypes = requiredConfigTypes;
-    const isValid = requiredTypes.every(type => selectedConfigs[type]);
+    // Form is valid when all three required config types are selected
+    const isValid = Boolean(workorderId) && Boolean(teamconfigId) && Boolean(runtimeconfigId);
     
     setIsFormValid(isValid);
-  }, [selectedConfigs]);
-  
-  // Handle config selection
-  const handleConfigSelect = (configType: string, configId: string) => {
-    setSelectedConfigs(prev => ({
-      ...prev,
-      [configType]: configId
-    }));
-  };
+  }, [workorderId, teamconfigId, runtimeconfigId]);
   
   // Handle form submission
   const handleSubmit = () => {
     if (isFormValid) {
-      submitJob(selectedConfigs);
+      submitJobTuple({
+        workorder: workorderId,
+        teamconfig: teamconfigId,
+        runtimeconfig: runtimeconfigId
+      });
     }
   };
   
@@ -108,33 +106,83 @@ const JobCreator: React.FC = () => {
         )}
         
         <Box>
-          {requiredConfigTypes.map(configType => (
-            <FormControl 
-              key={configType} 
-              fullWidth 
-              sx={{ mb: 2 }}
-              disabled={loading}
+          {/* Workorder Selection */}
+          <FormControl 
+            fullWidth 
+            sx={{ mb: 2 }}
+            disabled={loading}
+          >
+            <InputLabel id="workorder-label">
+              {configTypes['workorder'].name}
+            </InputLabel>
+            <Select
+              labelId="workorder-label"
+              value={workorderId}
+              label={configTypes['workorder'].name}
+              onChange={(e) => setWorkorderId(e.target.value as string)}
             >
-              <InputLabel id={`${configType}-label`}>
-                {configTypes[configType].name}
-              </InputLabel>
-              <Select
-                labelId={`${configType}-label`}
-                value={selectedConfigs[configType] || ''}
-                label={configTypes[configType].name}
-                onChange={(e) => handleConfigSelect(configType, e.target.value as string)}
-              >
-                <MenuItem value="">
-                  <em>Select a {configTypes[configType].name.toLowerCase()}</em>
+              <MenuItem value="">
+                <em>Select a {configTypes['workorder'].name.toLowerCase()}</em>
+              </MenuItem>
+              {configOptions['workorder']?.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.id} - {option.description}
                 </MenuItem>
-                {configOptions[configType]?.map((option) => (
-                  <MenuItem key={option.id} value={option.id}>
-                    {option.id} - {option.description}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          ))}
+              ))}
+            </Select>
+          </FormControl>
+          
+          {/* Team Configuration Selection */}
+          <FormControl 
+            fullWidth 
+            sx={{ mb: 2 }}
+            disabled={loading}
+          >
+            <InputLabel id="teamconfig-label">
+              {configTypes['teamconfig'].name}
+            </InputLabel>
+            <Select
+              labelId="teamconfig-label"
+              value={teamconfigId}
+              label={configTypes['teamconfig'].name}
+              onChange={(e) => setTeamconfigId(e.target.value as string)}
+            >
+              <MenuItem value="">
+                <em>Select a {configTypes['teamconfig'].name.toLowerCase()}</em>
+              </MenuItem>
+              {configOptions['teamconfig']?.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.id} - {option.description}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          {/* Runtime Configuration Selection */}
+          <FormControl 
+            fullWidth 
+            sx={{ mb: 2 }}
+            disabled={loading}
+          >
+            <InputLabel id="runtimeconfig-label">
+              {configTypes['runtimeconfig'].name}
+            </InputLabel>
+            <Select
+              labelId="runtimeconfig-label"
+              value={runtimeconfigId}
+              label={configTypes['runtimeconfig'].name}
+              onChange={(e) => setRuntimeconfigId(e.target.value as string)}
+            >
+              <MenuItem value="">
+                <em>Select a {configTypes['runtimeconfig'].name.toLowerCase()}</em>
+              </MenuItem>
+              {configOptions['runtimeconfig']?.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.id} - {option.description}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
             <Button
