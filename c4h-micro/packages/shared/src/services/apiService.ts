@@ -229,9 +229,9 @@ class ApiService {
     
     // Format the request according to the API expectations
     const requestData = {
-      workorder: { id: params.workorder, version: "latest" },
-      team: { id: params.teamconfig, version: "latest" },
-      runtime: { id: params.runtimeconfig, version: "latest" },
+      workorder: { id: params.workorder, version: "latest", config_type: "workorder" },
+      team: { id: params.teamconfig, version: "latest", config_type: "teamconfig" },
+      runtime: { id: params.runtimeconfig, version: "latest", config_type: "runtimeconfig" },
       user_id: params.userId || 'current-user',
       job_configuration: params.jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
     };
@@ -243,9 +243,9 @@ class ApiService {
     console.log(`API: Submitting job tuple with workorder=${workorderId}, team=${teamconfigId}, runtime=${runtimeconfigId}`);
     
     const requestData = {
-      workorder: { id: workorderId, version: "latest" },
-      team: { id: teamconfigId, version: "latest" },
-      runtime: { id: runtimeconfigId, version: "latest" },
+      workorder: { id: workorderId, version: "latest", config_type: "workorder" },
+      team: { id: teamconfigId, version: "latest", config_type: "teamconfig" },
+      runtime: { id: runtimeconfigId, version: "latest", config_type: "runtimeconfig" },
       user_id: userId || 'current-user',
       job_configuration: { max_runtime: 3600, notify_on_completion: true }
     };
@@ -264,5 +264,11 @@ class ApiService {
   }
 }
 
+// Create and export a singleton instance
 export const apiService = new ApiService();
-export default apiService;
+
+// Export the axios instance as well
+export const api = axiosInstance;
+
+// Export as default for backward compatibility
+export default axiosInstance;

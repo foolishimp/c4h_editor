@@ -22,8 +22,7 @@ interface ConfigOption {
   description: string;
 }
 
-// Filter to only include config types required for jobs 
-// We specifically need workorder, teamconfig, and runtimeconfig
+// Filter to only include config types required for jobs
 const REQUIRED_CONFIG_TYPES = ['workorder', 'teamconfig', 'runtimeconfig'];
 
 const JobCreator: React.FC = () => {
@@ -56,7 +55,8 @@ const JobCreator: React.FC = () => {
           // Use direct API call instead of apiService.getConfigs
           const endpoint = configTypes[configType]?.apiEndpoints.list;
           if (endpoint) {
-            const configs = await api.get(endpoint);
+            const response = await api.get(endpoint);
+            const configs = response.data || [];
             
             if (Array.isArray(configs)) {
               options[configType] = configs.map(item => {
@@ -91,17 +91,21 @@ const JobCreator: React.FC = () => {
   const handleSubmit = () => {
     if (isFormValid) {
       try {
+        // FIXED: Add config_type to each configuration object
         submitJobTuple({
-          workorder: workorderId,
-          teamconfig: teamconfigId,
-          runtimeconfig: runtimeconfigId
+          workorder: {
+            id: workorderId,
+            config_type: 'workorder'
+          },
+          teamconfig: {
+            id: teamconfigId,
+            config_type: 'teamconfig'
+          },
+          runtimeconfig: {
+            id: runtimeconfigId,
+            config_type: 'runtimeconfig'
+          }
         });
-        
-        // Reset form after successful submission
-        // We'll keep this commented until we confirm the submission was successful
-        // setWorkorderId("");
-        // setTeamconfigId("");
-        // setRuntimeconfigId("");
       } catch (err) { /* Error is handled by the context */ }
     }
   };

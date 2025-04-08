@@ -22,5 +22,5 @@ export { default as DiffViewer } from './components/DiffViewer';
 export { default as RemoteComponent } from './components/RemoteComponent';
 
 // Export API service
-export { apiService, default as api } from './services/apiService';
+export { apiService, api } from './services/apiService';
 export { API_ENDPOINTS } from './config/api';

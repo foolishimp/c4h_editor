@@ -17,9 +17,13 @@ interface JobContextState {
   cancelJob: (id: string) => Promise<void>;
   pollJobStatus: (id: string) => Promise<void>;
 
-  // New method with explicit parameters
+  // New method with explicit configuration objects
   submitJobTuple: (
-    params: {workorder: string, teamconfig: string, runtimeconfig: string}
+    params: {
+      workorder: { id: string, config_type: string },
+      teamconfig: { id: string, config_type: string },
+      runtimeconfig: { id: string, config_type: string }
+    }
   ) => Promise<void>;
 }
 
@@ -116,9 +120,9 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
 
       // Create job request with the properly named fields according to backend's expectations
       const requestData = {
-        workorder: { id: configs.workorder, version: "latest" },
-        team: { id: configs.teamconfig, version: "latest" }, // Note: teamconfig → team
-        runtime: { id: configs.runtimeconfig, version: "latest" }, // Note: runtimeconfig → runtime
+        workorder: { id: configs.workorder, version: "latest", config_type: "workorder" },
+        team: { id: configs.teamconfig, version: "latest", config_type: "teamconfig" },
+        runtime: { id: configs.runtimeconfig, version: "latest", config_type: "runtimeconfig" },
         user_id: 'current-user',
         job_configuration: { max_runtime: 3600, notify_on_completion: true }
       };
@@ -152,30 +156,46 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     }
   }, [loadJobs]);
 
-  // New method to submit job with explicit tuple parameters
+  // New method to submit job with explicit configuration objects
   const submitJobTuple = useCallback(async (
-    params: {workorder: string, teamconfig: string, runtimeconfig: string}
+    params: {
+      workorder: { id: string, config_type: string },
+      teamconfig: { id: string, config_type: string },
+      runtimeconfig: { id: string, config_type: string }
+    }
   ) => {
     setLoading(true); 
     setError(null);
     
     try {
       // Validate required parameters
-      if (!params.workorder) {
+      if (!params.workorder.id) {
         throw new Error("Workorder configuration is required");
       }
-      if (!params.teamconfig) {
+      if (!params.teamconfig.id) {
         throw new Error("Team configuration is required");
       }
-      if (!params.runtimeconfig) {
+      if (!params.runtimeconfig.id) {
         throw new Error("Runtime configuration is required");
       }
       
       // Create job request using the tuple-based format matching the backend API design
       const jobRequest = {
-        workorder: { id: params.workorder, version: "latest" },
-        team: { id: params.teamconfig, version: "latest" }, // Note: renamed from teamconfig to team
-        runtime: { id: params.runtimeconfig, version: "latest" }, // Note: renamed from runtimeconfig to runtime
+        workorder: { 
+          id: params.workorder.id, 
+          version: "latest", 
+          config_type: params.workorder.config_type 
+        },
+        team: { 
+          id: params.teamconfig.id, 
+          version: "latest", 
+          config_type: params.teamconfig.config_type 
+        },
+        runtime: { 
+          id: params.runtimeconfig.id, 
+          version: "latest", 
+          config_type: params.runtimeconfig.config_type 
+        },
         user_id: 'current-user',
         job_configuration: { max_runtime: 3600, notify_on_completion: true }
       };

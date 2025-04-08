@@ -16,6 +16,7 @@ export enum JobStatus {
 export interface JobConfigReference {
   id: string;
   version: string;
+  config_type: string; // Added to match API requirements
 }
 
 export interface JobResult {
