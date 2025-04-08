@@ -1,5 +1,8 @@
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
+
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { configTypes, ConfigTypeMetadata } from '../config/configTypes';
+import { configTypes, ConfigTypeMetadata } from '../config/configTypes'; 
+import { Job, JobStatus, JobListResponse } from '../types/job';
 
 const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL 
   ? process.env.VITE_API_BASE_URL 
@@ -19,7 +22,7 @@ axiosInstance.interceptors.response.use(
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
-);
+); 
 
 class ApiService {
   async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
@@ -41,7 +44,7 @@ class ApiService {
     const response = await axiosInstance.delete<T>(url, config);
     return response.data;
   }
-
+  
   async getConfigs(configType: string) {
     const endpoint = configTypes[configType]?.apiEndpoints.list;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -49,7 +52,7 @@ class ApiService {
     const response = await this.get<any[]>(endpoint);
     console.log(`API: Received ${response.length} configs from server`);
     return response;
-  }
+  } 
 
   async getConfig(configType: string, id: string): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.get(id);
@@ -70,7 +73,7 @@ class ApiService {
       throw error;
     }
   }
-
+  
   private createEmptyConfig(configType: string, id: string): any {
     const defaultContent = configTypes[configType]?.defaultContent || {};
     console.log(`API: Creating empty config of type ${configType} with ID ${id || 'empty'}`);
@@ -88,7 +91,7 @@ class ApiService {
       }
     };
   }
-
+  
   async createConfig(configType: string, data: any): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.create;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -114,13 +117,12 @@ class ApiService {
           metadata: data.metadata,
           commit_message: requestData.commit_message,
           author: requestData.author
-          // Make sure we pass the description through
         });
       }
       throw error;
     }
   }
-
+  
   async updateConfig(configType: string, id: string, data: any): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -146,7 +148,7 @@ class ApiService {
       throw error;
     }
   }
-
+  
   async deleteConfig(configType: string, id: string, commitMessage: string = "Deleted via UI", author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -159,9 +161,7 @@ class ApiService {
       }
     });
   }
-
-  // File: /packages/shared/src/services/apiService.ts
-
+  
   async archiveConfig(configType: string, id: string, author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.archive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -169,7 +169,7 @@ class ApiService {
     // Pass author as a query parameter
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
-  
+   
   async unarchiveConfig(configType: string, id: string, author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.unarchive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -177,7 +177,7 @@ class ApiService {
     // Pass author as a query parameter
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
-
+  
   async cloneConfig(configType: string, id: string, newId: string) {
     const endpoint = configTypes[configType]?.apiEndpoints.clone(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -185,7 +185,7 @@ class ApiService {
     // Pass new_id as a query parameter
     return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
   }
-
+  
   async getConfigHistory(configType: string, id: string) {
     const endpoint = configTypes[configType]?.apiEndpoints.history(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -193,29 +193,74 @@ class ApiService {
     return this.get<{ config_id: string; config_type: string; versions: Array<{ version: string; commit_hash: string; created_at: string; author: string; message: string; }> }>(endpoint);
   }
 
+  // Job API methods
   async getJobs() {
     console.log('API: Fetching all jobs from /api/v1/jobs');
-    return this.get<{ items: any[]; total: number; limit: number; offset: number }>('/api/v1/jobs');
+    try {
+      const response = await this.get<JobListResponse>('/api/v1/jobs');
+      console.log(`API: Received ${response.items?.length || 0} jobs`);
+      return response;
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      throw error;
+    }
   }
-
+  
   async getJob(id: string) {
     console.log(`API: Fetching job ${id} from /api/v1/jobs/${id}`);
-    return this.get<any>(`/api/v1/jobs/${id}`);
+    try {
+      const response = await this.get<any>(`/api/v1/jobs/${id}`);
+      console.log(`API: Received job details for ${id}`);
+      return response;
+    } catch (error) {
+      console.error(`Error fetching job ${id}:`, error);
+      throw error;
+    }
   }
-
-  async submitJob(configIds: Record<string, string>, userId?: string, jobConfiguration?: Record<string, any>) {
-    console.log('API: Submitting job with configs:', configIds);
-    const jobSubmitRequest = {
-      configurations: configIds,
-      user_id: userId,
-      job_configuration: jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
+  
+  async submitJob(params: {
+    workorder: string,
+    teamconfig: string,
+    runtimeconfig: string,
+    userId?: string,
+    jobConfiguration?: Record<string, any>
+  }) {
+    console.log('API: Submitting job with configs:', params);
+    
+    // Format the request according to the API expectations
+    const requestData = {
+      workorder: { id: params.workorder, version: "latest" },
+      team: { id: params.teamconfig, version: "latest" },
+      runtime: { id: params.runtimeconfig, version: "latest" },
+      user_id: params.userId || 'current-user',
+      job_configuration: params.jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
     };
-    return this.post<any>('/api/v1/jobs', jobSubmitRequest);
+    
+    return this.post<any>('/api/v1/jobs', requestData);
   }
-
+  
+  async submitJobTuple(workorderId: string, teamconfigId: string, runtimeconfigId: string, userId?: string) {
+    console.log(`API: Submitting job tuple with workorder=${workorderId}, team=${teamconfigId}, runtime=${runtimeconfigId}`);
+    
+    const requestData = {
+      workorder: { id: workorderId, version: "latest" },
+      team: { id: teamconfigId, version: "latest" },
+      runtime: { id: runtimeconfigId, version: "latest" },
+      user_id: userId || 'current-user',
+      job_configuration: { max_runtime: 3600, notify_on_completion: true }
+    };
+    
+    return this.post<any>('/api/v1/jobs', requestData);
+  }
+  
   async cancelJob(id: string) {
-    console.log(`API: Cancelling job ${id} at /api/v1/jobs/${id}/cancel`);
-    return this.post<any>(`/api/v1/jobs/${id}/cancel`, {});
+    console.log(`API: Cancelling job ${id}`);
+    return this.post<any>(`/api/v1/jobs/${id}/cancel`, {}); 
+  }
+  
+  async getJobHistory(id: string) {
+    console.log(`API: Fetching history for job ${id}`);
+    return this.get<any>(`/api/v1/jobs/${id}/history`);
   }
 }
 

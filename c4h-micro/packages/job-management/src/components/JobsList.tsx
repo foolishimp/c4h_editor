@@ -1,5 +1,5 @@
 // File: packages/job-management/src/components/JobsList.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useJobContext } from '../contexts/JobContext';
-import { JobStatus } from 'shared';
+import { JobStatus, Job } from 'shared';
 import { TimeAgo } from 'shared';
 
 interface JobsListProps {
@@ -25,6 +25,9 @@ interface JobsListProps {
 
 const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
   const { jobs, loadJobs, loading, error } = useJobContext();
+  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+  const [statusFilter] = useState<JobStatus | 'all'>('all');
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
   // Load jobs on mount
   useEffect(() => {
@@ -32,12 +35,28 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
     
     // Set up polling interval
     const interval = setInterval(() => {
-      loadJobs();
+      loadJobs(); 
     }, 10000); // Poll every 10 seconds
     
+    setPollingInterval(interval);
+    
     // Clean up interval
-    return () => clearInterval(interval);
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+    };
   }, [loadJobs]);
+
+  // Filter jobs when jobs array or filter changes
+  useEffect(() => {
+    if (statusFilter === 'all') {
+      setFilteredJobs(jobs);
+    } else {
+      setFilteredJobs(jobs.filter(job => job.status === statusFilter));
+    }
+  }, [jobs, statusFilter]);
   
   // Get status chip color
   const getStatusColor = (status: string) => {
@@ -60,11 +79,11 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
   };
   
   // Format configurations for display
-  const formatConfigs = (configurations: Record<string, any>) => {
+  const formatConfigs = useCallback((configurations: Record<string, any>) => {
     return Object.entries(configurations)
       .map(([type, config]) => `${type}: ${config.id}`)
       .join(', ');
-  };
+  }, []);
   
   return (
     <Box>
@@ -74,8 +93,9 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
           startIcon={<RefreshIcon />} 
           onClick={loadJobs}
           disabled={loading}
+          sx={{ mr: 1 }}
         >
-          Refresh
+          Refresh 
         </Button>
       </Box>
       
@@ -85,7 +105,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
         </Box>
       )}
       
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper}> 
         <Table>
           <TableHead>
             <TableRow>
@@ -98,7 +118,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading && jobs.length === 0 ? (
+            {loading && filteredJobs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <CircularProgress size={24} sx={{ mr: 1 }} />
@@ -106,14 +126,14 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
                 </TableCell>
               </TableRow>
             ) : jobs.length === 0 ? (
-              <TableRow>
+              <TableRow> 
                 <TableCell colSpan={6} align="center">
                   No jobs found. Create your first job!
                 </TableCell>
               </TableRow>
             ) : (
-              jobs.map((job) => (
-                <TableRow key={job.id}>
+              filteredJobs.map((job) => (
+                <TableRow key={job.id} hover>
                   <TableCell>{job.id}</TableCell>
                   <TableCell>{formatConfigs(job.configurations)}</TableCell>
                   <TableCell>
@@ -121,7 +141,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
                       label={job.status} 
                       color={getStatusColor(job.status)} 
                     />
-                  </TableCell>
+                  </TableCell> 
                   <TableCell>
                     <TimeAgo timestamp={job.createdAt} />
                   </TableCell>
@@ -131,7 +151,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
                   <TableCell>
                     <Button
                       variant="outlined"
-                      size="small"
+                      size="small" 
                       onClick={() => onSelectJob(job.id)}
                     >
                       View Details
@@ -143,7 +163,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
           </TableBody>
         </Table>
       </TableContainer>
-    </Box>
+    </Box> 
   );
 };
 

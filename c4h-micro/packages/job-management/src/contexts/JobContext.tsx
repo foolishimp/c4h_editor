@@ -1,5 +1,7 @@
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
+
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api } from 'shared';
+import { api, apiService } from 'shared';
 import { Job, JobStatus } from 'shared';
 
 // Context state interface
@@ -8,13 +10,13 @@ interface JobContextState {
   job: Job | null;
   loading: boolean;
   error: string | null;
-  
+
   loadJobs: () => Promise<void>;
   loadJob: (id: string) => Promise<void>;
   submitJob: (configs: Record<string, string>) => Promise<void>;
   cancelJob: (id: string) => Promise<void>;
   pollJobStatus: (id: string) => Promise<void>;
-  
+
   // New method with explicit parameters
   submitJobTuple: (
     params: {workorder: string, teamconfig: string, runtimeconfig: string}
@@ -29,38 +31,13 @@ interface JobProviderProps {
   children: ReactNode;
 }
 
-// Define interfaces for API responses
-interface JobsResponse {
-  items: any[];
-  total: number;
-  limit: number;
-  offset: number;
-}
-
-
-interface JobResponse {
-  data: {
-    id: string;
-    configurations: Record<string, any>;
-    status: string;
-    service_job_id: string;
-    created_at: string;
-    updated_at: string;
-    submitted_at: string;
-    completed_at: string;
-    user_id: string;
-    job_configuration: Record<string, any>;
-    result: any;
-  };
-}
-
 // Provider component
 export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Load all jobs
   const loadJobs = useCallback(async () => {
     setLoading(true);
@@ -68,7 +45,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     
     try {
       // The response is directly the data, not wrapped in a data property
-      const response = await api.get<JobsResponse>('/api/v1/jobs');
+      const response = await apiService.getJobs();
       
       // Safely access items with fallback to empty array
       const jobsData = (response.items || []).map((item: any) => ({
@@ -92,7 +69,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);      
+  }, []);
 
   // Load a specific job
   const loadJob = useCallback(async (id: string) => {
@@ -100,7 +77,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      const response = await api.get<JobResponse>(`/api/v1/jobs/${id}`);
+      const response = await apiService.getJob(id);
       
       // Map response to Job type
       const jobData: Job = {
@@ -124,7 +101,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []);  
   
   // Submit a new job
   const submitJob = useCallback(async (configs: Record<string, string>) => {
@@ -132,21 +109,21 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      // Format the configurations as expected by the API
-      const configurations = Object.entries(configs).reduce((acc, [type, id]) => {
-        acc[type] = { id }; // Format each config as an object with id property
-        return acc;
-      }, {} as Record<string, { id: string }>);
-      
+      // Validate required configuration types
+      if (!configs.workorder || !configs.teamconfig || !configs.runtimeconfig) {
+        throw new Error("All required configuration types must be specified");
+      }
+
+      // Create job request with the properly named fields according to backend's expectations
       const requestData = {
-        configurations,
-        user_id: 'current-user', // This would come from auth context in a real app
-        job_configuration: {
-          max_runtime: 3600,
-          notify_on_completion: true
-        }
+        workorder: { id: configs.workorder, version: "latest" },
+        team: { id: configs.teamconfig, version: "latest" }, // Note: teamconfig → team
+        runtime: { id: configs.runtimeconfig, version: "latest" }, // Note: runtimeconfig → runtime
+        user_id: 'current-user',
+        job_configuration: { max_runtime: 3600, notify_on_completion: true }
       };
       
+      console.log("Submitting job with request:", requestData);
       await api.post('/api/v1/jobs', requestData);
       
       // Reload jobs after submission
@@ -179,7 +156,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
   const submitJobTuple = useCallback(async (
     params: {workorder: string, teamconfig: string, runtimeconfig: string}
   ) => {
-    setLoading(true);
+    setLoading(true); 
     setError(null);
     
     try {
@@ -194,22 +171,17 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
         throw new Error("Runtime configuration is required");
       }
       
-      // Format the configurations as expected by the API (tuple structure)
-      const requestData = {
-        configurations: {
-          workorder: { id: params.workorder },
-          teamconfig: { id: params.teamconfig },
-          runtimeconfig: { id: params.runtimeconfig }
-        },
-        user_id: 'current-user', // This would come from auth context in a real app
-        job_configuration: {
-          max_runtime: 3600,
-          notify_on_completion: true
-        }
+      // Create job request using the tuple-based format matching the backend API design
+      const jobRequest = {
+        workorder: { id: params.workorder, version: "latest" },
+        team: { id: params.teamconfig, version: "latest" }, // Note: renamed from teamconfig to team
+        runtime: { id: params.runtimeconfig, version: "latest" }, // Note: renamed from runtimeconfig to runtime
+        user_id: 'current-user',
+        job_configuration: { max_runtime: 3600, notify_on_completion: true }
       };
       
-      console.log("JobContext: Submitting job tuple:", requestData);
-      await api.post('/api/v1/jobs', requestData);
+      console.log("JobContext: Submitting job tuple:", jobRequest);
+      await api.post('/api/v1/jobs', jobRequest);
       
       // Reload jobs after submission
       await loadJobs();
@@ -228,7 +200,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [loadJobs]);
+  }, [loadJobs]); 
   
   // Cancel a job
   const cancelJob = useCallback(async (id: string) => {
@@ -236,7 +208,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     setError(null);
     
     try {
-      await api.post(`/api/v1/jobs/${id}/cancel`);
+      await apiService.cancelJob(id);
       
       // Reload jobs after cancellation
       await loadJobs();
@@ -251,7 +223,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [job, loadJobs, loadJob]);
+  }, [job, loadJobs, loadJob]); 
   
   // Poll job status
   const pollJobStatus = useCallback(async (id: string) => {
@@ -260,7 +232,7 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     } catch (err) {
       console.error('Error polling job status:', err);
     }
-  }, [loadJob]);
+  }, [loadJob]); 
   
   // Prepare context value
   const contextValue: JobContextState = {

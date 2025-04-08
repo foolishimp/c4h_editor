@@ -1,18 +1,19 @@
 """API routes for job management with multiple configurations."""
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 import traceback
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
-from backend.models.job import Job, JobStatus, JobResult, ConfigReference
+from backend.models.job import Job, JobStatus, JobResult, ConfigReference, JobAuditLog, JobHistoryEntry
 from backend.services.config_repository import ConfigRepository, get_config_repository
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService
 from backend.config.config_types import get_config_types, validate_config_type
 from backend.dependencies import get_job_repository, get_c4h_service
+from backend.models.job import StatusChangeEvent
 
 # Create logger
 logger = logging.getLogger(__name__)
@@ -28,8 +29,14 @@ class JobConfigReference(BaseModel):
     config_type: str = Field(..., description="Configuration type (workorder, team, runtime)")
     name: Optional[str] = Field(None, description="Optional display name")
     version: Optional[str] = None
-
-
+    
+    @validator('config_type')
+    def validate_config_type(cls, v):
+        valid_types = ['workorder', 'teamconfig', 'runtimeconfig']
+        if v not in valid_types:
+            raise ValueError(f"config_type must be one of {valid_types}")
+        return v
+        
 class JobSubmitRequest(BaseModel):  # Legacy request format
     configurations: Dict[str, JobConfigReference]
     user_id: Optional[str] = None
@@ -44,8 +51,15 @@ class JobTupleRequest(BaseModel):
     user_id: Optional[str] = Field(None, description="User ID")
     job_configuration: Optional[Dict[str, Any]] = Field(None, description="Job-specific configuration")
 
+class JobStatusChangeRequest(BaseModel):
+    """Request model for changing job status."""
+    status: JobStatus = Field(..., description="New status for the job")
+    reason: Optional[str] = Field(None, description="Reason for status change")
+    user_id: Optional[str] = Field(None, description="User making the change")
+    result: Optional[Dict[str, Any]] = Field(None, description="Result data if status is completed/failed")
 
-class JobResponse(BaseModel):  
+
+class JobResponse(BaseModel):
     """Job response model"""
     id: str
     configurations: Dict[str, Dict[str, str]]
@@ -58,13 +72,23 @@ class JobResponse(BaseModel):
     user_id: Optional[str] = None
     job_configuration: Dict[str, Any]
     result: Optional[Dict[str, Any]] = None
+    
 
+class JobHistoryResponse(BaseModel):
+    """Response model for job history/audit log."""
+    job_id: str
+    entries: List[Dict[str, Any]]
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "job_id": "1234",
+                "entries": [
+                    {"timestamp": "2023-01-01T00:00:00", "event_type": "status_change", "details": {"old_status": "created", "new_status": "submitted"}}
+                ]
+            }
+        }
 
-class JobListResponse(BaseModel):
-    items: List[JobResponse]
-    total: int
-    offset: int
-    limit: int
 
 
 # Primary job submission endpoint - uses the tuple-based API
@@ -108,15 +132,15 @@ async def submit_job_tuple(
             try:
                 # Load configurations
                 workorder_config = get_config_repository(request.workorder.config_type).get_config(
-                    request.workorder.id, request.workorder.version
+                    request.workorder.id, request.workorder.version or "latest"
                 )
                 team_config = get_config_repository(request.team.config_type).get_config(
-                    request.team.id, request.team.version
+                    request.team.id, request.team.version or "latest"
                 )
                 runtime_config = get_config_repository(request.runtime.config_type).get_config(
-                    request.runtime.id, request.runtime.version
+                    request.runtime.id, request.runtime.version or "latest"
                 )
-                
+
                 # Submit to service with correct configuration tuple
                 submission = await c4h_service.submit_job(
                     workorder=workorder_config,
@@ -180,137 +204,14 @@ async def submit_job_tuple(
         raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
 
 
-@router.post("", response_model=JobResponse)
-async def submit_job(
-    request: JobSubmitRequest,
-    background_tasks: BackgroundTasks,
-    job_repo: JobRepository = Depends(get_job_repository),
-    c4h_service: C4HService = Depends(get_c4h_service)
-):
-    """[DEPRECATED] Submit a job with multiple configurations to the C4H service."""
-    try: 
-        # Validate configuration types
-        config_types = get_config_types()
-        for config_type in request.configurations.keys():
-            # Log warning - old method is deprecated
-            logger.warning(f"Using deprecated job submission API - please migrate to the tuple-based API")
-            
-            # Check if config type is valid
-            if config_type not in config_types:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Invalid configuration type: {config_type}"
-                )
-        
-        # Format configurations for job repository
-        configurations = {}
-        for config_type, config_ref in request.configurations.items():
-            configurations[config_type] = {
-                "id": config_ref.id,
-                "version": config_ref.version or "latest"
-            }
-        
-        # Create job record
-        job = job_repo.create_job(
-            configurations=configurations,
-            user_id=request.user_id, 
-            configuration=request.job_configuration 
-        )
-        
-        # Submit to C4H service asynchronously
-        async def submit_and_update():
-            try:
-                try:
-                    # Map old format to new format to maintain backward compatibility
-                    workorder = get_config_repository("workorder").get_config(
-                        job.configurations["workorder"].id, job.configurations["workorder"].version
-                    ) if "workorder" in job.configurations else None
-                    
-                    team = get_config_repository("teamconfig").get_config(
-                        job.configurations["teamconfig"].id, job.configurations["teamconfig"].version
-                    ) if "teamconfig" in job.configurations else None
-                    
-                    runtime = get_config_repository("runtimeconfig").get_config(
-                        job.configurations["runtimeconfig"].id, job.configurations["runtimeconfig"].version
-                    ) if "runtimeconfig" in job.configurations else None
-                    
-                    # Verify we have all required configs
-                    if not workorder or not team or not runtime:
-                        raise ValueError("Missing required configuration(s). Need workorder, teamconfig, and runtimeconfig.")
-                        
-                    # Submit to service
-                    submission = await c4h_service.submit_job(
-                        workorder=workorder,
-                        team=team, 
-                        runtime=runtime
-                    )
-                    
-                    # Update job record with service response
-                    if submission.status == "error":
-                        job.update_status(JobStatus.FAILED)
-                        job.result = JobResult(
-                            error=submission.message or "Failed to submit job to service"
-                        )
-                    # Accept both running and processing as active states
-                    elif submission.status in ["running", "processing"]:
-                        job.update_status(JobStatus.RUNNING)
-                    elif submission.status == "cancelled":
-                        job.update_status(JobStatus.CANCELLED)
-                    else:
-                        job.service_job_id = submission.job_id
-                        job.update_status(JobStatus.SUBMITTED)
-                        
-                    logger.info(f"Job {job.id} submitted to service, status: {submission.status}")
-                except ValueError as ve:
-                    job.update_status(JobStatus.FAILED)
-                    job.result = JobResult(error=str(ve))
-                    job_repo.update_job(job)
-            except Exception as e:
-                logger.error(f"Error in submit_and_update for job {job.id}: {str(e)}")
-                logger.error(traceback.format_exc())
-                
-                # Update job with error
-                job.update_status(JobStatus.FAILED)
-                job.result = JobResult(
-                    error=f"Error submitting job: {str(e)}"
-                )
-                job_repo.update_job(job)
-        
-        # Add submission to background tasks
-        background_tasks.add_task(submit_and_update)
-        
-        # Format response
-        configurations_response = {}
-        for config_type, config_ref in job.configurations.items():
-            configurations_response[config_type] = {
-                "id": config_ref.id,
-                "version": config_ref.version
-            }
-        
-        # Return the job record
-        return JobResponse(
-            id=job.id,
-            configurations=configurations_response,
-            status=job.status.value,
-            service_job_id=job.service_job_id,
-            created_at=job.created_at,
-            updated_at=job.updated_at,
-            submitted_at=job.submitted_at,
-            completed_at=job.completed_at,
-            user_id=job.user_id,
-            job_configuration=job.configuration,
-            result=job.result.dict() if job.result else None
-        )
-    except ValueError as e:
-        logger.error(f"Value error submitting job: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error submitting job: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Failed to submit job: {str(e)}")
+class JobListResponse(BaseModel):
+    items: List[JobResponse]
+    total: int
+    offset: int
+    limit: int
 
 
-@router.get("", response_model=JobListResponse)
+@router.get("", response_model=JobListResponse, summary="List jobs with optional filtering")
 async def list_jobs(
     config_type: Optional[str] = Query(None, description="Filter by config type"),
     config_id: Optional[str] = Query(None, description="Filter by config ID"),
@@ -321,7 +222,7 @@ async def list_jobs(
     job_repo: JobRepository = Depends(get_job_repository)
 ):
     """List jobs with optional filtering."""
-    try:
+    try: 
         # Convert string status to enum if provided
         job_status = None
         if status:
@@ -394,7 +295,7 @@ async def list_jobs(
         raise HTTPException(status_code=500, detail=f"Failed to list jobs: {str(e)}")
 
 
-@router.get("/{job_id}", response_model=JobResponse)
+@router.get("/{job_id}", response_model=JobResponse, summary="Get job details by ID")
 async def get_job(
     job_id: str = Path(..., description="ID of the job"),
     job_repo: JobRepository = Depends(get_job_repository),
@@ -472,16 +373,21 @@ async def get_job(
 
 
 @router.post("/{job_id}/cancel", response_model=JobResponse)
-async def cancel_job(
+async def cancel_job( 
     job_id: str = Path(..., description="ID of the job"),
+    reason: Optional[str] = Query(None, description="Reason for cancellation"),
+    user_id: Optional[str] = Query(None, description="User making the cancellation"),
     job_repo: JobRepository = Depends(get_job_repository),
     c4h_service: C4HService = Depends(get_c4h_service)
 ):
-    """Cancel a job."""
+    """
+    Cancel a job.
+    Records the cancellation with audit information including reason and user who cancelled.
+    """
     try:
         # Get job from repository
         job = job_repo.get_job(job_id)
-        
+
         if not job:
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
         
@@ -497,7 +403,20 @@ async def cancel_job(
             cancelled = await c4h_service.cancel_job(job.service_job_id)
             if not cancelled:
                 logger.warning(f"Failed to cancel job {job_id} in service")
-        
+
+        # Create audit log entry
+        audit_log = job_repo.get_job_audit_log(job_id)
+        if not audit_log:
+            audit_log = JobAuditLog(job_id=job_id)
+
+        # Add entry for cancellation
+        audit_log.add_entry(
+            event_type="status_change",
+            user_id=user_id,
+            details={"old_status": job.status.value, "new_status": "cancelled", "reason": reason}
+        )
+        job_repo.update_job_audit_log(audit_log)
+
         # Update job status regardless of service response
         job.update_status(JobStatus.CANCELLED)
         job_repo.update_job(job)
@@ -532,3 +451,53 @@ async def cancel_job(
         logger.error(f"Error cancelling job: {e}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to cancel job: {str(e)}")
+
+
+@router.get("/{job_id}/history", response_model=JobHistoryResponse)
+async def get_job_history(
+    job_id: str = Path(..., description="ID of the job"),
+    job_repo: JobRepository = Depends(get_job_repository)
+):
+    """
+    Get the history/audit log for a job.
+    Includes all state transitions, updates, and user actions.
+    """
+    try:
+        # First verify job exists
+        job = job_repo.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+            
+        # Get audit log
+        audit_log = job_repo.get_job_audit_log(job_id)
+        
+        # If no audit log exists, create an empty one with just creation event
+        if not audit_log:
+            audit_log = JobAuditLog(job_id=job_id)
+            audit_log.add_entry(
+                event_type="job_created",
+                user_id=job.user_id,
+                details={
+                    "status": job.status.value,
+                    "configurations": {k: v.dict() for k, v in job.configurations.items()}
+                }
+            )
+        
+        # Convert entries to dict for response
+        entries = []
+        for entry in audit_log.entries:
+            entry_dict = entry.dict()
+            # Ensure timestamp is serialized properly
+            entry_dict["timestamp"] = entry.timestamp.isoformat()
+            entries.append(entry_dict)
+            
+        return JobHistoryResponse(
+            job_id=job_id,
+            entries=entries
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting job history: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to get job history: {str(e)}")

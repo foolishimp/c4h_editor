@@ -1,5 +1,6 @@
-// File: packages/shared/src/types/job.ts
-/**
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/types/job.ts
+
+/** 
  * Enhanced Job types to support the configuration-driven approach
  */
 
@@ -10,6 +11,11 @@ export enum JobStatus {
   COMPLETED = "completed",
   FAILED = "failed",
   CANCELLED = "cancelled"
+}
+
+export interface JobConfigReference {
+  id: string;
+  version: string;
 }
 
 export interface JobResult {
@@ -27,12 +33,7 @@ export interface JobConfiguration {
   [key: string]: any;
 }
 
-export interface JobConfigReference {
-  id: string;
-  version: string;
-}
-
-export interface Job {
+export interface Job { 
   id: string;
   configurations: Record<string, JobConfigReference>;
   status: JobStatus;
@@ -46,24 +47,22 @@ export interface Job {
   result?: JobResult;
 }
 
-// Legacy types for backward compatibility
-export interface LegacyJob {
-  id: string;
-  workOrderId: string;
-  workOrderVersion?: string;
-  status: JobStatus;
-  serviceJobId?: string;
-  createdAt: string;
-  updatedAt: string;
-  submittedAt?: string;
-  completedAt?: string;
-  userId?: string;
-  configuration?: Record<string, any>;
-  results?: JobResult;
+export interface JobListResponse {
+  items: Job[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
-export interface JobSubmitRequest {
-  configurations: Record<string, string>;
+export interface JobHistoryEntry {
+  timestamp: string;
+  event_type: string;
   user_id?: string;
-  job_configuration?: JobConfiguration;
+  details: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+export interface JobHistoryResponse {
+  job_id: string;
+  entries: JobHistoryEntry[];
 }

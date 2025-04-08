@@ -3,7 +3,7 @@
 import os
 import json
 import logging
-import time
+from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import httpx
@@ -125,8 +125,7 @@ class C4HService:
             "Content-Type": "application/json"
         }
         
-        # Log submission
-        logger.info(f"Submitting job with workorder: {workorder.id}, team: {team.id}, runtime: {runtime.id} to {url}")
+        logger.info(f"Submitting job with workorder={workorder.id}, team={team.id}, runtime={runtime.id} to {url}")
         
         # Send request
         try:
@@ -160,7 +159,7 @@ class C4HService:
             )
         except Exception as e:
             logger.error(f"Error submitting job: {str(e)}")
-            return JobSubmissionResponse(
+            return JobSubmissionResponse(  
                 job_id="",
                 status="error",
                 message=f"Error submitting job: {str(e)}"
@@ -202,8 +201,8 @@ class C4HService:
                 return JobStatusResponse(
                     job_id=job_id,
                     status="error",
-                    error=error_msg,
-                    created_at=datetime.utcnow(),
+                    error=error_msg, 
+                    created_at=datetime.now(UTC),
                     updated_at=datetime.utcnow()
                 )
             
@@ -226,8 +225,8 @@ class C4HService:
             return JobStatusResponse(
                 job_id=job_id,
                 status="error",
-                error=f"Error checking job status: {str(e)}",
-                created_at=datetime.utcnow(),
+                error=f"Error checking job status: {str(e)}", 
+                created_at=datetime.now(UTC),
                 updated_at=datetime.utcnow()
             )
     

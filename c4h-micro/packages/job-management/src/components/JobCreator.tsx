@@ -1,3 +1,5 @@
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
+
 import React, { useState, useEffect } from 'react';
 import { 
   Alert,
@@ -11,8 +13,8 @@ import {
   CircularProgress,
   Select, 
   MenuItem
-} from '@mui/material';
-import { configTypes, apiService } from 'shared';
+} from '@mui/material'; 
+import { configTypes, api } from 'shared';
 import { useJobContext } from '../contexts/JobContext';
 
 interface ConfigOption {
@@ -20,7 +22,7 @@ interface ConfigOption {
   description: string;
 }
 
-// Filter to only include config types required for jobs
+// Filter to only include config types required for jobs 
 // We specifically need workorder, teamconfig, and runtimeconfig
 const REQUIRED_CONFIG_TYPES = ['workorder', 'teamconfig', 'runtimeconfig'];
 
@@ -28,7 +30,7 @@ const JobCreator: React.FC = () => {
   const { submitJobTuple, loading, error } = useJobContext();
   
   // State for selected config IDs - with strict typing for required configs
-  const [workorderId, setWorkorderId] = useState<string>("");
+  const [workorderId, setWorkorderId] = useState<string>(""); 
   const [teamconfigId, setTeamconfigId] = useState<string>("");
   const [runtimeconfigId, setRuntimeconfigId] = useState<string>("");
   
@@ -38,7 +40,7 @@ const JobCreator: React.FC = () => {
   // State for form validity
   const [isFormValid, setIsFormValid] = useState<boolean>(false);
   
-  // Load available configs for each type
+  // Load available configs for each type 
   useEffect(() => {
     const loadConfigOptions = async () => {
       // Initialize options with empty arrays for all required config types
@@ -51,15 +53,19 @@ const JobCreator: React.FC = () => {
       
       for (const configType of REQUIRED_CONFIG_TYPES) {
         try {
-          // Use apiService's getConfigs method which handles endpoints correctly
-          const configs = await apiService.getConfigs(configType);
-          if (Array.isArray(configs)) {
-            options[configType] = configs.map(item => {
-              // Handle different response structures safely - checking all possible locations for descriptions
-              const description = (item.metadata?.description?.trim() || item.title?.trim() || 
-                                 item.description?.trim() || '').trim() || 'No description';
-              return { id: item.id, description };
-            });
+          // Use direct API call instead of apiService.getConfigs
+          const endpoint = configTypes[configType]?.apiEndpoints.list;
+          if (endpoint) {
+            const configs = await api.get(endpoint);
+            
+            if (Array.isArray(configs)) {
+              options[configType] = configs.map(item => {
+                // Handle different response structures safely - checking all possible locations for descriptions
+                const description = (item.metadata?.description?.trim() || item.title?.trim() || 
+                                   item.description?.trim() || '').trim() || 'No description';
+                return { id: item.id, description };
+              });
+            }
           }
         } catch (err) {
           console.error(`Error loading ${configType} options:`, err);
@@ -76,7 +82,7 @@ const JobCreator: React.FC = () => {
   // Validate form
   useEffect(() => {
     // Form is valid when all three required config types are selected
-    const isValid = Boolean(workorderId) && Boolean(teamconfigId) && Boolean(runtimeconfigId);
+    const isValid = Boolean(workorderId) && Boolean(teamconfigId) && Boolean(runtimeconfigId); 
     
     setIsFormValid(isValid);
   }, [workorderId, teamconfigId, runtimeconfigId]);
@@ -84,11 +90,19 @@ const JobCreator: React.FC = () => {
   // Handle form submission
   const handleSubmit = () => {
     if (isFormValid) {
-      submitJobTuple({
-        workorder: workorderId,
-        teamconfig: teamconfigId,
-        runtimeconfig: runtimeconfigId
-      });
+      try {
+        submitJobTuple({
+          workorder: workorderId,
+          teamconfig: teamconfigId,
+          runtimeconfig: runtimeconfigId
+        });
+        
+        // Reset form after successful submission
+        // We'll keep this commented until we confirm the submission was successful
+        // setWorkorderId("");
+        // setTeamconfigId("");
+        // setRuntimeconfigId("");
+      } catch (err) { /* Error is handled by the context */ }
     }
   };
   
@@ -112,7 +126,7 @@ const JobCreator: React.FC = () => {
             sx={{ mb: 2 }}
             disabled={loading}
           >
-            <InputLabel id="workorder-label">
+            <InputLabel id="workorder-label"> 
               {configTypes['workorder'].name}
             </InputLabel>
             <Select
@@ -138,7 +152,7 @@ const JobCreator: React.FC = () => {
             sx={{ mb: 2 }}
             disabled={loading}
           >
-            <InputLabel id="teamconfig-label">
+            <InputLabel id="teamconfig-label"> 
               {configTypes['teamconfig'].name}
             </InputLabel>
             <Select
@@ -164,7 +178,7 @@ const JobCreator: React.FC = () => {
             sx={{ mb: 2 }}
             disabled={loading}
           >
-            <InputLabel id="runtimeconfig-label">
+            <InputLabel id="runtimeconfig-label"> 
               {configTypes['runtimeconfig'].name}
             </InputLabel>
             <Select
@@ -189,7 +203,7 @@ const JobCreator: React.FC = () => {
               variant="contained"
               onClick={handleSubmit}
               disabled={!isFormValid || loading}
-            >
+            > 
               {loading ? <CircularProgress size={24} /> : 'Submit Job'}
             </Button>
           </Box>

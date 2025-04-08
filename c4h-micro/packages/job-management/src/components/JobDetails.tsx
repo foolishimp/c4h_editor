@@ -1,5 +1,5 @@
 // File: packages/job-management/src/components/JobDetails.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -15,7 +15,7 @@ import {
   ListItemText
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import CancelIcon from '@mui/icons-material/Cancel';
+import CancelIcon from '@mui/icons-material/Cancel'; 
 import { useJobContext } from '../contexts/JobContext';
 import { JobStatus, JobConfigReference } from 'shared';
 import { TimeAgo } from 'shared';
@@ -27,6 +27,7 @@ interface JobDetailsProps {
 
 const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
   const { job, loadJob, cancelJob, error, loading } = useJobContext();
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
   // Load job on mount and jobId change
   useEffect(() => {
@@ -34,13 +35,22 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
     
     // Set up polling for active jobs
     const interval = setInterval(() => {
-      if (job && ['created', 'submitted', 'running'].includes(job.status)) {
+      if (job && [JobStatus.CREATED, JobStatus.SUBMITTED, JobStatus.RUNNING].includes(job.status)) {
         loadJob(jobId);
       }
     }, 5000); // Poll every 5 seconds
     
-    return () => clearInterval(interval);
-  }, [jobId, loadJob, job]);
+    setPollingInterval(interval);
+    
+    // Cleanup function
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+    };
+  }, [jobId, loadJob, job?.status]);
+  
   
   // Get status chip color
   const getStatusColor = (status: string) => {
@@ -65,7 +75,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
   // Handle cancel job
   const handleCancel = () => {
     if (job) {
-      cancelJob(job.id);
+      cancelJob(job.id); 
     }
   };
   
@@ -77,7 +87,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
     return value.id || 'Unknown';
   };
   
-  if (loading && !job) {
+  if (loading && !job) { 
     return (
       <Card sx={{ mt: 4 }}>
         <CardContent sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -86,7 +96,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
       </Card>
     );
   }
-  
+
   if (error) {
     return (
       <Card sx={{ mt: 4 }}>
@@ -96,7 +106,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
       </Card>
     );
   }
-  
+
   if (!job) {
     return (
       <Card sx={{ mt: 4 }}>
@@ -106,7 +116,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
       </Card>
     );
   }
-  
+
   return (
     <Card sx={{ mt: 4 }}>
       <CardContent>
@@ -120,7 +130,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
             Close
           </Button>
         </Box>
-        
+
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1">ID: {job.id}</Typography>
           
@@ -131,7 +141,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
               sx={{ mr: 2 }}
             />
             
-            {['created', 'submitted', 'running'].includes(job.status) && (
+            {[JobStatus.CREATED, JobStatus.SUBMITTED, JobStatus.RUNNING].includes(job.status) && (
               <Button
                 variant="outlined"
                 color="warning"
@@ -144,7 +154,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
             )}
           </Box>
         </Box>
-        
+
         <Divider sx={{ mb: 2 }} />
         
         <Typography variant="h6" gutterBottom>Configurations</Typography>
@@ -156,7 +166,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
             </Box>
           ))}
         </Paper>
-        
+
         <Typography variant="h6" gutterBottom>Timeline</Typography>
         <List dense sx={{ mb: 3 }}>
           <ListItem>
@@ -165,7 +175,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
               secondary={<TimeAgo timestamp={job.createdAt} />} 
             />
           </ListItem>
-          
+
           {job.submittedAt && (
             <ListItem>
               <ListItemText 
@@ -174,7 +184,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
               />
             </ListItem>
           )}
-          
+
           {job.completedAt && (
             <ListItem>
               <ListItemText 
@@ -184,7 +194,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
             </ListItem>
           )}
         </List>
-        
+
         {job.result && (
           <>
             <Typography variant="h6" gutterBottom>Results</Typography>
@@ -202,7 +212,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
                 </Box>
               </Paper>
             )}
-            
+
             {job.result.error && (
               <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
                 <Typography variant="subtitle2" gutterBottom color="error">Error:</Typography>
@@ -217,7 +227,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
                 </Box>
               </Paper>
             )}
-            
+
             {job.result.metrics && Object.keys(job.result.metrics).length > 0 && (
               <Paper variant="outlined" sx={{ p: 2 }}>
                 <Typography variant="subtitle2" gutterBottom>Metrics:</Typography>
