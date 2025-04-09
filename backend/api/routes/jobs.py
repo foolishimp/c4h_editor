@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, UTC
 import logging
 import traceback
+import asyncio  # Added import for asyncio
 from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, BackgroundTasks
 from pydantic import BaseModel, Field, validator
 
@@ -128,6 +129,9 @@ async def submit_job_tuple(
         )
         
         # Submit to C4H service asynchronously
+        # File: /Users/jim/src/apps/c4h_editor/backend/api/routes/jobs.py (partial)
+        # Enhanced submit_and_update function to handle development mode better
+
         async def submit_and_update():
             try:
                 # Load configurations
@@ -154,11 +158,43 @@ async def submit_job_tuple(
                     job.result = JobResult(
                         error=submission.message or "Failed to submit job to service"
                     )
+                    job_repo.update_job(job)
+                    logger.error(f"Job {job.id} submission failed: {submission.message}")
                 else:
+                    # Handle both real and mock job submissions
                     job.service_job_id = submission.job_id
                     job.update_status(JobStatus.SUBMITTED)
-                
-                logger.info(f"Job {job.id} submitted to service, status: {submission.status}")
+                    job_repo.update_job(job)
+                    
+                    # In development mode, simulate progression through job statuses
+                    if "message" in submission.dict() and "development mode" in submission.message:
+                        logger.info(f"Development mode detected for job {job.id}, simulating job progression")
+                        
+                        # Simulate processing delay
+                        await asyncio.sleep(2)
+                        
+                        # Update to running
+                        job.update_status(JobStatus.RUNNING)
+                        job_repo.update_job(job)
+                        
+                        # Simulate completion after a delay
+                        await asyncio.sleep(3)
+                        
+                        # Simulate successful completion
+                        job.update_status(JobStatus.COMPLETED)
+                        job.result = JobResult(
+                            output=f"Successfully processed job for workorder '{workorder_config.id}'",
+                            metrics={
+                                "duration": 5.0,
+                                "tokens": 3500,
+                                "file_count": 3
+                            }
+                        )
+                        job_repo.update_job(job)
+                        
+                        logger.info(f"Development mode: Job {job.id} simulated to completion")
+                    else:
+                        logger.info(f"Job {job.id} submitted to service, status: {submission.status}")
             except Exception as e:
                 logger.error(f"Error in submit_and_update for job {job.id}: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -169,7 +205,7 @@ async def submit_job_tuple(
                     error=f"Error submitting job: {str(e)}"
                 )
                 job_repo.update_job(job)
-        
+
         # Add submission to background tasks
         background_tasks.add_task(submit_and_update)
         

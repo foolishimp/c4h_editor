@@ -165,7 +165,7 @@ class ConfigRepository:
         
         Args:
             config_id: ID of the configuration
-            version: Optional version or commit reference
+            version: Optional version or commit reference ("latest" will use current version)
             model_cls: Optional model class for deserialization
             
         Returns:
@@ -178,7 +178,13 @@ class ConfigRepository:
             logger.error(f"{self.config_type.capitalize()} with ID '{config_id}' not found")
             raise ValueError(f"{self.config_type.capitalize()} with ID '{config_id}' not found")
         
-        if version:
+        # Special handling for "latest" version
+        if version == "latest":
+            # Just get current version from the file
+            logger.info(f"Using current version for 'latest' reference of {self.config_type} '{config_id}'")
+            with open(config_path, "r") as f:
+                data = json.load(f)
+        elif version:
             try:
                 # Get file content at specific commit
                 rel_path = config_path.relative_to(self.repo_path)
@@ -196,7 +202,7 @@ class ConfigRepository:
         logger.info(f"{self.config_type.capitalize()} '{config_id}' retrieved, version: {version or 'latest'}")
         
         return config
-    
+
     def update_config(self, config: Configuration, commit_message: str, author: str) -> str:
         """
         Update an existing configuration.

@@ -24,9 +24,9 @@ DEFAULT_CONFIG = {
         "cors_origins": ["*"],
     },
     "c4h_service": {
-        "api_base": "https://api.c4h.example.com",
-        "api_version": "v1",
-        "host": "localhost",
+        "api_base": "http://0.0.0.0:5500",
+        "api_version": "api/v1",
+        "host": "0.0.0.0",
         "port": 5500,
         "api_key_env": "C4H_API_KEY",
         "job_config": {

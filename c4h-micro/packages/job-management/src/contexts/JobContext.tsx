@@ -75,6 +75,10 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     }
   }, []);
 
+
+  // File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
+  // Fixed to handle dates as strings per the Job interface requirements
+
   // Load a specific job
   const loadJob = useCallback(async (id: string) => {
     setLoading(true);
@@ -83,30 +87,39 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     try {
       const response = await apiService.getJob(id);
       
-      // Map response to Job type
-      const jobData: Job = {
-        id: response.data.id,
-        configurations: response.data.configurations || {},
-        status: response.data.status as JobStatus,
-        serviceJobId: response.data.service_job_id,
-        createdAt: response.data.created_at,
-        updatedAt: response.data.updated_at,
-        submittedAt: response.data.submitted_at,
-        completedAt: response.data.completed_at,
-        userId: response.data.user_id,
-        jobConfiguration: response.data.job_configuration || {},
-        result: response.data.result
+      // Handle different response formats - some endpoints wrap in data, others don't
+      const jobData = response.data || response;
+      
+      if (!jobData || !jobData.id) {
+        throw new Error(`Invalid job data received for job ID: ${id}`);
+      }
+      
+      // Map response to Job type - maintaining date strings as per the Job interface
+      const mappedJob: Job = {
+        id: jobData.id,
+        configurations: jobData.configurations || {},
+        status: jobData.status as JobStatus,
+        serviceJobId: jobData.service_job_id,
+        createdAt: jobData.created_at || new Date().toISOString(),
+        updatedAt: jobData.updated_at || new Date().toISOString(),
+        submittedAt: jobData.submitted_at || undefined,
+        completedAt: jobData.completed_at || undefined,
+        userId: jobData.user_id,
+        jobConfiguration: jobData.job_configuration || {},
+        result: jobData.result
       };
       
-      setJob(jobData);
+      setJob(mappedJob);
     } catch (err: any) {
-      setError(err.message || `Failed to load job: ${id}`);
+      const errorMessage = err.message || `Failed to load job: ${id}`;
       console.error('Error loading job:', err);
+      setError(errorMessage);
+      setJob(null); // Make sure we clear the job state on error
     } finally {
       setLoading(false);
     }
-  }, []);  
-  
+  }, []);
+
   // Submit a new job
   const submitJob = useCallback(async (configs: Record<string, string>) => {
     setLoading(true);

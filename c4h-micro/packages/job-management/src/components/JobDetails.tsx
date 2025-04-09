@@ -1,5 +1,6 @@
-// File: packages/job-management/src/components/JobDetails.tsx
-import React, { useEffect, useState } from 'react';
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobDetails.tsx
+
+import React, { useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -15,9 +16,10 @@ import {
   ListItemText
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import CancelIcon from '@mui/icons-material/Cancel'; 
+import CancelIcon from '@mui/icons-material/Cancel';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { useJobContext } from '../contexts/JobContext';
-import { JobStatus, JobConfigReference } from 'shared';
+import { JobStatus } from 'shared';
 import { TimeAgo } from 'shared';
 
 interface JobDetailsProps {
@@ -27,30 +29,11 @@ interface JobDetailsProps {
 
 const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
   const { job, loadJob, cancelJob, error, loading } = useJobContext();
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
-  // Load job on mount and jobId change
+  // Load job on mount and jobId change - only once, no polling
   useEffect(() => {
     loadJob(jobId);
-    
-    // Set up polling for active jobs
-    const interval = setInterval(() => {
-      if (job && [JobStatus.CREATED, JobStatus.SUBMITTED, JobStatus.RUNNING].includes(job.status)) {
-        loadJob(jobId);
-      }
-    }, 5000); // Poll every 5 seconds
-    
-    setPollingInterval(interval);
-    
-    // Cleanup function
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        setPollingInterval(null);
-      }
-    };
-  }, [jobId, loadJob, job?.status]);
-  
+  }, [jobId, loadJob]);
   
   // Get status chip color
   const getStatusColor = (status: string) => {
@@ -72,19 +55,29 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
     }
   };
   
+  // Handle refresh button click
+  const handleRefresh = () => {
+    loadJob(jobId);
+  };
+  
   // Handle cancel job
   const handleCancel = () => {
     if (job) {
       cancelJob(job.id); 
+      // After cancel, refresh to see updated status
+      setTimeout(() => loadJob(job.id), 500);
     }
   };
   
   // Format configurations for display
-  const formatConfigValue = (value: string | JobConfigReference): string => {
+  const formatConfigValue = (value: any): string => {
     if (typeof value === 'string') {
       return value;
     }
-    return value.id || 'Unknown';
+    if (value && typeof value === 'object' && 'id' in value) {
+      return value.id || 'Unknown';
+    }
+    return 'Unknown';
   };
   
   if (loading && !job) { 
@@ -102,6 +95,14 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
       <Card sx={{ mt: 4 }}>
         <CardContent>
           <Typography color="error">Error loading job: {error}</Typography>
+          <Button 
+            variant="outlined" 
+            startIcon={<RefreshIcon />} 
+            onClick={handleRefresh}
+            sx={{ mt: 2 }}
+          >
+            Try Again
+          </Button>
         </CardContent>
       </Card>
     );
@@ -112,6 +113,21 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
       <Card sx={{ mt: 4 }}>
         <CardContent>
           <Typography>Job not found</Typography>
+          <Button 
+            variant="outlined" 
+            onClick={onClose}
+            sx={{ mt: 2, mr: 1 }}
+          >
+            Close
+          </Button>
+          <Button 
+            variant="outlined" 
+            startIcon={<RefreshIcon />} 
+            onClick={handleRefresh}
+            sx={{ mt: 2 }}
+          >
+            Try Again
+          </Button>
         </CardContent>
       </Card>
     );
@@ -122,13 +138,24 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h5">Job Details</Typography>
-          <Button 
-            variant="outlined"
-            startIcon={<CloseIcon />}
-            onClick={onClose}
-          >
-            Close
-          </Button>
+          <Box>
+            <Button 
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              disabled={loading}
+              sx={{ mr: 1 }}
+            >
+              Refresh
+            </Button>
+            <Button 
+              variant="outlined"
+              startIcon={<CloseIcon />}
+              onClick={onClose}
+            >
+              Close
+            </Button>
+          </Box>
         </Box>
 
         <Box sx={{ mb: 3 }}>
@@ -159,7 +186,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
         
         <Typography variant="h6" gutterBottom>Configurations</Typography>
         <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
-          {Object.entries(job.configurations).map(([type, config]) => (
+          {job.configurations && Object.entries(job.configurations).map(([type, config]) => (
             <Box key={type} sx={{ mb: 1 }}>
               <Typography variant="subtitle2">{type}:</Typography>
               <Typography variant="body2">{formatConfigValue(config)}</Typography>
@@ -236,7 +263,7 @@ const JobDetails: React.FC<JobDetailsProps> = ({ jobId, onClose }) => {
                     <ListItem key={key}>
                       <ListItemText 
                         primary={key} 
-                        secondary={value.toString()} 
+                        secondary={value !== null && value !== undefined ? value.toString() : 'N/A'} 
                       />
                     </ListItem>
                   ))}

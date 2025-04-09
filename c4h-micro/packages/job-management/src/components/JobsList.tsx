@@ -1,5 +1,6 @@
-// File: packages/job-management/src/components/JobsList.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobsList.tsx
+
+import React, { useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -16,7 +17,7 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useJobContext } from '../contexts/JobContext';
-import { JobStatus, Job } from 'shared';
+import { JobStatus } from 'shared';
 import { TimeAgo } from 'shared';
 
 interface JobsListProps {
@@ -25,59 +26,12 @@ interface JobsListProps {
 
 const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
   const { jobs, loadJobs, loading, error } = useJobContext();
-  const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
-  const [statusFilter] = useState<JobStatus | 'all'>('all');
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
-  // Load jobs on mount
+  // Load jobs only on mount - no polling
   useEffect(() => {
     loadJobs();
-    
-    // Set up polling interval
-    const interval = setInterval(() => {
-      loadJobs(); 
-    }, 10000); // Poll every 10 seconds
-    
-    setPollingInterval(interval);
-    
-    // Clean up interval
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        setPollingInterval(null);
-      }
-    };
   }, [loadJobs]);
 
-  // Filter jobs when jobs array or filter changes
-  useEffect(() => {
-    if (statusFilter === 'all') {
-      setFilteredJobs(jobs);
-    } else {
-      setFilteredJobs(jobs.filter(job => job.status === statusFilter));
-    }
-  }, [jobs, statusFilter]);
-  
-  // Get status chip color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case JobStatus.CREATED:
-        return 'default';
-      case JobStatus.SUBMITTED:
-        return 'info';
-      case JobStatus.RUNNING:
-        return 'primary';
-      case JobStatus.COMPLETED:
-        return 'success';
-      case JobStatus.FAILED:
-        return 'error';
-      case JobStatus.CANCELLED:
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
-  
   // Format configurations for display
   const formatConfigs = useCallback((configurations: Record<string, any>) => {
     return Object.entries(configurations)
@@ -118,7 +72,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading && filteredJobs.length === 0 ? (
+            {loading && jobs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center">
                   <CircularProgress size={24} sx={{ mr: 1 }} />
@@ -132,7 +86,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredJobs.map((job) => (
+              jobs.map((job) => (
                 <TableRow key={job.id} hover>
                   <TableCell>{job.id}</TableCell>
                   <TableCell>{formatConfigs(job.configurations)}</TableCell>
@@ -165,6 +119,26 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
       </TableContainer>
     </Box> 
   );
+};
+
+// Helper function to get status chip color
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case JobStatus.CREATED:
+      return 'default';
+    case JobStatus.SUBMITTED:
+      return 'info';
+    case JobStatus.RUNNING:
+      return 'primary';
+    case JobStatus.COMPLETED:
+      return 'success';
+    case JobStatus.FAILED:
+      return 'error';
+    case JobStatus.CANCELLED:
+      return 'warning';
+    default:
+      return 'default';
+  }
 };
 
 export default JobsList;
