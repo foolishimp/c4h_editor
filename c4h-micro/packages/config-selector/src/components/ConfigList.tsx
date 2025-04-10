@@ -6,11 +6,11 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableSortLabel,
+  TablePagination,
   TableContainer,
   TableHead,
   TableRow,
-  TableSortLabel,
-  TablePagination,
   Paper,
   Chip,
   IconButton,
@@ -400,62 +400,62 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 <TableCell colSpan={5} align="center">Loading...</TableCell>
               </TableRow>
             ) : filteredConfigs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  {searchTerm 
-                    ? `No ${configName.toLowerCase()} found matching your search.` 
-                    : showArchived 
-                      ? `No archived ${configName.toLowerCase()} found.` 
-                      : `No ${configName.toLowerCase()} found. Create your first one!`}
+            <TableRow>
+              <TableCell colSpan={5} align="center">
+                {searchTerm 
+                  ? `No ${configName.toLowerCase()} found matching your search.` 
+                  : showArchived 
+                    ? `No archived ${configName.toLowerCase()} found.` 
+                    : `No ${configName.toLowerCase()} found. Create your first one!`}
+              </TableCell>
+            </TableRow>
+          ) : (
+            // Apply pagination to the filtered configs
+            filteredConfigs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((config) => (
+              <TableRow 
+                key={config.id} 
+                hover 
+                onClick={() => handleRowClick(config.id)}
+                sx={{ cursor: 'pointer' }}
+              >
+                <TableCell component="th" scope="row">{config.id}</TableCell>
+                <TableCell>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ fontStyle: getDescription(config) === 'No description' ? 'italic' : 'normal' }}
+                  >
+                    {getDescription(config)}
+                  </Typography>
+                  {config.metadata?.tags && config.metadata.tags.length > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      {config.metadata.tags.map((tag: string) => (
+                        <Chip 
+                          key={tag} 
+                          label={tag} 
+                          size="small" 
+                          variant="outlined"
+                          sx={{ mr: 0.5, mb: 0.5 }}
+                        />
+                      ))}
+                    </Box>
+                  )}
+                </TableCell>
+                <TableCell>{config.metadata?.author}</TableCell>
+                <TableCell>
+                  <TimeAgo timestamp={config.metadata?.updated_at} />
+                </TableCell>
+                <TableCell>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleMenuOpen(e, config.id)}
+                  >
+                    <MoreVertIcon />
+                  </IconButton>
                 </TableCell>
               </TableRow>
-            ) : (
-              // Apply pagination to the filtered configs
-              filteredConfigs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((config) => (
-                <TableRow 
-                  key={config.id} 
-                  hover 
-                  onClick={() => handleRowClick(config.id)}
-                  sx={{ cursor: 'pointer' }}
-                >
-                  <TableCell component="th" scope="row">{config.id}</TableCell>
-                  <TableCell>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ fontStyle: getDescription(config) === 'No description' ? 'italic' : 'normal' }}
-                    >
-                      {getDescription(config)}
-                    </Typography>
-                    {config.metadata?.tags && config.metadata.tags.length > 0 && (
-                      <Box sx={{ mt: 1 }}>
-                        {config.metadata.tags.map((tag: string) => (
-                          <Chip 
-                            key={tag} 
-                            label={tag} 
-                            size="small" 
-                            variant="outlined"
-                            sx={{ mr: 0.5, mb: 0.5 }}
-                          />
-                        ))}
-                      </Box>
-                    )}
-                  </TableCell>
-                  <TableCell>{config.metadata?.author}</TableCell>
-                  <TableCell>
-                    <TimeAgo timestamp={config.metadata?.updated_at} />
-                  </TableCell>
-                  <TableCell>
-                    <IconButton
-                      size="small"
-                      onClick={(e)ig.id)}
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
+            ))
+          )}
+        </TableBody>
         </Table>
         <TablePagination
           rowsPerPageOptions={[25, 50, 100]}

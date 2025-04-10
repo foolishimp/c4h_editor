@@ -1,6 +1,4 @@
-// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobsList.tsx
-
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -11,10 +9,15 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
+  TablePagination,
   Paper,
   Chip,
+  TextField,
+  InputAdornment,
   CircularProgress
 } from '@mui/material';
+import { Search as SearchIcon } from '@mui/icons-material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useJobContext } from '../contexts/JobContext';
 import { JobStatus } from 'shared';
@@ -24,9 +27,25 @@ interface JobsListProps {
   onSelectJob: (jobId: string) => void;
 }
 
+// Define sort direction type
+type SortDirection = 'asc' | 'desc';
+
+// Define sort field type
+type SortField = 'id' | 'configurations' | 'status' | 'created_at' | 'updated_at';
+
+// Interface for sort state
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
 const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
   const { jobs, loadJobs, loading, error } = useJobContext();
-  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sort, setSort] = useState<SortState>({ field: 'updated_at', direction: 'desc' });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
+
   // Load jobs only on mount - no polling
   useEffect(() => {
     loadJobs();
@@ -38,6 +57,72 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
       .map(([type, config]) => `${type}: ${config.id}`)
       .join(', ');
   }, []);
+  
+  // Filter and sort jobs
+  const filteredJobs = useMemo(() => {
+    let filtered = [...jobs];
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(job => 
+        job.id.toLowerCase().includes(term) || 
+        formatConfigs(job.configurations).toLowerCase().includes(term) ||
+        job.status.toLowerCase().includes(term)
+      );
+    }
+    
+    // Apply sorting
+    filtered = filtered.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sort.field) {
+        case 'id':
+          comparison = a.id.localeCompare(b.id);
+          break;
+        case 'configurations':
+          comparison = formatConfigs(a.configurations).localeCompare(formatConfigs(b.configurations));
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'created_at':
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          comparison = dateA - dateB;
+          break;
+        case 'updated_at':
+          const updatedA = new Date(a.updatedAt || 0).getTime();
+          const updatedB = new Date(b.updatedAt || 0).getTime();
+          comparison = updatedA - updatedB;
+          break;
+      }
+      
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+    
+    return filtered;
+  }, [jobs, searchTerm, sort, formatConfigs]);
+  
+  const handleSortChange = (field: SortField) => {
+    if (sort.field === field) {
+      // Toggle direction if same field
+      setSort({ field, direction: sort.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      setSort({ field, direction: 'asc' });
+    }
+  };
+  
+  // Handle page change
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+  
+  // Handle rows per page change
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
   
   return (
     <Box>
@@ -53,6 +138,23 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
         </Button>
       </Box>
       
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <TextField
+          placeholder="Search jobs..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          sx={{ mr: 2, flexGrow: 1 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+      
       {error && (
         <Box sx={{ mb: 3, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
           <Typography color="error">{error}</Typography>
@@ -63,59 +165,106 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Configurations</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Created</TableCell>
-              <TableCell>Updated</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'id'}
+                  direction={sort.field === 'id' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('id')}
+                >
+                  ID
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'configurations'}
+                  direction={sort.field === 'configurations' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('configurations')}
+                >
+                  Configurations
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'status'}
+                  direction={sort.field === 'status' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('status')}
+                >
+                  Status
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'created_at'}
+                  direction={sort.field === 'created_at' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('created_at')}
+                >
+                  Created
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'updated_at'}
+                  direction={sort.field === 'updated_at' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('updated_at')}
+                >
+                  Updated
+                </TableSortLabel>
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {loading && jobs.length === 0 ? (
+            {loading && filteredJobs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={5} align="center">
                   <CircularProgress size={24} sx={{ mr: 1 }} />
                   Loading jobs...
                 </TableCell>
               </TableRow>
-            ) : jobs.length === 0 ? (
+            ) : filteredJobs.length === 0 ? (
               <TableRow> 
-                <TableCell colSpan={6} align="center">
-                  No jobs found. Create your first job!
+                <TableCell colSpan={5} align="center">
+                  {searchTerm 
+                    ? `No jobs found matching your search.` 
+                    : `No jobs found. Create your first job!`}
                 </TableCell>
               </TableRow>
             ) : (
-              jobs.map((job) => (
-                <TableRow key={job.id} hover>
-                  <TableCell>{job.id}</TableCell>
-                  <TableCell>{formatConfigs(job.configurations)}</TableCell>
-                  <TableCell>
-                    <Chip 
-                      label={job.status} 
-                      color={getStatusColor(job.status)} 
-                    />
-                  </TableCell> 
-                  <TableCell>
-                    <TimeAgo timestamp={job.createdAt} />
-                  </TableCell>
-                  <TableCell>
-                    <TimeAgo timestamp={job.updatedAt} />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outlined"
-                      size="small" 
-                      onClick={() => onSelectJob(job.id)}
-                    >
-                      View Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+              // Apply pagination to the filtered jobs
+              filteredJobs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((job) => (
+              <TableRow key={job.id} hover>
+                <TableCell 
+                  onClick={() => onSelectJob(job.id)}
+                  sx={{ cursor: 'pointer' }}
+                >{job.id}</TableCell>
+                <TableCell>{formatConfigs(job.configurations)}</TableCell>
+                <TableCell>
+                  <Chip 
+                    label={job.status} 
+                    color={getStatusColor(job.status)} 
+                  />
+                </TableCell> 
+                <TableCell>
+                  <TimeAgo timestamp={job.createdAt} />
+                </TableCell>
+                <TableCell>
+                  <TimeAgo timestamp={job.updatedAt} />
+                </TableCell>
+              </TableRow>
+            ))
+          )}
           </TableBody>
         </Table>
+        <TablePagination
+          rowsPerPageOptions={[25, 50, 100]}
+          component="div"
+          count={filteredJobs.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Rows per page:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
+        />
       </TableContainer>
     </Box> 
   );
