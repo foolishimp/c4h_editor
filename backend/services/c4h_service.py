@@ -66,7 +66,7 @@ class C4HService:
             logger.info(f"C4H API key not found in environment variable {self.api_key_env} - proceeding without authentication header")
 
         # Initialize HTTP client
-        self.http_client = httpx.AsyncClient(timeout=60.0)
+        self.http_client = httpx.AsyncClient(timeout=1200.0)
 
         logger.info(f"C4H service client initialized with API base: {self.api_base}, API version: {self.api_version}")
 

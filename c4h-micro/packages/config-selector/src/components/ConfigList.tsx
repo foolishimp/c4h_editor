@@ -1,4 +1,3 @@
-// File: /packages/config-selector/src/components/ConfigList.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -10,6 +9,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
+  TablePagination,
   Paper,
   Chip,
   IconButton,
@@ -30,6 +31,7 @@ import {
   MoreVert as MoreVertIcon,
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon
+  
 } from '@mui/icons-material';
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes, TimeAgo } from 'shared';
@@ -39,6 +41,20 @@ interface ConfigListProps {
   onEdit?: (id: string) => void;
   onCreateNew?: () => void;
 }
+
+// Define sort direction type
+type SortDirection = 'asc' | 'desc';
+
+// Define sort field type
+type SortField = 'id' | 'description' | 'author' | 'updated_at';
+
+// Interface for sort state
+interface SortState {
+  field: SortField;
+  direction: SortDirection;
+}
+
+const DEFAULT_ROWS_PER_PAGE = 25;
 
 const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const { 
@@ -55,6 +71,10 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [filteredConfigs, setFilteredConfigs] = useState<any[]>([]);
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
+  const [sort, setSort] = useState<SortState>({ field: 'updated_at', direction: 'desc' });
   
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
@@ -110,6 +130,31 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
       );
     }
     
+    // Apply sorting
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sort.field) {
+        case 'id':
+          comparison = a.id.localeCompare(b.id);
+          break;
+        case 'description':
+          comparison = getDescription(a).localeCompare(getDescription(b));
+          break;
+        case 'author':
+          comparison = (a.metadata?.author || '').localeCompare(b.metadata?.author || '');
+          break;
+        case 'updated_at':
+          // Compare dates - newer dates first for desc
+          const dateA = new Date(a.metadata?.updated_at || 0).getTime();
+          const dateB = new Date(b.metadata?.updated_at || 0).getTime();
+          comparison = dateA - dateB;
+          break;
+      }
+      
+      return sort.direction === 'asc' ? comparison : -comparison;
+    });
+    
     setFilteredConfigs(filtered);
   }, [configs, searchTerm, showArchived]);
   
@@ -125,12 +170,22 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     }
   };
   
-  // Handle edit config
-  const handleEdit = (id: string) => {
+  // Handle row click (replaces edit button)
+  const handleRowClick = (id: string) => {
     if (onEdit) {
       onEdit(id);
     } else {
       handleNavigate(`/configs/${configType}/${id}`);
+    }
+  };
+  
+  // Handle sort change
+  const handleSortChange = (field: SortField) => {
+    if (sort.field === field) {
+      // Toggle direction if same field
+      setSort({ field, direction: sort.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      setSort({ field, direction: 'asc' });
     }
   };
   
@@ -232,6 +287,17 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     setShowDeleteDialog(false);
   };
   
+  // Handle page change
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+  
+  // Handle rows per page change
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+  
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -289,11 +355,43 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>ID</TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>Author</TableCell>
-              <TableCell>Updated</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'id'}
+                  direction={sort.field === 'id' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('id')}
+                >
+                  ID
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'description'}
+                  direction={sort.field === 'description' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('description')}
+                >
+                  Description
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'author'}
+                  direction={sort.field === 'author' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('author')}
+                >
+                  Author
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sort.field === 'updated_at'}
+                  direction={sort.field === 'updated_at' ? sort.direction : 'asc'}
+                  onClick={() => handleSortChange('updated_at')}
+                >
+                  Updated
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>Options</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -312,9 +410,15 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredConfigs.map((config) => (
-                <TableRow key={config.id}>
-                  <TableCell>{config.id}</TableCell>
+              // Apply pagination to the filtered configs
+              filteredConfigs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((config) => (
+                <TableRow 
+                  key={config.id} 
+                  hover 
+                  onClick={() => handleRowClick(config.id)}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  <TableCell component="th" scope="row">{config.id}</TableCell>
                   <TableCell>
                     <Typography 
                       variant="body2" 
@@ -341,17 +445,9 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                     <TimeAgo timestamp={config.metadata?.updated_at} />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => handleEdit(config.id)}
-                      sx={{ mr: 1 }}
-                    >
-                      Edit
-                    </Button>
                     <IconButton
                       size="small"
-                      onClick={(e) => handleMenuOpen(e, config.id)}
+                      onClick={(e)ig.id)}
                     >
                       <MoreVertIcon />
                     </IconButton>
@@ -361,6 +457,17 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          rowsPerPageOptions={[25, 50, 100]}
+          component="div"
+          count={filteredConfigs.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Rows per page:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
+        />
       </TableContainer>
       
       {/* Context Menu */}
