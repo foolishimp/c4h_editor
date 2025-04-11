@@ -186,7 +186,8 @@ async def health_check():
         "services": {
             "repository": True,
             "jobs": True,
-            "c4h": True
+            "c4h": True,
+            "multi_config_support": True
         },
         "supported_config_types": available_config_types
     }

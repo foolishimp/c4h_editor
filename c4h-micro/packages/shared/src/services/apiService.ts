@@ -1,8 +1,6 @@
-// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/services/apiService.ts
-
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { configTypes, ConfigTypeMetadata } from '../config/configTypes'; 
-import { Job, JobStatus, JobListResponse } from '../types/job';
+import { Job, JobStatus, JobListResponse, JobConfigReference } from '../types/job';
 
 const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL 
   ? process.env.VITE_API_BASE_URL 
@@ -240,17 +238,46 @@ class ApiService {
   }
   
   async submitJobTuple(workorderId: string, teamconfigId: string, runtimeconfigId: string, userId?: string) {
+    // Legacy method - uses the old format
     console.log(`API: Submitting job tuple with workorder=${workorderId}, team=${teamconfigId}, runtime=${runtimeconfigId}`);
     
     const requestData = {
-      workorder: { id: workorderId, version: "latest", config_type: "workorder" },
-      team: { id: teamconfigId, version: "latest", config_type: "teamconfig" },
-      runtime: { id: runtimeconfigId, version: "latest", config_type: "runtimeconfig" },
+      configurations: {
+        workorder: { id: workorderId, version: "latest", config_type: "workorder" },
+        team: { id: teamconfigId, version: "latest", config_type: "teamconfig" },
+        runtime: { id: runtimeconfigId, version: "latest", config_type: "runtimeconfig" },
+      },
       user_id: userId || 'current-user',
       job_configuration: { max_runtime: 3600, notify_on_completion: true }
     };
     
     return this.post<any>('/api/v1/jobs', requestData);
+  }
+
+  async submitJobConfigs(
+    configs: JobConfigReference[],
+    userId?: string,
+    jobConfiguration?: Record<string, any>
+  ) {
+    console.log('API: Submitting job with configurations list:', configs);
+
+    if (!configs || configs.length === 0) {
+      throw new Error('At least one configuration must be provided');
+    }
+
+    // Fill in default version if not provided
+    const configurations = configs.map(config => ({
+      ...config,
+      version: config.version || 'latest'
+    }));
+
+    // Create request data with configurations list
+    const requestData = {
+      configurations,
+      user_id: userId || 'current-user',
+      job_configuration: jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
+    };
+    return this.post<any>('/api/v1/jobs/multi-config', requestData); // Use the new endpoint
   }
   
   async cancelJob(id: string) {

@@ -1,4 +1,3 @@
-# backend/models/job.py
 """Job model for tracking configuration job submissions to C4H service."""
 
 from datetime import datetime, UTC
@@ -50,6 +49,13 @@ class ConfigReference(BaseModel, frozen=True):
     id: str = Field(..., description="Identifier of the configuration")
     version: str = Field(..., description="Version of the configuration")
 
+class ConfigurationSource(BaseModel):
+    """Source of a configuration used in a job."""
+    config_type: str = Field(..., description="Type of configuration")
+    config_id: str = Field(..., description="Identifier of the configuration")
+    version: Optional[str] = Field(None, description="Version of the configuration")
+    override_data: Optional[Dict[str, Any]] = Field(None, description="Override data for the configuration")
+    priority: int = Field(0, description="Priority of the configuration (lower = higher priority)")
 
 class Job(BaseModel):
     """Job represents a configuration tuple submission to the C4H service."""
@@ -58,6 +64,9 @@ class Job(BaseModel):
     # Immutable job definition
     configurations: Dict[str, ConfigReference] = Field(
         ..., description="Map of configuration types to references"
+    )
+    config_sources: List[ConfigurationSource] = Field(
+        default_factory=list, description="Sources of configurations in priority order"
     )
     user_id: Optional[str] = Field(None, description="User who submitted the job")
     configuration: Dict[str, Any] = Field(default_factory=dict, 

@@ -1,9 +1,3 @@
-# File: /Users/jim/src/apps/c4h_editor/backend/services/c4h_service.py
-# MODIFIED:
-# - Removed development/mock logic to always call the real API
-# - Added logging for URL and payload
-# - Aligned submit_job payload structure with C4H Service API JobRequest model
-
 """Service client for interacting with the C4H API with support for multiple configurations."""
 
 import os
@@ -38,7 +32,7 @@ class JobStatusResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime 
     storage_path: Optional[str] = None
 
 
@@ -71,8 +65,66 @@ class C4HService:
         logger.info(f"C4H service client initialized with API base: {self.api_base}, API version: {self.api_version}")
 
     # ADD/REPLACE this function in /Users/jim/src/apps/c4h_editor/backend/services/c4h_service.py
+    
+    async def submit_job_with_configs(self, configurations: List[Dict[str, Any]]) -> JobSubmissionResponse:
+        """
+        Submit a job with a list of configuration objects to the C4H service.
+        
+        Args:
+            configurations: List of configuration objects in priority order (leftmost = highest priority)
+                           These will be sent directly to the C4H Service for internal merging
+        
+        Returns:
+            JobSubmissionResponse with job_id and status
+        """
+        if not configurations or not isinstance(configurations, list):
+            raise ValueError("configurations must be a non-empty list")
+
+        logger.info(f"Preparing job submission with {len(configurations)} configurations")
+        
+        # Create URL
+        url_parts = [self.api_base]
+        if self.api_version:
+            url_parts.append(self.api_version)
+        url_parts.append("jobs")
+        url = "/".join(s.strip('/') for s in url_parts)
+        
+        # Prepare headers
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        
+        logger.info(f"Submitting job to URL: {url}")
+        try:
+            # Log the configurations being sent (safely limiting detail for large configs)
+            config_summary = [f"Config {i}: {c.get('id', 'unknown')} ({c.get('config_type', 'unknown')})" 
+                             for i, c in enumerate(configurations)]
+            logger.info(f"Configurations in submission: {config_summary}")
+        except Exception as e:
+            logger.error(f"Error logging config summary: {e}")
+        
+        try:
+            # --- START CHANGE ---
+            # Wrap the list in the expected dictionary structure
+            payload = {"configs": configurations}
+            response = await self.http_client.post(url, headers=headers, json=payload)
+            # --- END CHANGE ---
+            
+            if response.status_code >= 400:
+                logger.error(f"C4H API error: status_code={response.status_code}, response={response.text}")
+                return JobSubmissionResponse(
+                    job_id="", status="error", 
+                    message=f"C4H API error: {response.status_code} - {response.text}"
+                )
+            
+            response_data = response.json()
+            return JobSubmissionResponse(**response_data)
+        except Exception as e:
+            logger.error(f"Error submitting job: {e}", exc_info=True)
+            return JobSubmissionResponse(job_id="", status="error", message=f"Error submitting job: {str(e)}")
 
     async def submit_job(self, workorder: Configuration = None, team: Configuration = None, runtime: Configuration = None) -> JobSubmissionResponse:
+        """Legacy method for backward compatibility - will be deprecated in future releases."""
         """
         Submit a job with multiple configurations to the C4H service.
         Payload structure is aligned with the C4H Service API's JobRequest model,

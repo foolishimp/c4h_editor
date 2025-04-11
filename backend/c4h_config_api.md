@@ -378,6 +378,31 @@ Request:
 
 Response: Same format as Get Job
 
+#### Submit Job with Multiple Configurations
+
+```
+POST /api/v1/jobs/multi-config
+```
+
+Request:
+```json
+{
+  "workorder": {"id": "workorder-id", "version": "1.0.0", "config_type": "workorder"},
+  "team": {"id": "teamconfig-id", "config_type": "teamconfig"},
+  "runtime": {"id": "runtimeconfig-id", "config_type": "runtimeconfig"},
+  "user_id": "user-id",
+  "job_configuration": {
+    "max_runtime": 3600,
+    "notify_on_completion": true
+  },
+  "overrides": [
+    {"config_type": "workorder", "content": {"workorder": {"project": {"path": "/modified/path"}}}}
+  ]
+}
+```
+
+Response: Same format as Get Job
+
 #### Cancel Job
 
 ```

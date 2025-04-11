@@ -1,5 +1,3 @@
-// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
-
 import React, { useState, useEffect } from 'react';
 import { 
   Alert,
@@ -14,7 +12,7 @@ import {
   Select, 
   MenuItem
 } from '@mui/material'; 
-import { configTypes, api } from 'shared';
+import { configTypes, api, JobConfigReference } from 'shared';
 import { useJobContext } from '../contexts/JobContext';
 
 interface ConfigOption {
@@ -26,7 +24,7 @@ interface ConfigOption {
 const REQUIRED_CONFIG_TYPES = ['workorder', 'teamconfig', 'runtimeconfig'];
 
 const JobCreator: React.FC = () => {
-  const { submitJobTuple, loading, error } = useJobContext();
+  const { submitJobConfigurations, loading, error } = useJobContext();
   
   // State for selected config IDs - with strict typing for required configs
   const [workorderId, setWorkorderId] = useState<string>(""); 
@@ -52,11 +50,13 @@ const JobCreator: React.FC = () => {
       
       for (const configType of REQUIRED_CONFIG_TYPES) {
         try {
-          // Use direct API call instead of apiService.getConfigs
+          // Get the API endpoint for this config type
           const endpoint = configTypes[configType]?.apiEndpoints.list;
           if (endpoint) {
+            // Make the API call
             const response = await api.get(endpoint);
-            const configs = response.data || [];
+            
+            const configs = Array.isArray(response.data) ? response.data : [];
             
             if (Array.isArray(configs)) {
               options[configType] = configs.map(item => {
@@ -91,21 +91,24 @@ const JobCreator: React.FC = () => {
   const handleSubmit = () => {
     if (isFormValid) {
       try {
-        // FIXED: Add config_type to each configuration object
-        submitJobTuple({
-          workorder: {
-            id: workorderId,
-            config_type: 'workorder'
+        // Create a list of configurations in the order they should be applied
+        // Order matters - items later in the list have precedence in merges
+        const configList: JobConfigReference[] = [
+          // List from lowest to highest precedence
+          {
+            id: runtimeconfigId,
+            config_type: 'runtimeconfig'
           },
-          teamconfig: {
+          {
             id: teamconfigId,
             config_type: 'teamconfig'
           },
-          runtimeconfig: {
-            id: runtimeconfigId,
-            config_type: 'runtimeconfig'
+          {
+            id: workorderId,
+            config_type: 'workorder'
           }
-        });
+        ];
+        submitJobConfigurations(configList);
       } catch (err) { /* Error is handled by the context */ }
     }
   };

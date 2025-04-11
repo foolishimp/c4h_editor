@@ -1,5 +1,3 @@
-// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shared/src/types/job.ts
-
 /** 
  * Enhanced Job types to support the configuration-driven approach
  */
@@ -15,8 +13,14 @@ export enum JobStatus {
 
 export interface JobConfigReference {
   id: string;
-  version: string;
-  config_type: string; // Added to match API requirements
+  version?: string;
+  config_type: string;
+}
+
+export interface JobSubmissionRequest {
+  configurations: JobConfigReference[];
+  user_id?: string;
+  job_configuration?: JobConfiguration;
 }
 
 export interface JobResult {

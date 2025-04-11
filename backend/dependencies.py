@@ -1,4 +1,3 @@
-# File: backend/dependencies.py
 """
 Dependency injection functions for FastAPI endpoints.
 Focused on generic configuration management and C4H service access.
@@ -54,6 +53,7 @@ def get_c4h_service():
     if _c4h_service is None:
         # Load from default config path if available
         config_path = Path("./config.yaml")
+        logger.info("Initializing C4H service with multi-config support")
         if config_path.exists():
             _c4h_service = C4HService(str(config_path))
             logger.info(f"Created C4HService with config from {config_path}")

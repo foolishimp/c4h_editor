@@ -1,8 +1,6 @@
-// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
-
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api, apiService } from 'shared';
-import { Job, JobStatus } from 'shared';
+import { apiService } from 'shared';
+import { Job, JobStatus, JobConfigReference } from 'shared';
 
 // Context state interface
 interface JobContextState {
@@ -13,18 +11,9 @@ interface JobContextState {
 
   loadJobs: () => Promise<void>;
   loadJob: (id: string) => Promise<void>;
-  submitJob: (configs: Record<string, string>) => Promise<void>;
   cancelJob: (id: string) => Promise<void>;
   pollJobStatus: (id: string) => Promise<void>;
-
-  // New method with explicit configuration objects
-  submitJobTuple: (
-    params: {
-      workorder: { id: string, config_type: string },
-      teamconfig: { id: string, config_type: string },
-      runtimeconfig: { id: string, config_type: string }
-    }
-  ) => Promise<void>;
+  submitJobConfigurations: (configs: JobConfigReference[]) => Promise<void>;
 }
 
 // Create the context
@@ -120,28 +109,19 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // Submit a new job
-  const submitJob = useCallback(async (configs: Record<string, string>) => {
-    setLoading(true);
+  // New method that accepts configuration list
+  const submitJobConfigurations = useCallback(async (configs: JobConfigReference[]) => {
+    setLoading(true); 
     setError(null);
     
     try {
-      // Validate required configuration types
-      if (!configs.workorder || !configs.teamconfig || !configs.runtimeconfig) {
-        throw new Error("All required configuration types must be specified");
+      // Validate required configurations
+      if (!configs || configs.length === 0) {
+        throw new Error("At least one configuration must be provided");
       }
 
-      // Create job request with the properly named fields according to backend's expectations
-      const requestData = {
-        workorder: { id: configs.workorder, version: "latest", config_type: "workorder" },
-        team: { id: configs.teamconfig, version: "latest", config_type: "teamconfig" },
-        runtime: { id: configs.runtimeconfig, version: "latest", config_type: "runtimeconfig" },
-        user_id: 'current-user',
-        job_configuration: { max_runtime: 3600, notify_on_completion: true }
-      };
-      
-      console.log("Submitting job with request:", requestData);
-      await api.post('/api/v1/jobs', requestData);
+      // Use apiService to submit the job with configurations list
+      await apiService.submitJobConfigs(configs);
       
       // Reload jobs after submission
       await loadJobs();
@@ -169,72 +149,6 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     }
   }, [loadJobs]);
 
-  // New method to submit job with explicit configuration objects
-  const submitJobTuple = useCallback(async (
-    params: {
-      workorder: { id: string, config_type: string },
-      teamconfig: { id: string, config_type: string },
-      runtimeconfig: { id: string, config_type: string }
-    }
-  ) => {
-    setLoading(true); 
-    setError(null);
-    
-    try {
-      // Validate required parameters
-      if (!params.workorder.id) {
-        throw new Error("Workorder configuration is required");
-      }
-      if (!params.teamconfig.id) {
-        throw new Error("Team configuration is required");
-      }
-      if (!params.runtimeconfig.id) {
-        throw new Error("Runtime configuration is required");
-      }
-      
-      // Create job request using the tuple-based format matching the backend API design
-      const jobRequest = {
-        workorder: { 
-          id: params.workorder.id, 
-          version: "latest", 
-          config_type: params.workorder.config_type 
-        },
-        team: { 
-          id: params.teamconfig.id, 
-          version: "latest", 
-          config_type: params.teamconfig.config_type 
-        },
-        runtime: { 
-          id: params.runtimeconfig.id, 
-          version: "latest", 
-          config_type: params.runtimeconfig.config_type 
-        },
-        user_id: 'current-user',
-        job_configuration: { max_runtime: 3600, notify_on_completion: true }
-      };
-      
-      console.log("JobContext: Submitting job tuple:", jobRequest);
-      await api.post('/api/v1/jobs', jobRequest);
-      
-      // Reload jobs after submission
-      await loadJobs();
-    } catch (err: any) {
-      // Extract more detailed error information if available
-      const errorDetail = err.response?.data?.detail;
-      let errorMessage = 'Failed to submit job';
-      
-      if (errorDetail) {
-        errorMessage = typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail);
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      setError(errorMessage);
-      console.error('Error submitting job tuple:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadJobs]); 
-  
   // Cancel a job
   const cancelJob = useCallback(async (id: string) => {
     setLoading(true);
@@ -276,10 +190,9 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     
     loadJobs,
     loadJob,
-    submitJob,
+    submitJobConfigurations,
     cancelJob,
-    pollJobStatus,
-    submitJobTuple
+    pollJobStatus
   };
   
   return (
