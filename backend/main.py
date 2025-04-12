@@ -6,6 +6,9 @@ Focused on configuration management and C4H service access.
 
 import logging
 import json
+import sys
+import structlog # Import structlog
+from structlog import get_logger
 import os
 import time
 from fastapi import FastAPI, Request
@@ -25,18 +28,39 @@ from backend.services.c4h_service import C4HService
 from backend.config import load_config
 from backend.config.config_types import load_config_types, get_config_types
 from backend.api.middleware import RequestLoggingMiddleware, APIErrorLoggingMiddleware
-from backend.dependencies import get_job_repository, get_c4h_service
+from backend.dependencies import get_job_repository, get_c4h_service # Keep this if dependencies.py is used for repo/service instances
 
-# Configure logging
+# --- Explicit Structlog Configuration ---
+# Configure standard logging first (level set by uvicorn --log-level flag takes precedence here if basicConfig isn't called first,
+# but structlog needs this base handler setup). We won't set the level here.
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(message)s", # structlog will handle the final formatting
+    stream=sys.stdout,
+    level=logging.DEBUG # Set the underlying handler level low enough
 )
-logger = logging.getLogger(__name__)
+
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level, # Filter based on standard logging levels
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger, # Use standard logger wrapper
+    cache_logger_on_first_use=True,
+)
+
+# Now, get the logger using the configured structlog
+logger = get_logger(__name__)
 
 # Create API request logger
+# Note: JsonFormatter might conflict slightly with structlog's output,
+# but we'll keep it for now for the specific api.requests logger.
+# Consider switching to structlog's JSONRenderer later if needed.
 api_logger = logging.getLogger("api.requests")
-api_logger.setLevel(logging.INFO)
+# Let the root level control this logger too, or set explicitly if needed:
+# api_logger.setLevel(logging.DEBUG)
 
 # Configure a formatter for structured logging
 class JsonFormatter(logging.Formatter):
