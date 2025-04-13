@@ -20,8 +20,9 @@ from backend.config.config_types import get_config_types, validate_config_type
 from backend.dependencies import get_job_repository, get_c4h_service
 from backend.models.job import StatusChangeEvent # Import if used in update_job
 
-# --- Logger setup ---
-logging.basicConfig(level=logging.INFO)
+# --- Logger setup --- (Import necessary modules)
+import logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # --- API Router ---
@@ -391,6 +392,15 @@ async def submit_multi_configs(
 
         if not config_list_for_service:
              raise ValueError("No valid configuration content could be prepared for submission.")
+
+        # --- ADDED: Log the payload before sending ---
+        payload = {"configs": config_list_for_service}
+        try:
+            payload_json = json.dumps(payload, indent=2, default=str) # Use default=str for datetimes etc.
+            logger.debug(f"Background: Attempting POST request to C4H Service /api/v1/jobs with payload:\n{payload_json}")
+        except Exception as json_err:
+            logger.error(f"Background: Failed to serialize payload for logging: {json_err}")
+        # --- END ADDED ---
 
         # Submit the list containing ONLY the content dictionaries
         submission = await c4h_service.submit_job_with_configs(config_list_for_service)
