@@ -110,12 +110,10 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const filteredConfigs = useMemo(() => {
     let filtered = configs || [];
 
-    // Filter by archived status - *Correction*: API list should ideally handle this filter server-side if possible.
-    // If API doesn't filter, this frontend filter is needed but less efficient.
-    // Assuming API *does* support filtering via query param, this frontend filter might be redundant
-    // or only needed if showing archived items explicitly. Let's keep it for now.
-    filtered = filtered.filter(config =>
-      showArchived ? config?.archived === true : config?.archived !== true // Check direct 'archived' field if API returns it
+    // Filter by archived status
+    // CORRECTED: Check config.archived directly, default to false if missing
+    filtered = filtered.filter(config => 
+      showArchived ? config?.archived === true : config?.archived !== true
     );
 
     // Filter by search term
@@ -381,7 +379,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   <TableCell>
                     <TimeAgo timestamp={config.updated_at} /> {/* Use direct access */}
                   </TableCell>
-                  <TableCell align="right"> {/* Align options to the right */}
+                  <TableCell align="right"> {/*         <TableCell align="right"> {/* Align options to the right */}
                     <IconButton size="small" onClick={(e) => handleMenuOpen(e, config.id)}>
                       <MoreVertIcon />
                     </IconButton>
@@ -441,4 +439,3 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
 };
 
 export default ConfigList;
-
