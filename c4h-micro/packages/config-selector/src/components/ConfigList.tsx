@@ -31,7 +31,7 @@ import {
   MoreVert as MoreVertIcon,
   Archive as ArchiveIcon,
   Unarchive as UnarchiveIcon
-  
+
 } from '@mui/icons-material';
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes, TimeAgo } from 'shared';
@@ -44,10 +44,8 @@ interface ConfigListProps {
 
 // Define sort direction type
 type SortDirection = 'asc' | 'desc';
-
 // Define sort field type
 type SortField = 'id' | 'description' | 'author' | 'updated_at';
-
 // Interface for sort state
 interface SortState {
   field: SortField;
@@ -57,17 +55,16 @@ interface SortState {
 const DEFAULT_ROWS_PER_PAGE = 25;
 
 const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
-  const { 
-    configType, 
-    configs, 
-    loadConfigs, 
+  const {
+    configType,
+    configs,
+    loadConfigs,
     archiveConfig,
     cloneConfig,
     deleteConfig,
     loading,
     error
   } = useConfigContext();
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [filteredConfigs, setFilteredConfigs] = useState<any[]>([]);
@@ -75,16 +72,15 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_ROWS_PER_PAGE);
   const [sort, setSort] = useState<SortState>({ field: 'updated_at', direction: 'desc' });
-  
+
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
-  
+
   const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [newConfigId, setNewConfigId] = useState('');
   const [cloneSourceId, setCloneSourceId] = useState<string | null>(null);
-  
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
   // Config name from registry
   const configName = configTypes[configType]?.name || configType;
 
@@ -92,48 +88,48 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const getDescription = (config: any): string => {
     // Check for both metadata.description and title field (API returns description as title in list response)
     const description = (config.metadata?.description?.trim() || config.title || '').trim() || 'No description';
-    console.log('ConfigList: Config description:', {
-      config_id: config.id,
-      metadata_description: config.metadata?.description,
-      title: config.title,
-      final_description: description
-    });
+    // console.log('ConfigList: Config description:', { // Keep console logs minimal or remove for production
+    //   config_id: config.id,
+    //   metadata_description: config.metadata?.description,
+    //   title: config.title,
+    //   final_description: description
+    // });
     return description;
   };
-  
+
   // Custom navigation handler that doesn't rely on React Router
   const handleNavigate = (path: string) => {
     window.location.href = path;
   };
-  
+
   // Load configs on mount and when configType changes
   useEffect(() => {
     loadConfigs();
-    console.log('ConfigList: Loading configs for type:', configType);
+    // console.log('ConfigList: Loading configs for type:', configType); // Keep console logs minimal
   }, [configType, loadConfigs]);
-  
+
   // Filter configs based on search term and archived status
   useEffect(() => {
     let filtered = configs || [];
-    
+
     // Filter by archived status
-    filtered = filtered.filter(config => 
+    filtered = filtered.filter(config =>
       showArchived ? config.metadata?.archived : !config.metadata?.archived
     );
-    
+
     // Filter by search term
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(config => 
-        config.id.toLowerCase().includes(term) || 
+      filtered = filtered.filter(config =>
+         config.id.toLowerCase().includes(term) ||
         getDescription(config).toLowerCase().includes(term)
       );
     }
-    
+
     // Apply sorting
     filtered = [...filtered].sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sort.field) {
         case 'id':
           comparison = a.id.localeCompare(b.id);
@@ -151,25 +147,25 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
           comparison = dateA - dateB;
           break;
       }
-      
+
       return sort.direction === 'asc' ? comparison : -comparison;
     });
-    
+
     setFilteredConfigs(filtered);
-  }, [configs, searchTerm, showArchived]);
-  
+  }, [configs, searchTerm, showArchived, sort]); // Added sort dependency
+
   // Handle create new config
   const handleCreateNew = () => {
-    console.log('ConfigList: Create new button clicked for type:', configType);
+    // console.log('ConfigList: Create new button clicked for type:', configType); // Keep console logs minimal
     if (onCreateNew) {
-      console.log('ConfigList: Using onCreateNew callback');
+      // console.log('ConfigList: Using onCreateNew callback'); // Keep console logs minimal
       onCreateNew();
     } else {
-      console.log('ConfigList: Using direct navigation');
+      // console.log('ConfigList: Using direct navigation'); // Keep console logs minimal
       handleNavigate(`/configs/${configType}/new`);
     }
   };
-  
+
   // Handle row click (replaces edit button)
   const handleRowClick = (id: string) => {
     if (onEdit) {
@@ -178,50 +174,48 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
       handleNavigate(`/configs/${configType}/${id}`);
     }
   };
-  
+
   // Handle sort change
   const handleSortChange = (field: SortField) => {
-    if (sort.field === field) {
-      // Toggle direction if same field
-      setSort({ field, direction: sort.direction === 'asc' ? 'desc' : 'asc' });
-    } else {
-      setSort({ field, direction: 'asc' });
-    }
+    const isAsc = sort.field === field && sort.direction === 'asc';
+    setSort({ field, direction: isAsc ? 'desc' : 'asc' });
   };
-  
+
   // Handle menu open
   const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
     setMenuAnchorEl(event.currentTarget);
     setSelectedConfigId(id);
-    console.log(`Menu opened for config: ${id}`);
+    // console.log(`Menu opened for config: ${id}`); // Keep console logs minimal
   };
-  
+
   // Handle menu close
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
     setSelectedConfigId(null);
   };
-  
+
   // Handle archive/unarchive
   const handleArchiveToggle = async () => {
     if (selectedConfigId) {
       try {
-        const isArchived = configs.find(c => c.id === selectedConfigId)?.metadata?.archived || false;
-        console.log(`Toggling archive state for ${selectedConfigId} from ${isArchived} to ${!isArchived}`);
-        
+        const configToToggle = configs.find(c => c.id === selectedConfigId);
+        const isArchived = configToToggle?.metadata?.archived || false;
+        // console.log(`Toggling archive state for ${selectedConfigId} from ${isArchived} to ${!isArchived}`); // Keep console logs minimal
+
         await archiveConfig(selectedConfigId, !isArchived);
-        console.log(`Archive operation completed for ${selectedConfigId}`);
-        
-        // Force reload configs after archive operation
+        // console.log(`Archive operation completed for ${selectedConfigId}`); // Keep console logs minimal
+        // Force reload configs after archive operation - loadConfigs should trigger useEffect to refilter
         await loadConfigs();
-        
+
         handleMenuClose();
       } catch (err) {
         console.error(`Archive toggle error:`, err);
+        // Optionally: Show error to user via Snackbar/Alert
+        handleMenuClose();
       }
     }
   };
-  
+
   // Modify the handleCloneClick function
   const handleCloneClick = () => {
     if (selectedConfigId) {
@@ -229,7 +223,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
       setNewConfigId(`${configToClone}-copy`);
       setShowCloneDialog(true);
       setCloneSourceId(configToClone); // Save ID for later use
-      console.log(`Showing clone dialog for ${configToClone}`);
+      // console.log(`Showing clone dialog for ${configToClone}`); // Keep console logs minimal
       handleMenuClose();
     }
   };
@@ -238,89 +232,95 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
   const handleCloneConfirm = async () => {
     if (cloneSourceId && newConfigId) { // Use cloneSourceId here instead of selectedConfigId
       try {
-        console.log(`Cloning ${cloneSourceId} to ${newConfigId}`);
+        // console.log(`Cloning ${cloneSourceId} to ${newConfigId}`); // Keep console logs minimal
         await cloneConfig(cloneSourceId, newConfigId);
-        console.log(`Clone operation completed`);
+        // console.log(`Clone operation completed`); // Keep console logs minimal
         setShowCloneDialog(false);
         setNewConfigId('');
         setCloneSourceId(null); // Reset after use
-        await loadConfigs();
+        await loadConfigs(); // Refresh list after clone
       } catch (err) {
         console.error(`Clone error:`, err);
+        // Optionally: Show error to user
+        setShowCloneDialog(false); // Close dialog on error too
+        setNewConfigId('');
+        setCloneSourceId(null);
       }
     }
   };
-  
+
   // Handle clone dialog close
   const handleCloneCancel = () => {
     setShowCloneDialog(false);
     setNewConfigId('');
+    setCloneSourceId(null); // Reset source ID on cancel
   };
-  
+
   // Handle delete dialog open
   const handleDeleteClick = () => {
     if (selectedConfigId) {
-      console.log(`Showing delete dialog for ${selectedConfigId}`);
+      // console.log(`Showing delete dialog for ${selectedConfigId}`); // Keep console logs minimal
       setShowDeleteDialog(true);
       handleMenuClose();
     }
   };
-  
+
   // Handle delete confirm
   const handleDeleteConfirm = async () => {
     if (selectedConfigId) {
       try {
-        console.log(`Deleting ${selectedConfigId}`);
+        // console.log(`Deleting ${selectedConfigId}`); // Keep console logs minimal
         await deleteConfig(selectedConfigId);
-        console.log(`Delete operation completed`);
+        // console.log(`Delete operation completed`); // Keep console logs minimal
         setShowDeleteDialog(false);
         // Force reload configs after delete operation
         await loadConfigs();
       } catch (err) {
         console.error(`Delete error:`, err);
+        // Optionally: Show error to user
+        setShowDeleteDialog(false);
       }
     }
   };
-  
+
   // Handle delete dialog close
   const handleDeleteCancel = () => {
     setShowDeleteDialog(false);
   };
-  
+
   // Handle page change
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
-  
   // Handle rows per page change
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
-  
+
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5">{configName} List</Typography>
         <Box>
-          <Button 
-            startIcon={<RefreshIcon />} 
+          <Button
+            startIcon={<RefreshIcon />}
             onClick={loadConfigs}
             disabled={loading}
             sx={{ mr: 1 }}
           >
             Refresh
           </Button>
-          <Button 
-            variant="contained" 
-            startIcon={<AddIcon />} 
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
             onClick={handleCreateNew}
           >
             Create New {configName}
           </Button>
         </Box>
       </Box>
-      
+
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
         <TextField
           placeholder={`Search ${configName.toLowerCase()}...`}
@@ -336,21 +336,21 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
             ),
           }}
         />
-        <IconButton 
-          onClick={() => setShowArchived(!showArchived)} 
+        <IconButton
+          onClick={() => setShowArchived(!showArchived)}
           color={showArchived ? "primary" : "default"}
           title={showArchived ? "Hide archived" : "Show archived"}
         >
           {showArchived ? <UnarchiveIcon /> : <ArchiveIcon />}
         </IconButton>
       </Box>
-      
+
       {error && (
         <Box sx={{ mb: 3, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
           <Typography color="error">{error}</Typography>
         </Box>
       )}
-      
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -364,6 +364,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   ID
                 </TableSortLabel>
               </TableCell>
+
               <TableCell>
                 <TableSortLabel
                   active={sort.field === 'description'}
@@ -373,6 +374,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   Description
                 </TableSortLabel>
               </TableCell>
+
               <TableCell>
                 <TableSortLabel
                   active={sort.field === 'author'}
@@ -382,6 +384,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   Author
                 </TableSortLabel>
               </TableCell>
+
               <TableCell>
                 <TableSortLabel
                   active={sort.field === 'updated_at'}
@@ -391,6 +394,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   Updated
                 </TableSortLabel>
               </TableCell>
+
               <TableCell>Options</TableCell>
             </TableRow>
           </TableHead>
@@ -402,26 +406,26 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
             ) : filteredConfigs.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} align="center">
-                {searchTerm 
-                  ? `No ${configName.toLowerCase()} found matching your search.` 
-                  : showArchived 
-                    ? `No archived ${configName.toLowerCase()} found.` 
+                {searchTerm
+                  ? `No ${configName.toLowerCase()} found matching your search.`
+                  : showArchived
+                    ? `No archived ${configName.toLowerCase()} found.`
                     : `No ${configName.toLowerCase()} found. Create your first one!`}
               </TableCell>
             </TableRow>
           ) : (
             // Apply pagination to the filtered configs
             filteredConfigs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((config) => (
-              <TableRow 
-                key={config.id} 
-                hover 
-                onClick={() => handleRowClick(config.id)}
+              <TableRow
+                key={config.id}
+                hover
+                onClick={() => handleRowClick(config.id)} // Click on row navigates
                 sx={{ cursor: 'pointer' }}
               >
                 <TableCell component="th" scope="row">{config.id}</TableCell>
                 <TableCell>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{ fontStyle: getDescription(config) === 'No description' ? 'italic' : 'normal' }}
                   >
                     {getDescription(config)}
@@ -429,13 +433,13 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   {config.metadata?.tags && config.metadata.tags.length > 0 && (
                     <Box sx={{ mt: 1 }}>
                       {config.metadata.tags.map((tag: string) => (
-                        <Chip 
-                          key={tag} 
-                          label={tag} 
-                          size="small" 
+                        <Chip
+                          key={tag}
+                          label={tag}
+                          size="small"
                           variant="outlined"
                           sx={{ mr: 0.5, mb: 0.5 }}
-                        />
+                         />
                       ))}
                     </Box>
                   )}
@@ -445,9 +449,13 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                   <TimeAgo timestamp={config.metadata?.updated_at} />
                 </TableCell>
                 <TableCell>
+                  {/* Apply stopPropagation to the IconButton's onClick */}
                   <IconButton
                     size="small"
-                    onClick={(e) => handleMenuOpen(e, config.id)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent event from bubbling to TableRow
+                      handleMenuOpen(e, config.id);
+                    }}
                   >
                     <MoreVertIcon />
                   </IconButton>
@@ -455,7 +463,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
               </TableRow>
             ))
           )}
-        </TableBody>
+          </TableBody>
         </Table>
         <TablePagination
           rowsPerPageOptions={[25, 50, 100]}
@@ -469,7 +477,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} of ${count}`}
         />
       </TableContainer>
-      
+
       {/* Context Menu */}
       <Menu
         anchorEl={menuAnchorEl}
@@ -477,14 +485,14 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
         onClose={handleMenuClose}
       >
         <MenuItem onClick={handleArchiveToggle}>
-          {configs && selectedConfigId && configs.find(c => c.id === selectedConfigId)?.metadata?.archived 
-            ? 'Unarchive' 
+          {configs && selectedConfigId && configs.find(c => c.id === selectedConfigId)?.metadata?.archived
+            ? 'Unarchive'
             : 'Archive'}
         </MenuItem>
         <MenuItem onClick={handleCloneClick}>Clone</MenuItem>
         <MenuItem onClick={handleDeleteClick} sx={{ color: 'error.main' }}>Delete</MenuItem>
       </Menu>
-      
+
       {/* Clone Dialog */}
       <Dialog open={showCloneDialog} onClose={handleCloneCancel}>
         <DialogTitle>Clone {configName}</DialogTitle>
@@ -506,13 +514,14 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
           <Button onClick={handleCloneConfirm} disabled={!newConfigId.trim()}>Clone</Button>
         </DialogActions>
       </Dialog>
-      
+
       {/* Delete Dialog */}
       <Dialog open={showDeleteDialog} onClose={handleDeleteCancel}>
         <DialogTitle>Delete {configName}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete this {configName.toLowerCase()}? This action cannot be undone.
+            Are you sure you want to delete this {configName.toLowerCase()}?
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
