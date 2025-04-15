@@ -18,6 +18,7 @@ import { useJobContext } from '../contexts/JobContext';
 interface ConfigOption {
   id: string;
   description: string;
+  updated_at?: string;
 }
 
 // Filter to only include config types required for jobs
@@ -57,14 +58,29 @@ const JobCreator: React.FC = () => {
             const response = await api.get(endpoint);
             
             const configs = Array.isArray(response.data) ? response.data : [];
-            
+
             if (Array.isArray(configs)) {
-              options[configType] = configs.map(item => {
+              // Map to ConfigOption format first
+              let mappedOptions: ConfigOption[] = configs.map(item => {
                 // Handle different response structures safely - checking all possible locations for descriptions
                 const description = (item.metadata?.description?.trim() || item.title?.trim() || 
                                    item.description?.trim() || '').trim() || 'No description';
-                return { id: item.id, description };
+                // Include updated_at for sorting
+                return { 
+                  id: item.id, 
+                  description: description,
+                  updated_at: item.updated_at // Assuming API returns this field directly now
+                };
               });
+
+              // Sort by updated_at descending (newest first)
+              mappedOptions.sort((a, b) => {
+                const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+                const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+                return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA); // Descending sort
+              });
+
+              options[configType] = mappedOptions;
             }
           }
         } catch (err) {
