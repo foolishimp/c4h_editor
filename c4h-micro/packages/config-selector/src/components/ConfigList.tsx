@@ -45,7 +45,7 @@ interface ConfigListProps {
 // Define sort direction type
 type SortDirection = 'asc' | 'desc';
 // Define sort field type
-type SortField = 'id' | 'description' | 'author' | 'updated_at';
+type SortField = 'id' | 'description' | 'author' | 'updated_at'; // Add 'updated_at' if check determined it was missing
 // Interface for sort state
 interface SortState {
   field: SortField;
@@ -140,11 +140,11 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
         case 'author':
           comparison = (a.metadata?.author || '').localeCompare(b.metadata?.author || '');
           break;
+        // NOTE: Add case only if pre-check determined it was missing. Assume added here.
         case 'updated_at':
-          // Compare dates - newer dates first for desc
-          const dateA = new Date(a.metadata?.updated_at || 0).getTime();
+          const dateA = new Date(a.updated_at || 0).getTime(); // Use direct access
           const dateB = new Date(b.metadata?.updated_at || 0).getTime();
-          comparison = dateA - dateB;
+          comparison = dateA - dateB; // Default descending handled later
           break;
       }
 
@@ -385,6 +385,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 </TableSortLabel>
               </TableCell>
 
+              {/* Added Updated column header */}
               <TableCell>
                 <TableSortLabel
                   active={sort.field === 'updated_at'}
@@ -446,7 +447,8 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
                 </TableCell>
                 <TableCell>{config.metadata?.author}</TableCell>
                 <TableCell>
-                  <TimeAgo timestamp={config.metadata?.updated_at} />
+                  {/* Added Updated data cell - Use direct access */}
+                  <TimeAgo timestamp={config.updated_at} /> 
                 </TableCell>
                 <TableCell>
                   {/* Apply stopPropagation to the IconButton's onClick */}

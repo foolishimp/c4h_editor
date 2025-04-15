@@ -1,7 +1,7 @@
 """Repository for storing and retrieving jobs with multiple configurations."""
 
 import os
-import json
+import json # Keep json import
 import logging
 from datetime import datetime, UTC
 from typing import Dict, List, Optional, Any, Set, Tuple
@@ -15,6 +15,14 @@ from backend.config.config_types import get_config_types
 
 logger = logging.getLogger(__name__)
 
+# --- Add Custom JSON Encoder Helper ---
+def datetime_serializer(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, datetime):
+        # Ensure timezone info ('Z' for UTC) is always included
+        # Assumes aware datetime objects are UTC from datetime.now(UTC)
+        return obj.isoformat(timespec='microseconds').replace('+00:00', 'Z')
+    raise TypeError ("Type %s not serializable" % type(obj))
 
 class JobRepository:
     """Repository for storing and retrieving jobs."""
@@ -44,7 +52,9 @@ class JobRepository:
     
     def _serialize_job(self, job: Job) -> Dict[str, Any]:
         """Serialize a job to a dictionary."""
-        return json.loads(job.json())
+        # Use model_dump to get dict with datetime objects intact
+        # mode='python' ensures datetime objects are preserved
+        return job.model_dump(mode='python')
     
     def create_job(self, 
                   configurations: Dict[str, Dict[str, str]],
@@ -101,7 +111,7 @@ class JobRepository:
         )
         
         with open(job_path, "w") as f:
-            json.dump(self._serialize_job(job), f, indent=2)
+            json.dump(self._serialize_job(job), f, indent=2, default=datetime_serializer) # Use custom serializer
         
         logger.info(f"Created job {job_id} with configurations: {list(configurations.keys())}")
         
@@ -114,11 +124,21 @@ class JobRepository:
             for field in ['created_at', 'updated_at', 'submitted_at', 'completed_at']:
                 if field in data and data[field] is not None:
                     if isinstance(data[field], str):
+                        # Ensure timezone info is present for fromisoformat
+                        date_str = data[field]
+                        if not date_str.endswith('Z') and '+' not in date_str and '-' not in date_str[10:]: # Basic check if timezone might be missing
+                            date_str += 'Z' # Assume UTC if missing, might need adjustment based on actual stored format
                         try:
-                            data[field] = datetime.fromisoformat(data[field])
-                        except ValueError:
-                            # Handle old format without timezone
-                            data[field] = datetime.fromisoformat(data[field].replace('Z', '+00:00'))
+                            data[field] = datetime.fromisoformat(date_str.replace('Z', '+00:00')) # Handle Z properly
+                        except ValueError as date_err:
+                            logger.warning(f"Could not parse date string '{data[field]}' for field '{field}', setting to None: {date_err}")
+                            data[field] = None # Set to None if parsing fails
+            
+            # --- START FIX: Default updated_at to created_at if missing/invalid ---
+            if data.get('updated_at') is None and data.get('created_at') is not None:
+                data['updated_at'] = data['created_at']
+                logger.debug(f"Job {data.get('id')}: Defaulted missing updated_at to created_at")
+            # --- END FIX ---
             
             return Job(**data)
         except Exception as e:
@@ -227,7 +247,7 @@ class JobRepository:
         
         # Save to file
         with open(job_path, "w") as f:
-            json.dump(self._serialize_job(job), f, indent=2)
+            json.dump(self._serialize_job(job), f, indent=2, default=datetime_serializer) # Use custom serializer
         
         logger.info(f"Updated job {job.id}, status: {job.status}")
         

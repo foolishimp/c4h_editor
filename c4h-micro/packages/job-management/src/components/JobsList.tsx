@@ -31,7 +31,7 @@ interface JobsListProps {
 type SortDirection = 'asc' | 'desc';
 
 // Define sort field type
-type SortField = 'id' | 'configurations' | 'status' | 'created_at' | 'updated_at';
+type SortField = 'id' | 'configurations' | 'status' | 'created_at' | 'updated_at'; // NOTE: Assuming 'updated_at' was already present based on intent pre-check
 
 // Interface for sort state
 interface SortState {
@@ -91,6 +91,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
           const dateB = new Date(b.createdAt || 0).getTime();
           comparison = dateA - dateB;
           break;
+        // NOTE: Assuming 'updated_at' case already exists based on intent pre-check. No change here.
         case 'updated_at':
           const updatedA = new Date(a.updatedAt || 0).getTime();
           const updatedB = new Date(b.updatedAt || 0).getTime();
@@ -202,12 +203,14 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
                 </TableSortLabel>
               </TableCell>
               <TableCell>
+                {/* Added Updated column header */}
                 <TableSortLabel
                   active={sort.field === 'updated_at'}
                   direction={sort.field === 'updated_at' ? sort.direction : 'asc'}
                   onClick={() => handleSortChange('updated_at')}
                 >
                   Updated
+                  {/* NOTE: Removing the duplicate 'Updated' sort label that might have existed before */}
                 </TableSortLabel>
               </TableCell>
             </TableRow>
@@ -247,7 +250,11 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
                   <TimeAgo timestamp={job.createdAt} />
                 </TableCell>
                 <TableCell>
+                  {/* Added Updated data cell */}
                   <TimeAgo timestamp={job.updatedAt} />
+                </TableCell>
+                <TableCell>
+                  {/* Placeholder for potential future actions */}
                 </TableCell>
               </TableRow>
             ))

@@ -1,13 +1,12 @@
-# backend/services/config_repository.py
 """
 Generic repository for storing and versioning configurations.
 This base class can be used for all configuration types.
 """
 
 import os
-import json
+import json # Keep json import
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Type, cast
 import logging
 from pathlib import Path
@@ -19,6 +18,14 @@ from backend.models.configuration import Configuration, ConfigurationVersion, Co
 from backend.config.config_types import get_config_type, get_repo_path, validate_config_type
 
 logger = logging.getLogger(__name__)
+
+# --- Add Custom JSON Encoder Helper ---
+def datetime_serializer(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, datetime):
+        # Ensure timezone info ('Z' for UTC) is always included
+        return obj.isoformat(timespec='microseconds') + 'Z'
+    raise TypeError ("Type %s not serializable" % type(obj))
 
 class ConfigRepository:
     """
@@ -76,7 +83,9 @@ class ConfigRepository:
     
     def _serialize_config(self, config: Configuration) -> Dict[str, Any]:
         """Serialize a configuration to a dictionary."""
-        return json.loads(config.json())
+        # Use model_dump to get dict with datetime objects intact
+        # mode='python' ensures datetime objects are preserved
+        return config.model_dump(mode='python')
     
     def _deserialize_config(self, data: Dict[str, Any], model_cls: Type[Configuration] = Configuration) -> Configuration:
         """Deserialize a dictionary to a configuration."""
@@ -124,7 +133,7 @@ class ConfigRepository:
         
         # Write the file
         with open(config_path, "w") as f:
-            json.dump(serialized, f, indent=2)
+            json.dump(serialized, f, indent=2, default=datetime_serializer) # Use custom serializer
         
         # Verify file exists before git operations
         if not config_path.exists():
@@ -232,7 +241,7 @@ class ConfigRepository:
         # Write config to file
         serialized = self._serialize_config(config)
         with open(config_path, "w") as f:
-            json.dump(serialized, f, indent=2)
+            json.dump(serialized, f, indent=2, default=datetime_serializer) # Use custom serializer
         
         try:
             # Commit to git - use relative path from repo root
@@ -323,6 +332,20 @@ class ConfigRepository:
                     continue
                     
                 last_commit = commits[0]
+
+                # --- START FIX: Ensure valid updated_at ---
+                updated_at_str = data.get("metadata", {}).get("updated_at")
+                if not updated_at_str:
+                    try:
+                        # Fallback to file modification time if metadata is missing/invalid
+                        mtime_timestamp = path.stat().st_mtime
+                        updated_at_dt = datetime.fromtimestamp(mtime_timestamp, tz=timezone.utc)
+                        updated_at_str = updated_at_dt.isoformat()
+                        logger.debug(f"Using file mtime for updated_at fallback for {config_id}")
+                    except Exception as fallback_err:
+                        logger.warning(f"Could not get file mtime for {config_id}, using utcnow as last resort: {fallback_err}")
+                        updated_at_str = datetime.now(timezone.utc).isoformat() # Last resort fallback
+                # --- END FIX ---
                 
                 # Extract basic metadata
                 configs.append({
@@ -330,10 +353,10 @@ class ConfigRepository:
                     "version": data.get("metadata", {}).get("version", "unknown"),
                     "title": data.get("metadata", {}).get("description", config_id),
                     "author": data.get("metadata", {}).get("author", "unknown"),
-                    "updated_at": data.get("metadata", {}).get("updated_at", datetime.utcnow().isoformat()),
+                    "updated_at": updated_at_str, # Use the validated/fallback string
                     "config_type": self.config_type,
                     "last_commit": last_commit.hexsha,
-                    "last_commit_message": last_commit.message
+                    "last_commit_message": last_commit.message.strip(), # Ensure message is stripped
                 })
             except Exception as e:
                 logger.error(f"Error listing {self.config_type} '{config_id}': {str(e)}")
@@ -349,6 +372,7 @@ class ConfigRepository:
         
         Args:
             config_id: ID of the configuration
+            model_cls: Optional model classion
             model_cls: Optional model class for deserialization
             
         Returns:
