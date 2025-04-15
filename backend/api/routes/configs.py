@@ -1,4 +1,3 @@
-# File: backend/api/routes/configs.py
 """
 Generic API routes for configuration management.
 These endpoints support all configuration types in a unified interface.
@@ -52,6 +51,7 @@ class ConfigListResponse(BaseModel):
     author: str
     updated_at: str
     last_commit: str
+    archived: Optional[bool] = None # Make field optional to handle missing data gracefully
     last_commit_message: str
 
 class ConfigHistoryResponse(BaseModel):
@@ -106,8 +106,13 @@ async def list_configs(
         if archived is not None:
             configs = [c for c in configs if c.get("archived", False) == archived]
             
-        return configs
+        # Ensure the response model can handle the data structure from repo.list_configs
+        # No explicit mapping needed if field names match ConfigListResponse
+        # Pydantic will automatically use the fields defined in ConfigListResponse
+        # including the newly added 'archived' field.
+        return configs 
     except HTTPException:
+        # Re-raise HTTPExceptions directly
         raise
     except Exception as e:
         logger.error(f"Error listing configurations: {e}")
@@ -141,6 +146,7 @@ async def get_config(
         else:
             # Get last commit for this config
             config_path = repo._get_config_path(config_id)
+            # CORRECTED: Access iter_commits via the repo object within ConfigRepository
             last_commit = next(repo.repo.iter_commits(paths=str(config_path)))
             commit = last_commit.hexsha
         

@@ -6,7 +6,7 @@ This base class can be used for all configuration types.
 import os
 import json # Keep json import
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timezone # Ensure timezone is imported
 from typing import Dict, List, Optional, Any, Type, cast
 import logging
 from pathlib import Path
@@ -90,6 +90,27 @@ class ConfigRepository:
     def _deserialize_config(self, data: Dict[str, Any], model_cls: Type[Configuration] = Configuration) -> Configuration:
         """Deserialize a dictionary to a configuration."""
         try:
+            # Pre-process datetime strings before Pydantic validation
+            if isinstance(data.get("metadata"), dict):
+                for field in ['created_at', 'updated_at']:
+                    if field in data["metadata"] and isinstance(data["metadata"][field], str):
+                        date_str = data["metadata"][field]
+                        # Handle potential '+00:00Z' by removing trailing 'Z' if offset exists
+                        if date_str.endswith('+00:00Z'):
+                            date_str = date_str[:-1] # Remove trailing Z
+                        # Add 'Z' if no timezone info detected
+                        elif 'Z' not in date_str and '+' not in date_str and '-' not in date_str[10:]:
+                            date_str += 'Z'
+                        
+                        try:
+                            # Attempt to parse cleaned string, store back if successful
+                            # Pydantic will handle the final conversion to datetime object
+                            datetime.fromisoformat(date_str.replace('Z', '+00:00')) # Just validate parsing
+                            data["metadata"][field] = date_str # Store cleaned string for Pydantic
+                        except ValueError as date_err:
+                            logger.warning(f"Could not parse date string '{data['metadata'][field]}' for field '{field}' during pre-processing, leaving as is: {date_err}")
+                            # Leave original string for Pydantic to potentially handle or raise error
+
             return model_cls(**data)
         except ValidationError as e:
             logger.error(f"Error deserializing {self.config_type} data: {str(e)}")
@@ -357,6 +378,7 @@ class ConfigRepository:
                     "config_type": self.config_type,
                     "last_commit": last_commit.hexsha,
                     "last_commit_message": last_commit.message.strip(), # Ensure message is stripped
+                    "archived": data.get("metadata", {}).get("archived", False) # Add the missing archived field
                 })
             except Exception as e:
                 logger.error(f"Error listing {self.config_type} '{config_id}': {str(e)}")
