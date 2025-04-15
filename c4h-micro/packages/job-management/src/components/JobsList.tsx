@@ -93,7 +93,7 @@ const JobsList: React.FC<JobsListProps> = ({ onSelectJob }) => {
           break;
         // NOTE: Assuming 'updated_at' case already exists based on intent pre-check. No change here.
         case 'updated_at':
-          const updatedA = new Date(a.updatedAt || 0).getTime();
+          const updatedA = new Date(a.updatedAt || 0).getTime(); // Ensure direct access for a
           const updatedB = new Date(b.updatedAt || 0).getTime();
           comparison = updatedA - updatedB;
           break;
