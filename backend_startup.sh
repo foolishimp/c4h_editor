@@ -5,6 +5,7 @@
 # Store the root directory where the script is located (should be /Users/jim/src/apps/c4h_editor)
 ROOT_DIR=$(pwd)
 EXPECTED_ROOT="/Users/jim/src/apps/c4h_editor" # Adjust if your root is different
+LOG_CONFIG_FILE="log_config.yaml" # Define log config file name
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -60,12 +61,21 @@ start_service() {
 
   local uvicorn_target="${service_name}.main:app"
   local host="0.0.0.0"
-  local log_level="debug" # Or make configurable
+  # local log_level="debug" # <-- REMOVED: Using log config file now
 
-  echo -e "${YELLOW}🚀 Starting $service_name on port $port (logging to $log_file)...${NC}"
+  # Check if log config file exists
+  if [ ! -f "$LOG_CONFIG_FILE" ]; then
+      echo -e "${RED}❌ Log configuration file not found: $LOG_CONFIG_FILE${NC}"
+      echo -e "${YELLOW}   Make sure it exists in the project root: $ROOT_DIR${NC}"
+      return 1
+  fi
 
+  echo -e "${YELLOW}🚀 Starting $service_name on port $port (using $LOG_CONFIG_FILE, logging to $log_file)...${NC}"
+
+  # --- UPDATED: Run uvicorn using --log-config ---
   # Run uvicorn in the background, redirecting output
-  uvicorn "$uvicorn_target" --reload --host "$host" --port "$port" --log-level "$log_level" > "$log_file" 2>&1 &
+  uvicorn "$uvicorn_target" --reload --host "$host" --port "$port" --log-config "$LOG_CONFIG_FILE" > "$log_file" 2>&1 &
+  # Note: Reloading with log-config might have limitations, test carefully. Remove --reload if issues arise.
 
   local pid=$!
   PIDS+=($pid)
@@ -74,8 +84,6 @@ start_service() {
   sleep 2 # Give it a moment to potentially fail
   if ! ps -p $pid > /dev/null; then
      echo -e "${RED}❌ Failed to start $service_name (PID $pid). Check $log_file for details.${NC}"
-     # Optionally remove PID from list if failed? Depends on desired cleanup behavior
-     # PIDS=("${PIDS[@]/$pid}") # Bash 4+ specific removal
      return 1
   else
      echo -e "${GREEN}✅ $service_name started with PID $pid${NC}"
@@ -128,7 +136,8 @@ if [ -z "$VIRTUAL_ENV" ]; then
 fi
 
 # Reminder for DB environment variables
-echo -e "${YELLOW}ℹ️  Reminder: Ensure DB environment variables (DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, DB_TYPE/SQLITE_DB_PATH) are set for the shell_service.${NC}"
+# Updated message for DATABASE_URL
+echo -e "${YELLOW}ℹ️  Reminder: Ensure DB environment variable (DATABASE_URL) is set if needed (defaults to SQLite in shell_service/data).${NC}"
 sleep 2
 
 # Check all ports first

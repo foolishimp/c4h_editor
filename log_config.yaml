@@ -1,0 +1,55 @@
+# File: /Users/jim/src/apps/c4h_editor/log_config.yaml
+version: 1
+disable_existing_loggers: False  # Keep existing loggers (like uvicorn's)
+
+formatters:
+  default:
+    (): "uvicorn.logging.DefaultFormatter"
+    fmt: "%(levelprefix)s %(asctime)s [%(name)s] %(message)s" # Include logger name
+    datefmt: "%Y-%m-%d %H:%M:%S"
+    use_colors: True
+  access:
+    (): "uvicorn.logging.AccessFormatter"
+    fmt: '%(levelprefix)s %(asctime)s [%(name)s] %(client_addr)s - "%(request_line)s" %(status_code)s'
+    datefmt: "%Y-%m-%d %H:%M:%S"
+    use_colors: True
+
+handlers:
+  default:
+    formatter: default
+    class: logging.StreamHandler
+    stream: ext://sys.stderr # Output to standard error
+    level: DEBUG  # <-- Set HANDLER level to DEBUG
+
+  access:
+    formatter: access
+    class: logging.StreamHandler
+    stream: ext://sys.stdout # Access logs to standard out
+    level: INFO # Keep access logs at INFO unless needed
+
+loggers:
+  # Configure root logger
+  "": # Root logger
+    handlers: [default]
+    level: DEBUG # <-- Set ROOT LOGGER level to DEBUG
+    propagate: False # Prevent root messages going to other handlers if any are added
+
+  # Configure specific application loggers (optional, inherits from root if not set)
+  shell_service: # Logger for your application module (and submodules like crud, db)
+    handlers: [default]
+    level: DEBUG # <-- Ensure app logger is DEBUG
+    propagate: False # Don't send shell_service messages to root handlers again
+
+  # Configure Uvicorn's own loggers
+  uvicorn.error:
+    handlers: [default]
+    level: INFO # Keep uvicorn errors at INFO unless debugging uvicorn itself
+    propagate: False
+  uvicorn.access:
+    handlers: [access]
+    level: INFO # Keep access logs at INFO
+    propagate: False
+  uvicorn: # Catch-all for other uvicorn logs
+    handlers: [default]
+    level: INFO
+    propagate: False

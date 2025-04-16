@@ -14,7 +14,7 @@ from shell_service.database import db  # <-- Corrected
 from shell_service.database import crud # <-- Corrected
 
 # Configure basic logging
-logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
 logger = logging.getLogger(__name__)
 
 # --- Lifespan Management for DB Setup/Teardown ---

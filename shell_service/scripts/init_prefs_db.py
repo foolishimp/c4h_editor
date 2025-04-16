@@ -16,14 +16,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Add try-except for imports to provide clearer error messages if modules are missing
 try:
     from database import db
-    from models.preferences import AppDefinition, ServiceEndpoints # type: ignore
+    from models.preferences import AppDefinition, ServiceEndpoints # type: ignore # Add type ignore if imports show issues
 except ImportError as e:
     print(f"Error importing modules: {e}. Make sure you are running from the correct directory and the virtual environment is active.", file=sys.stderr)
     sys.exit(1)
 
 
 # Configure logger
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Path to SQL schema file
@@ -52,6 +52,7 @@ async def load_default_data():
          return {"availableApps": [], "defaultEndpoints": {}}
     try:
         with open(DEFAULT_DATA_PATH, 'r') as f:
+            logger.info(f"Loading default data from: {DEFAULT_DATA_PATH}")
             return json.load(f)
     except json.JSONDecodeError as e:
         logger.error(f"Error decoding JSON from {DEFAULT_DATA_PATH}: {e}")
@@ -61,7 +62,6 @@ async def load_default_data():
          raise
 
 
-# --- Updated create_schema function to use executescript ---
 async def create_schema():
     """Create database schema using executescript for multi-statement SQL."""
     try:
@@ -74,59 +74,67 @@ async def create_schema():
                  await conn.executescript(schema_sql)
                  logger.info("SQLite schema script executed successfully.")
             else:
-                 # For PostgreSQL, execute as a single block (asyncpg handles it)
-                 # Or split and execute if necessary, but try single block first
                  await db.execute(schema_sql, fetch_type="status")
                  logger.info("PostgreSQL schema script executed successfully.")
         return True
     except FileNotFoundError:
-         # Error already logged in read_schema_file
          return False
     except Exception as e:
-        # Log the specific SQL that might have caused the issue if available
         logger.error(f"Error executing schema script: {e}", exc_info=True)
         return False
-# --- End of updated create_schema function ---
 
 
 async def populate_default_apps(available_apps):
     """Populate default available apps."""
-    # (Keep existing logic - relies on db.execute)
-    # ... (rest of the function remains the same) ...
     try:
-        logger.info(f"Populating {len(available_apps)} default apps")
+        if not available_apps:
+             logger.warning("No available apps data provided to populate_default_apps.")
+             return True # Not an error, just nothing to do
+
+        logger.info(f"Populating/Checking {len(available_apps)} default apps...")
 
         for app_data in available_apps:
-            app = AppDefinition(**app_data)
+            try:
+                # Create AppDefinition from defaults.json data
+                app = AppDefinition(**app_data)
+                logger.debug(f"Processing app data: {app_data}, Parsed AppDefinition URL: {app.url}") # Log parsed URL
 
-            # Check if app already exists
-            existing = await db.execute(
-                "SELECT id FROM available_apps WHERE id = $1",
-                app.id,
-                fetch_type="val"
-            )
+                # Check if app already exists
+                existing = await db.execute(
+                    "SELECT id FROM available_apps WHERE id = $1",
+                    app.id,
+                    fetch_type="val"
+                )
 
-            if existing:
-                logger.info(f"App {app.id} already exists, updating")
-                await db.execute(
-                    """
-                    UPDATE available_apps
-                    SET name = $2, scope = $3, module = $4, url = $5, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = $1
-                    """,
-                    app.id, app.name, app.scope, app.module, app.url,
-                    fetch_type="status"
-                )
-            else:
-                logger.info(f"Adding new app {app.id}")
-                await db.execute(
-                    """
-                    INSERT INTO available_apps(id, name, scope, module, url)
-                    VALUES($1, $2, $3, $4, $5)
-                    """,
-                    app.id, app.name, app.scope, app.module, app.url,
-                    fetch_type="status"
-                )
+                # --- ADDED LOGGING BEFORE DB EXECUTE ---
+                log_payload = f"id={app.id}, name={app.name}, scope={app.scope}, module={app.module}, url={app.url}"
+                if existing:
+                    logger.info(f"App {app.id} already exists, attempting UPDATE with: {log_payload}")
+                    await db.execute(
+                        """
+                        UPDATE available_apps
+                        SET name = $2, scope = $3, module = $4, url = $5, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = $1
+                        """,
+                        app.id, app.name, app.scope, app.module, app.url, # Pass app.url
+                        fetch_type="status"
+                    )
+                else:
+                    logger.info(f"Adding new app {app.id} with: {log_payload}")
+                    await db.execute(
+                        """
+                        INSERT INTO available_apps(id, name, scope, module, url)
+                        VALUES($1, $2, $3, $4, $5)
+                        """,
+                        app.id, app.name, app.scope, app.module, app.url, # Pass app.url
+                        fetch_type="status"
+                    )
+                # --- END ADDED LOGGING ---
+            except Exception as app_error:
+                 logger.error(f"Failed to process app data: {app_data}. Error: {app_error}", exc_info=True)
+                 # Decide whether to continue or fail script on single app error
+                 # return False # Option: Fail entire script
+                 continue # Option: Skip failed app and continue
 
         return True
     except Exception as e:
@@ -136,16 +144,16 @@ async def populate_default_apps(available_apps):
 
 async def populate_default_endpoints(endpoints_data):
     """Populate default service endpoints."""
-    # (Keep existing logic - relies on db.execute)
-    # ... (rest of the function remains the same) ...
     try:
-        logger.info("Setting up default service endpoints")
-        # Handle case where endpoints_data might be None or missing keys
+        logger.info("Populating/Checking default service endpoints...")
         if not endpoints_data or 'jobConfigServiceUrl' not in endpoints_data:
              logger.warning("No default endpoint data found in defaults.json, skipping population.")
-             return True # Not an error, just nothing to populate
+             return True
 
         endpoints = ServiceEndpoints(**endpoints_data)
+        url_to_save = endpoints.jobConfigServiceUrl
+
+        logger.debug(f"Endpoint URL to save: {url_to_save}") # Log URL being saved
 
         # Check if default endpoints exist
         existing = await db.execute(
@@ -154,24 +162,24 @@ async def populate_default_endpoints(endpoints_data):
         )
 
         if existing:
-            logger.info("Default endpoints already exist, updating")
+            logger.info("Default endpoints already exist, attempting UPDATE.")
             await db.execute(
                 """
                 UPDATE service_endpoints
                 SET job_config_service_url = $1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = 'default'
                 """,
-                endpoints.jobConfigServiceUrl,
+                url_to_save,
                 fetch_type="status"
             )
         else:
-            logger.info("Adding default endpoints")
+            logger.info("Adding default endpoints.")
             await db.execute(
                 """
                 INSERT INTO service_endpoints(id, job_config_service_url)
                 VALUES('default', $1)
                 """,
-                endpoints.jobConfigServiceUrl,
+                url_to_save,
                 fetch_type="status"
             )
 
@@ -183,41 +191,29 @@ async def populate_default_endpoints(endpoints_data):
 
 async def initialize_database():
     """Initialize the database with schema and default data."""
-    # (Keep existing logic - calls updated create_schema)
-    # ... (rest of the function remains the same) ...
     try:
-        # Connect to the database
         logger.info("Connecting to database...")
         connected = await db.connect()
         if not connected:
             logger.error("Failed to connect to database. Exiting.")
             return False
 
-        # Create schema
         if not await create_schema():
              logger.error("Schema creation failed. Exiting.")
-             # Attempt to disconnect even if schema fails
              await db.disconnect()
              return False
 
-        # Load default data
         logger.info("Loading default data...")
         default_data = await load_default_data()
 
-        # Populate default apps
-        logger.info("Populating default apps...")
-        if not await populate_default_apps(default_data.get("availableApps", [])):
-            logger.error("Failed to populate default apps.")
-            # Decide if this is a critical failure or just a warning
-            # For now, let's continue to endpoints but report failure
-            pass # Continue, but logged as error
+        apps_ok = await populate_default_apps(default_data.get("availableApps", []))
+        endpoints_ok = await populate_default_endpoints(default_data.get("defaultEndpoints", {}))
 
-        # Populate default endpoints
-        logger.info("Populating default endpoints...")
-        if not await populate_default_endpoints(default_data.get("defaultEndpoints", {})):
-             logger.error("Failed to populate default endpoints.")
-             # Decide if this is critical
-             pass # Continue, but logged as error
+        # Check if population steps succeeded
+        if not apps_ok or not endpoints_ok:
+             logger.error("One or more default data population steps failed.")
+             await db.disconnect()
+             return False
 
 
         logger.info("Database initialization completed successfully")
@@ -226,16 +222,19 @@ async def initialize_database():
         logger.error(f"Database initialization failed: {e}", exc_info=True)
         return False
     finally:
-        # Ensure disconnection happens even on errors after successful connect
         logger.info("Disconnecting from database...")
         await db.disconnect()
 
-
 if __name__ == "__main__":
-    # Ensure the event loop is managed correctly
     try:
-        asyncio.run(initialize_database())
+        # Set higher log level for asyncio/libs if needed for debugging startup
+        # logging.getLogger('asyncio').setLevel(logging.WARNING)
+        # logging.getLogger('aiosqlite').setLevel(logging.WARNING)
+        success = asyncio.run(initialize_database())
+        if not success:
+             sys.exit(1) # Exit with error code if init failed
     except KeyboardInterrupt:
         logger.info("Initialization interrupted by user.")
     except Exception as main_error:
          logger.critical(f"An unexpected error occurred during initialization: {main_error}", exc_info=True)
+         sys.exit(1) # Exit with error code

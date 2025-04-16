@@ -175,6 +175,24 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
       setSelectedTemplateId('');
   };
 
+  // --- Implement Delete Handler ---
+  const handleDeleteFrame = (frameIdToDelete: string) => {
+      // Simple confirmation
+      if (window.confirm(`Are you sure you want to delete this tab (ID: ${frameIdToDelete})?`)) {
+          console.log("Deleting frame:", frameIdToDelete);
+          setEditedFrames(currentFrames =>
+              currentFrames
+                  .filter(f => f.id !== frameIdToDelete)
+                  .map((frame, idx) => ({ ...frame, order: idx })) // Recalculate order
+          );
+          setSuccessMessage(null); // Clear messages on edit
+          setSaveError(null);
+      }
+  };
+  // --- End Delete Handler ---
+
+  // TODO: Implement handleSaveEdit (saves changes to the specific frame in local state)
+
   const handleTemplateChange = (event: SelectChangeEvent<string>) => {
       const templateId = event.target.value;
       setSelectedTemplateId(templateId);
@@ -338,6 +356,9 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
               </Box>
             ) : (
               /* --- List View --- */
+              <Box   </Box>
+            ) : (
+              /* --- List View --- */
               <Box>
                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1}}>
                      <Typography variant="h6" gutterBottom sx={{mb:0}}>Manage Tabs</Typography>
@@ -377,15 +398,15 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                                         onClick={() => handleEditFrame(frame)}
                                         disabled={isSaving || isEditMode}
                                     ><SettingsIcon fontSize="inherit" /></IconButton>
+                                    {/* --- Connect Delete Button --- */}
                                     <IconButton
                                         aria-label={`Delete ${frame.name}`}
                                         size="small"
                                         onClick={() => handleDeleteFrame(frame.id)} // Connect delete handler
-                                        disabled={isSaving || isEditMode}
-                                    ><DeleteIcon fontSize="inherit" /></IconButton>
+                                        disabled={isSaving || isEditMode}><DeleteIcon fontSize="inherit" /></IconButton>
                                 </>
                             }
-                            sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 } }}
+                            sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 }, opacity: isEditMode ? 0.5 : 1 }} // Dim list when editing
                         >
                             <ListItemIcon sx={{ minWidth: '30px', cursor: 'grab' }} aria-hidden="true"><DragHandleIcon fontSize='small' /></ListItemIcon>
                             <ListItemText primary={frame.name || '(Unnamed Frame)'} secondary={`ID: ${frame.id || '(new)'}`} />

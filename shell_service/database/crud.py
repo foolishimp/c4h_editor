@@ -31,7 +31,7 @@ DEFAULT_ENDPOINT_URL = "http://localhost:8000"
 DEFAULT_ENDPOINTS = ServiceEndpoints(jobConfigServiceUrl=DEFAULT_ENDPOINT_URL)
 
 async def get_user_frames(user_id: str) -> List[Frame]:
-    """Retrieve frames for a user."""
+    # (Code remains the same as previous correct version)
     try:
         is_healthy = await db.check_health()
         if is_healthy:
@@ -43,32 +43,28 @@ async def get_user_frames(user_id: str) -> List[Frame]:
                 ORDER BY "order"
                 """,
                 user_id,
-                fetch_type="all" # Specify fetch_type
+                fetch_type="all"
             )
             logger.info(f"[GET FRAMES] Raw rows fetched for user {user_id} ({len(rows)}): {rows}")
 
             if not rows:
                 logger.info(f"No frames found for user {user_id}, returning empty list")
-                return [] # Return empty list explicitly
+                return []
 
             frames = []
             for i, row in enumerate(rows):
-                # Attempt to construct Frame, rely on try/except for missing keys/errors
                 frame_to_add = None
-                frame_id, frame_name, frame_order = None, None, None # Initialize for logging scope
-                assigned_apps_list = [] # Initialize for logging scope
+                frame_id, frame_name, frame_order = None, None, None
+                assigned_apps_list = []
                 try:
-                    # --- Access by index ---
                     frame_id = row[0]
                     frame_name = row[1]
-                    frame_order = row[2] # This is the column named "order"
+                    frame_order = row[2]
                     assigned_apps_raw = row[3]
-                    # --- End Access ---
 
-                    # Check essential fields retrieved (ensure they are not None)
                     if frame_id is None or frame_name is None or frame_order is None:
                         logger.warning(f"[GET FRAMES] Row {i} - Missing essential data from DB query result (id='{frame_id}', name='{frame_name}', order='{frame_order}'). Skipping.")
-                        continue # Skip to next row
+                        continue
 
                     # Process assigned_apps
                     logger.debug(f"[GET FRAMES] Row {i} - Raw assigned_apps from DB: {assigned_apps_raw}")
@@ -77,13 +73,11 @@ async def get_user_frames(user_id: str) -> List[Frame]:
                         if not isinstance(assigned_apps_data, list):
                              logger.warning(f"[GET FRAMES] Row {i} - Parsed assigned_apps_data is not a list: {type(assigned_apps_data)}")
                              assigned_apps_data = []
-
                         temp_app_assignments = []
                         parse_success = True
                         for app_index, app_dict in enumerate(assigned_apps_data):
                              if isinstance(app_dict, dict) and 'appId' in app_dict:
                                  try:
-                                     # Try creating AppAssignment model
                                      temp_app_assignments.append(AppAssignment(**app_dict))
                                  except ValidationError as app_ve:
                                      logger.warning(f"[GET FRAMES] Row {i} App {app_index} - Pydantic Validation Error for AppAssignment: {app_ve}. Data: {app_dict}")
@@ -91,68 +85,52 @@ async def get_user_frames(user_id: str) -> List[Frame]:
                              else:
                                  logger.warning(f"[GET FRAMES] Row {i} App {app_index} - Invalid item in assigned_apps_data: {app_dict}")
                                  parse_success = False
-
                         if parse_success:
                              assigned_apps_list = temp_app_assignments
                         else:
                              logger.warning(f"[GET FRAMES] Row {i} - Some AppAssignment objects failed to parse or validate.")
-                             # Decide: skip frame or allow frame with empty/partial apps? For now, allow frame.
-                             assigned_apps_list = temp_app_assignments # Keep successfully parsed ones
-
+                             assigned_apps_list = temp_app_assignments
                     except json.JSONDecodeError:
                         logger.warning(f"[GET FRAMES] Row {i} - Could not decode assigned_apps JSON. Content: {assigned_apps_raw}")
-                        assigned_apps_list = [] # Default to empty list on JSON error
+                        assigned_apps_list = []
 
-
-                    # --- Log data *before* attempting Pydantic Frame construction ---
-                    log_data = {
-                        "id": frame_id, "id_type": type(frame_id),
-                        "name": frame_name, "name_type": type(frame_name),
-                        "order": frame_order, "order_type": type(frame_order),
-                        "assignedApps": assigned_apps_list
-                    }
+                    log_data = { "id": frame_id, "name": frame_name, "order": frame_order, "assignedApps": assigned_apps_list }
                     logger.debug(f"[GET FRAMES] Row {i} - Attempting Frame construction with data: {log_data}")
 
-                    # Construct Frame object with specific validation error catching
                     try:
                         frame_to_add = Frame(
-                            id=str(frame_id), # Ensure ID is string
+                            id=str(frame_id),
                             name=str(frame_name),
-                            order=int(frame_order), # Ensure order is int
-                            assignedApps=assigned_apps_list # Pass the constructed list
+                            order=int(frame_order),
+                            assignedApps=assigned_apps_list
                         )
                         logger.debug(f"[GET FRAMES] Row {i} - Pydantic Frame construction successful.")
                     except ValidationError as ve:
-                        logger.error(f"[GET FRAMES] Row {i} - Pydantic Validation Error during Frame construction: {ve}. Input data used: {log_data}", exc_info=False) # Log specific error, data, no need for full traceback here usually
-                        frame_to_add = None # Ensure frame is not added on validation error
-                    # --- End Pydantic construction block ---
+                        logger.error(f"[GET FRAMES] Row {i} - Pydantic Validation Error during Frame construction: {ve}. Input data used: {log_data}", exc_info=False)
+                        frame_to_add = None
 
                 except (KeyError, IndexError, TypeError) as e:
-                     # Catch errors from index access or other processing before construction
                      try: row_dict = dict(row)
                      except TypeError: row_dict = repr(row)
                      logger.error(f"[GET FRAMES] Error processing row {i} before Frame construction: {e}. Row data: {row_dict}", exc_info=True)
                      frame_to_add = None
-                except Exception as e: # Catch any other unexpected errors
+                except Exception as e:
                     logger.error(f"[GET FRAMES] Unexpected error processing row {i}: {e}", exc_info=True)
                     frame_to_add = None
-
 
                 if frame_to_add:
                     frames.append(frame_to_add)
                 else:
-                    # Log if appending failed after construction attempt
                     logger.warning(f"[GET FRAMES] Row {i} - Frame object was not added to the list (remained None).")
-
 
             logger.info(f"[GET FRAMES] Finished processing {len(rows)} rows, constructed {len(frames)} Frame objects for user {user_id}.")
             return frames
         else:
             logger.warning(f"Database unavailable in get_user_frames. Returning default frames for user {user_id}")
-            return DEFAULT_FRAMES # This is []
+            return DEFAULT_FRAMES
     except Exception as e:
         logger.error(f"Outer error fetching frames for user {user_id}: {e}", exc_info=True)
-        return DEFAULT_FRAMES # Return default on error
+        return DEFAULT_FRAMES
 
 async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
     # (Code remains the same as previous correct version)
@@ -196,7 +174,7 @@ async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
         return False
 
 async def get_available_apps() -> List[AppDefinition]:
-    # (Code remains the same as previous correct version)
+    """Retrieve list of available apps."""
     try:
         is_healthy = await db.check_health()
         logger.info(f"[SERVICE CRUD get_available_apps] Result of db.check_health(): {is_healthy}")
@@ -216,28 +194,34 @@ async def get_available_apps() -> List[AppDefinition]:
                 return []
 
             apps = []
-            for row in rows:
+            for i, row in enumerate(rows):
                  try:
-                     row_id = row['id']
-                     row_name = row['name']
-                     row_scope = row['scope']
-                     row_module = row['module']
+                     # --- Access by index ---
+                     row_id = row[0]     # id
+                     row_name = row[1]   # name
+                     row_scope = row[2]  # scope
+                     row_module = row[3] # module
+                     row_url = row[4]    # url
+                     # --- End Access by index ---
+
+                     logger.debug(f"[GET APPS] Row {i} - Values read by index: id='{row_id}', name='{row_name}', scope='{row_scope}', module='{row_module}', url='{row_url}' (type: {type(row_url)})")
+
+                     # Check if essential fields are present and not None
                      if row_id is not None and row_name is not None and row_scope is not None and row_module is not None:
-                         row_url = row['url'] if 'url' in row else None
                          app = AppDefinition(
-                             id=row_id,
-                             name=row_name,
-                             scope=row_scope,
-                             module=row_module,
-                             url=row_url
+                             id=str(row_id), # Ensure string
+                             name=str(row_name),
+                             scope=str(row_scope),
+                             module=str(row_module),
+                             url=str(row_url) if row_url is not None else None # Ensure string or None
                          )
                          apps.append(app)
                      else:
                          try: row_dict = dict(row)
                          except TypeError: row_dict = repr(row)
-                         logger.warning(f"Skipping row with missing essential app data: {row_dict}")
+                         logger.warning(f"Skipping row with missing essential app data (id/name/scope/module): {row_dict}")
                  except (KeyError, IndexError, TypeError) as e:
-                     logger.warning(f"Error accessing row data: {e}. Row: {repr(row)}")
+                     logger.warning(f"Error accessing row data by index for app: {e}. Row: {repr(row)}")
 
             logger.info(f"Successfully constructed {len(apps)} AppDefinition objects.")
             return apps
