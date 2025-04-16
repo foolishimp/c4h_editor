@@ -13,7 +13,7 @@ from functools import cached_property
 # --- Ensure these imports point to models/services WITHIN the editor's backend codebase ---
 # Adjust paths if your structure differs slightly
 from backend.models.job import Job, JobStatus, JobResult, ConfigReference, JobAuditLog, JobHistoryEntry
-from backend.services.config_repository import ConfigRepository, get_config_repository
+from backend.services.config_repository import ConfigRepository, get_config_repository, Configuration
 from backend.services.job_repository import JobRepository
 from backend.services.c4h_service import C4HService, JobStatusResponse # Ensure JobStatusResponse is imported
 from backend.config.config_types import get_config_types, validate_config_type
@@ -266,13 +266,28 @@ async def get_job(
         workflow_id = job_to_workflow_map.get(job_id)
         workflow_data = workflow_storage.get(workflow_id, {}) if workflow_id else {}
         changes = map_workflow_to_job_changes(workflow_data)
-        result_dict = job.result.dict() if job.result else None
 
+        # --- ADD THIS LINE ---
+        # Define result_dict based on the potentially updated job.result
+        result_dict = job.result.model_dump() if job.result else None # Use model_dump() if JobResult is Pydantic
+
+        # The return statement now uses the defined result_dict
         return JobResponse(
-            id=job.id, configurations=configurations_response, status=job.status.value, service_job_id=job.service_job_id,
-            created_at=job.created_at, updated_at=job.updated_at, submitted_at=job.submitted_at, completed_at=job.completed_at,
-            user_id=job.user_id, job_configuration=job.configuration, result=result_dict, changes=changes )
-    except HTTPException: raise
+            id=job.id,
+            configurations=configurations_response,
+            status=job.status.value,
+            service_job_id=job.service_job_id,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+            submitted_at=job.submitted_at,
+            completed_at=job.completed_at,
+            user_id=job.user_id,
+            job_configuration=job.configuration,
+            result=result_dict, # Now result_dict is defined
+            changes=changes
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("jobs.get.failed", extra={"job_id": job_id, "error": str(e)}, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get job: {str(e)}")
@@ -280,8 +295,7 @@ async def get_job(
 
 @router.post("/multi-config", response_model=JobResponse, summary="Create a job with multiple configurations")
 async def create_job_multi_config(
-    # request: JobTupleRequest, # OLD MODEL
-    request: JobListRequest, # NEW MODEL - Use the model matching the frontend
+    request: JobListRequest, # Use the model matching the frontend
     background_tasks: BackgroundTasks,
     job_repo: JobRepository = Depends(get_job_repository),
     c4h_service: C4HService = Depends(get_c4h_service)
@@ -289,44 +303,80 @@ async def create_job_multi_config(
     """Create a job with multiple configurations using the new multi-config submission approach."""
     try:
         # Create record first
-        configurations = { rt.config_type: {"id": rt.id, "version": rt.version or "latest"} 
-                          for rt in request.configurations if rt.id }
-        
+        # Ensure config_type is used as the key and handle potential None for version
+        configurations = {
+            rt.config_type: {"id": rt.id, "version": rt.version or "latest"}
+            for rt in request.configurations if rt.id and rt.config_type
+        }
+
         required = ["workorder", "teamconfig", "runtimeconfig"]
         for req in required:
             if req not in configurations or not configurations[req].get("id"):
-                raise HTTPException(status_code=400, detail=f"Missing/invalid config for: {req}")
-        
+                raise HTTPException(status_code=400, detail=f"Missing/invalid config reference for required type: {req}")
+
         # Create job record
-        job = job_repo.create_job(configurations=configurations, user_id=request.user_id, 
-                                  configuration=request.job_configuration)
+        job = job_repo.create_job(
+            configurations=configurations, # Pass the correctly structured dict
+            user_id=request.user_id,
+            configuration=request.job_configuration or {} # Ensure configuration is not None
+        )
         logger.info("jobs.create_multi.record_created", extra={"job_id": job.id, "status": job.status.value})
-        
-        # --- START CHANGE ---
-        # Pass the actual list of references from the request to the background task
-        # background_tasks.add_task(submit_multi_configs, job, job_repo, c4h_service, request) # OLD - passing JobTupleRequest
-        background_tasks.add_task(submit_multi_configs, job, job_repo, c4h_service, request.configurations) # NEW - passing the list
-        # --- END CHANGE ---
-        
+
+        background_tasks.add_task(
+            submit_multi_configs_to_service, # Use the background task function name from the diff
+            job=job,
+            job_repo=job_repo,
+            c4h_service=c4h_service,
+            config_references=request.configurations # Pass the original list of references
+        )
+
         # Format response
         configurations_response = {ct: {"id": ref.id, "version": ref.version} for ct, ref in job.configurations.items()}
-        result_dict = job.result.dict() if job.result else None
-        return JobResponse(id=job.id, configurations=configurations_response, status=job.status.value, service_job_id=job.service_job_id, created_at=job.created_at, updated_at=job.updated_at, submitted_at=job.submitted_at, completed_at=job.completed_at, user_id=job.user_id, job_configuration=job.configuration, result=result_dict, changes=None)
-    except ValueError as e: logger.error("jobs.create_multi.validation_error", extra={"error": str(e)}); raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e: logger.error("jobs.create.failed", extra={"error": str(e)}, exc_info=True); raise HTTPException(status_code=500, detail=f"Failed to create job: {str(e)}")
+
+        # --- FIX Applied Here ---
+        # Define result_dict properly before using it
+        # Use model_dump() if JobResult is a Pydantic model, otherwise adjust accordingly (e.g., .dict())
+        result_dict = job.result.model_dump() if job.result else None
+
+        return JobResponse(
+            id=job.id,
+            configurations=configurations_response,
+            status=job.status.value,
+            service_job_id=job.service_job_id,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+            submitted_at=job.submitted_at,
+            completed_at=job.completed_at,
+            user_id=job.user_id,
+            job_configuration=job.configuration,
+            result=result_dict, # Use the defined variable
+            changes=None # Assuming changes aren't relevant here or handled differently
+        )
+    except ValueError as e:
+        # Catch potential validation errors during job creation or config processing
+        logger.error("jobs.create_multi.validation_error", extra={"error": str(e)}, exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        # Re-raise HTTPExceptions directly if they occur (e.g., from missing config check)
+        raise
+    except Exception as e:
+        # Catch any other unexpected errors during job creation/submission setup
+        logger.error("jobs.create.failed", extra={"error": str(e)}, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create job: {str(e)}")
 
 
 # --- cancel_job endpoint (Implementation from previous response - unchanged OK) ---
 @router.post("/{job_id}/cancel", response_model=JobResponse)
-async def cancel_job( job_id: str = Path(...), job_repo: JobRepository = Depends(get_job_repository), c4h_service: C4HService = Depends(get_c4h_service) ):
+async def cancel_job(job_id: str = Path(...), job_repo: JobRepository = Depends(get_job_repository), c4h_service: C4HService = Depends(get_c4h_service)):
     # (Implementation from previous response is generally correct)
-    job = job_repo.get_job(job_id);
-    if not job: raise HTTPException(status_code=404, detail="Job not found")
+    job = job_repo.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
     if job.status not in [JobStatus.CREATED, JobStatus.SUBMITTED, JobStatus.RUNNING]: raise HTTPException(status_code=400, detail=f"Cannot cancel job in status {job.status.value}")
     cancelled_in_service = False
     if job.service_job_id:
         try: cancelled_in_service = await c4h_service.cancel_job(job.service_job_id)
-        except Exception as e: logger.error("jobs.cancel.service_call_failed", extra={"job_id":job_id, "error":str(e)})
+        except Exception as e: logger.error("jobs.cancel.service_call_failed", extra={"job_id": job_id, "error": str(e)})
     job.update_status(JobStatus.CANCELLED); job_repo.update_job(job, add_audit_entry=True)
     configurations_response = { c_type: {"id": ref.id, "version": ref.version} for c_type, ref in job.configurations.items()}
     result_dict = job.result.dict() if job.result else None
@@ -337,7 +387,7 @@ async def cancel_job( job_id: str = Path(...), job_repo: JobRepository = Depends
 
 # --- get_job_history endpoint (Implementation from previous response - unchanged OK) ---
 @router.get("/{job_id}/history")
-async def get_job_history( job_id: str = Path(...), job_repo: JobRepository = Depends(get_job_repository) ):
+async def get_job_history(job_id: str = Path(...), job_repo: JobRepository = Depends(get_job_repository)):
     # (Implementation from previous response is generally correct)
     audit_log = job_repo.get_job_audit_log(job_id)
     if not audit_log:
@@ -351,53 +401,61 @@ async def get_job_history( job_id: str = Path(...), job_repo: JobRepository = De
     return {"job_id": job_id, "entries": entries_dict}
 
 
-async def submit_multi_configs(
+# Renamed function for clarity
+async def submit_multi_configs_to_service(
     job: Job, job_repo: JobRepository, c4h_service: C4HService,
     # request: JobTupleRequest # OLD
     config_references: List[JobConfigReference] # NEW - Accept the list directly
 ):
     """Background task to submit job with multiple configurations to C4H service."""
+    logger.info(f"Background task started for job {job.id}: Preparing configs for C4H service.")
     try:
         # 1. Load all configurations and extract their CONTENT for the service payload
         config_list_for_service = [] # List to hold config *content* for the C4H service
         for config_ref in config_references: # NEW - Iterate over the passed list
             if not config_ref or not config_ref.id:
                 continue
-                
+
             try:
                 repo = get_config_repository(config_ref.config_type)
-                # Load the full Pydantic model instance from the editor's repo
-                config = repo.get_config(config_ref.id, config_ref.version or "latest")
-                
+                # Load the full Configuration object from the repository
+                config_object: Configuration = repo.get_config(config_ref.id, config_ref.version or "latest")
+                logger.debug(f"Job {job.id}: Loaded config {config_ref.config_type}/{config_ref.id} version {config_ref.version or 'latest'}")
+
                 # --- START CHANGE ---
-                # Extract *only* the 'content' part and ensure it's JSON-serializable
-                if hasattr(config, 'content'):
-                    content_data = config.content
-                    # If content itself is a Pydantic model, dump it correctly. Otherwise, assume dict.
-                    if hasattr(content_data, 'model_dump'):
-                        serializable_content = content_data.model_dump(mode='json')
+                # Extract *only* the 'content' field for the C4H service payload
+                if hasattr(config_object, 'content'):
+                    content_data = config_object.content
+                    # Ensure the content is JSON serializable (Pydantic models handle this well)
+                    # If content is already a dict, it should be fine. If it's a Pydantic model, model_dump works.
+                    if hasattr(content_data, 'model_dump'): # Check if it's a Pydantic model
+                        serializable_content = content_data.model_dump(mode='json', exclude_unset=True) # Use model_dump for Pydantic models
                     elif isinstance(content_data, dict):
-                         # Basic serialization for plain dicts just in case, handles datetimes
-                         serializable_content = json.loads(json.dumps(content_data, default=str))
+                        # Assuming basic dicts are directly serializable or handle complex types if needed
+                        serializable_content = content_data # Pass dict directly
                     else:
-                         logger.warning(f"Background: Content for {config_ref.id} is not a dict or Pydantic model, type: {type(content_data)}. Skipping.")
-                         continue # Skip if content structure is unexpected
+                        logger.warning(f"Job {job.id}: Content for {config_ref.id} is not a dict or Pydantic model, type: {type(content_data)}. Skipping.")
+                        continue # Skip if content structure is unexpected
 
                     config_list_for_service.append(serializable_content)
+                    logger.debug(f"Job {job.id}: Appended content for {config_ref.config_type}/{config_ref.id}")
                 # --- END CHANGE ---
-                logger.info(f"Background: Added {config_ref.config_type} configuration {config_ref.id}")
             except Exception as e:
-                logger.error(f"Background: Failed to load/process {config_ref.config_type} configuration {config_ref.id}: {e}")
+                logger.error(f"Job {job.id}: Failed to load/process {config_ref.config_type} configuration {config_ref.id}: {e}", exc_info=True)
                 raise # Propagate error to fail the job
 
         if not config_list_for_service:
+             logger.error(f"Job {job.id}: No valid configuration content could be prepared for submission.")
              raise ValueError("No valid configuration content could be prepared for submission.")
 
         # --- ADDED: Log the payload before sending ---
         payload = {"configs": config_list_for_service}
         try:
             payload_json = json.dumps(payload, indent=2, default=str) # Use default=str for datetimes etc.
-            logger.debug(f"Background: Attempting POST request to C4H Service /api/v1/jobs with payload:\n{payload_json}")
+            # Limit log size for large payloads
+            log_limit = 2000
+            logged_payload = payload_json[:log_limit] + ('...' if len(payload_json) > log_limit else '')
+            logger.debug(f"Job {job.id}: Attempting POST to C4H Service /api/v1/jobs with payload (truncated):\n{logged_payload}")
         except Exception as json_err:
             logger.error(f"Background: Failed to serialize payload for logging: {json_err}")
         # --- END ADDED ---
@@ -410,19 +468,20 @@ async def submit_multi_configs(
         if submission.status == "error":
             job.update_status(JobStatus.FAILED)
             job.result = JobResult(error=submission.message or "Failed to submit job to C4H service")
+            logger.error(f"Job {job.id}: Submission failed in C4H service. Status: {job.status.value}, Error: {job.result.error}")
         else:
             job.service_job_id = submission.job_id
             job.update_status(JobStatus.SUBMITTED)
-            logger.info("jobs.background.submitted_to_service", extra={"job_id": job.id, "service_job_id": submission.job_id, "service_status": submission.status})
-            
+            logger.info(f"Job {job.id}: Successfully submitted to C4H service. Service Job ID: {submission.job_id}, Service Status: {submission.status}")
+
         job_repo.update_job(job, add_audit_entry=True)
-        logger.info(f"Multi-config job submission complete: job_id={job.id}, status={job.status.value}")
+        logger.info(f"Job {job.id}: Background task complete. Final Status: {job.status.value}")
     except Exception as e:
-        logger.error(f"Error in submit_multi_configs: {e}", exc_info=True)
+        logger.error(f"Job {job.id}: Error in background submission task: {e}", exc_info=True)
         try: # Attempt to mark job as failed in repo
             job.update_status(JobStatus.FAILED)
             job.result = JobResult(error=f"Background submission task failed: {str(e)}")
             job_repo.update_job(job, add_audit_entry=True)
         except Exception as repo_err:
-            logger.error("jobs.background.failed_status_update_failed", extra={"job_id": job.id, "repo_error": str(repo_err)})
+            logger.critical(f"Job {job.id}: CRITICAL - Failed to update job status to FAILED after background task error. Repo error: {repo_err}", exc_info=True)
 # --- Ensure router is included in the main FastAPI app ---

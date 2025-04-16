@@ -4,16 +4,31 @@ Main FastAPI application for the Preferences Shell Service.
 
 import logging
 import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Assuming routes are in ./api/routes/
 from api.routes import shell as shell_router
+# Database imports
+from database import db
+from database import crud
 
 # Configure basic logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# --- Lifespan Management for DB Setup/Teardown ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Preferences Shell Service starting up...")
+    # Connect to database
+    await db.connect()
+    # Initialize default data
+    await crud.initialize_default_data()
+    yield
+    # Disconnect from database
+    await db.disconnect()
 
 app = FastAPI(
     title="C4H Preferences Shell Service",
@@ -21,7 +36,8 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# --- Middleware ---
+# --- Middleware --- 
+
 # TODO: Configure CORS properly based on deployment needs
 app.add_middleware(
     CORSMiddleware,
@@ -36,4 +52,10 @@ app.include_router(shell_router.router)
 
 @app.get("/health", tags=["health"])
 async def health_check():
-    return {"status": "healthy", "service": "Preferences Shell Service"}
+    # Enhanced health check that includes DB status
+    db_status = await db.check_health()
+    return {
+        "status": "healthy" if db_status else "degraded",
+        "service": "Preferences Shell Service",
+        "database": db_status
+    }
