@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Preferences Shell Service starting up...")
     # Connect to database
-    await db.connect()
+    connected = await db.connect() # Check connection result
+    logger.info(f"Database connection attempt during startup successful: {connected}") # Log result
+
     # Initialize default data
     await crud.initialize_default_data()
     yield

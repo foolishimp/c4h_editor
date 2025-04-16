@@ -1,7 +1,8 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { configTypes, ConfigTypeMetadata } from '../config/configTypes';
 import { Job, JobStatus, JobListResponse, JobConfigReference, JobSubmissionRequest } from '../types/job'; // Added JobSubmissionRequest
-import { Config } from '../types/config'; // Added Config base type
+import { Config, ConfigHistoryResponse } from '../types/config'; // Added ConfigHistoryResponse type hint
+import { ShellPreferencesRequest } from '../types/shell'; // Added ShellPreferencesRequest
 
 // --- Base URL Handling ---
 // Initial base URL can be from env var or a default fallback
@@ -215,11 +216,11 @@ class ApiService {
     return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
   }
   
-  async getConfigHistory(configType: string, id: string): Promise<{ config_id: string; config_type: string; versions: Array<{ version: string; commit_hash: string; created_at: string; author: string; message: string; }> }> {
+  async getConfigHistory(configType: string, id: string): Promise<ConfigHistoryResponse> {
     const endpoint = configTypes[configType]?.apiEndpoints.history(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Fetching history for config ${id} of type ${configType} at ${endpoint}`);
-    return this.get<{ config_id: string; config_type: string; versions: Array<{ version: string; commit_hash: string; created_at: string; author: string; message: string; }> }>(endpoint);
+    return this.get<ConfigHistoryResponse>(endpoint);
   }
 
   // Job API methods
@@ -303,6 +304,14 @@ class ApiService {
   async getJobHistory(id: string) {
     console.log(`API: Fetching history for job ${id}`);
     return this.get<any>(`/api/v1/jobs/${id}/history`);
+  }
+
+  // --- Shell Preferences API ---
+  async saveShellPreferences(preferences: ShellPreferencesRequest): Promise<{ message: string }> {
+    // Assuming the endpoint is fixed relative to the preferences service base URL
+    // Note: This uses the MAIN apiService instance, assuming Prefs service might be behind same gateway?
+    // If Prefs service has a *different* base URL always, this needs adjustment or a separate service helper.
+    return this.put<{ message: string }>('/api/v1/shell/preferences', preferences);
   }
 }
 

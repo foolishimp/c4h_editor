@@ -1,0 +1,35 @@
+{
+    "availableApps": [
+      {
+        "id": "config-selector-workflows",
+        "name": "Workflow Config Manager",
+        "scope": "configSelector",
+        "module": "./ConfigManager",
+        "url": "http://localhost:3003/assets/remoteEntry.js"
+      },
+      {
+        "id": "config-selector-teams",
+        "name": "Team Config Manager",
+        "scope": "configSelector",
+        "module": "./ConfigManager",
+        "url": "http://localhost:3003/assets/remoteEntry.js"
+      },
+      {
+        "id": "config-selector-runtime",
+        "name": "Runtime Config Manager",
+        "scope": "configSelector",
+        "module": "./ConfigManager",
+        "url": "http://localhost:3003/assets/remoteEntry.js"
+      },
+      {
+        "id": "job-management",
+        "name": "Job Manager",
+        "scope": "jobManagement",
+        "module": "./JobManager",
+        "url": "http://localhost:3004/assets/remoteEntry.js"
+      }
+    ],
+    "defaultEndpoints": {
+      "jobConfigServiceUrl": "http://localhost:8000"
+    }
+  }

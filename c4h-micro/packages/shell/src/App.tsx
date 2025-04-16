@@ -1,14 +1,16 @@
 // File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
 
-import React, { useEffect, useState, Suspense } from 'react'; // Removed unused useMemo
+import React, { useEffect, useState, Suspense, useCallback } from 'react';
+// Removed unused useMemo
 import {
     ThemeProvider,
     CssBaseline,
     Box,
     CircularProgress,
+    IconButton, // <-- Add IconButton
     Typography,
     AppBar,
-    Toolbar
+    Toolbar,
 } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router } from 'react-router-dom';
@@ -16,10 +18,12 @@ import { BrowserRouter as Router } from 'react-router-dom';
 // Context and new TabBar import
 import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
 import TabBar from './components/layout/TabBar';
-// Removed unused Frame, AppDefinition types (AppAssignment was already removed)
-import { AppAssignment } from 'shared'; // Keep AppAssignment if needed by logic below
+// Removed unused Frame, AppDefinition. Keep AppAssignment if needed.
+import { AppAssignment } from 'shared';
 // Import RemoteComponent loader
 import { RemoteComponent } from 'shared';
+import SettingsIcon from '@mui/icons-material/Settings'; // <-- Import the icon
+import PreferencesDialog from './components/preferences/PreferencesDialog'; // <-- Import the dialog
 
 // --- Theme definition ---
 const theme = createTheme({
@@ -69,6 +73,16 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, message
 function AppContent() {
     const { config, loading, error } = useShellConfig();
     const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
+    const [isPrefsDialogOpen, setIsPrefsDialogOpen] = useState<boolean>(false); // <-- Add state for dialog
+
+    const handleOpenPrefsDialog = useCallback(() => { // <-- Handler to open
+        setIsPrefsDialogOpen(true);
+    }, []);
+
+    const handleClosePrefsDialog = useCallback(() => { // <-- Handler to close
+        setIsPrefsDialogOpen(false);
+    }, []);
+
 
     useEffect(() => {
         if (!loading && !error && config?.frames && config.frames.length > 0 && !activeFrameId) {
@@ -79,7 +93,7 @@ function AppContent() {
         }
     }, [config, loading, error, activeFrameId]);
 
-    // Removed unused 'event' parameter from signature
+    // event parameter is unused, removed from signature
     const handleTabChange = (newFrameId: string) => {
         setActiveFrameId(newFrameId);
     };
@@ -97,6 +111,7 @@ function AppContent() {
         if (!activeFrame.assignedApps || activeFrame.assignedApps.length === 0) {
             return <Typography sx={{ p: 3 }}>No application assigned to the '{activeFrame.name}' frame.</Typography>;
         }
+        // Assuming one app per frame for now
         const assignment: AppAssignment = activeFrame.assignedApps[0];
         const appDefinition = config.availableApps.find(app => app.id === assignment.appId);
         if (!appDefinition) {
@@ -138,6 +153,16 @@ function AppContent() {
                             C4H Editor
                         </Typography>
                     </Box>
+
+                    {/* Add Settings Icon Button Here */}
+                    <IconButton
+                        color="inherit"
+                        aria-label="open preferences"
+                        onClick={handleOpenPrefsDialog} // <-- Connect to handler
+                        edge="end"
+                    >
+                        <SettingsIcon />
+                    </IconButton>
                 </Toolbar>
             </AppBar>
 
@@ -146,7 +171,7 @@ function AppContent() {
                  <TabBar
                      frames={config.frames}
                      activeFrameId={activeFrameId}
-                     // Pass simplified handler matching signature
+                     // Pass simplified handler signature
                      onTabChange={(_event: React.SyntheticEvent, newFrameId: string) => handleTabChange(newFrameId)}
                      width={verticalTabBarWidth}
                  />
@@ -162,7 +187,6 @@ function AppContent() {
 
                 {/* Content Display Area */}
                 <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
-                    {/* Loading/Error for the whole config fetch */}
                     {loading && (
                         <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                             <CircularProgress />
@@ -174,10 +198,9 @@ function AppContent() {
                             <Typography color="error" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{error}</Typography>
                         </Box>
                     )}
-                    {/* Render dynamic content or right sidebar only when config is loaded successfully */}
                     {!loading && !error && config && (
                         <>
-                            {/* Middle Content Area - Now uses renderActiveFrameContent */}
+                            {/* Middle Content Area */}
                             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
                                 <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
                                     {renderActiveFrameContent()}
@@ -205,10 +228,15 @@ function AppContent() {
                     )}
                  </Box>
             </Box>
+
+            {/* Render the Dialog */}
+            <PreferencesDialog
+                open={isPrefsDialogOpen} // <-- Control visibility with state
+                onClose={handleClosePrefsDialog} // <-- Pass close handler
+            />
         </Box>
     );
 }
-
 
 // --- App Component (Wrapper) ---
 function App() {
