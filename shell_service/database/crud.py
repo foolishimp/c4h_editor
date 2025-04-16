@@ -8,6 +8,7 @@ import json # Import json module
 from pathlib import Path
 import uuid
 import aiosqlite # Import needed for type checking
+from pydantic import ValidationError # Import Pydantic validation error
 
 # Adjust import path if necessary for your structure
 try:
@@ -52,73 +53,97 @@ async def get_user_frames(user_id: str) -> List[Frame]:
 
             frames = []
             for i, row in enumerate(rows):
-                logger.debug(f"[GET FRAMES] Processing row {i}: {dict(row) if row else 'None'}")
-                frame_to_add = None # Initialize frame for this row as None
+                # Attempt to construct Frame, rely on try/except for missing keys/errors
+                frame_to_add = None
+                frame_id, frame_name, frame_order = None, None, None # Initialize for logging scope
+                assigned_apps_list = [] # Initialize for logging scope
                 try:
-                    # --- Enhanced Logging & Validation ---
-                    assigned_apps_list = []
-                    assigned_apps_raw = row['assigned_apps'] if 'assigned_apps' in row else '[]' # Default to empty JSON array string
-                    logger.debug(f"[GET FRAMES] Row {i} - Raw assigned_apps from DB: {assigned_apps_raw}")
+                    # --- Access by index ---
+                    frame_id = row[0]
+                    frame_name = row[1]
+                    frame_order = row[2] # This is the column named "order"
+                    assigned_apps_raw = row[3]
+                    # --- End Access ---
 
+                    # Check essential fields retrieved (ensure they are not None)
+                    if frame_id is None or frame_name is None or frame_order is None:
+                        logger.warning(f"[GET FRAMES] Row {i} - Missing essential data from DB query result (id='{frame_id}', name='{frame_name}', order='{frame_order}'). Skipping.")
+                        continue # Skip to next row
+
+                    # Process assigned_apps
+                    logger.debug(f"[GET FRAMES] Row {i} - Raw assigned_apps from DB: {assigned_apps_raw}")
                     try:
-                        # Deserialize assigned_apps from TEXT column
                         assigned_apps_data = json.loads(assigned_apps_raw) if assigned_apps_raw else []
-                        logger.debug(f"[GET FRAMES] Row {i} - Parsed assigned_apps_data: {assigned_apps_data}")
-                        # Validate structure basic check - ensure it's a list
                         if not isinstance(assigned_apps_data, list):
                              logger.warning(f"[GET FRAMES] Row {i} - Parsed assigned_apps_data is not a list: {type(assigned_apps_data)}")
                              assigned_apps_data = []
 
-                        # Try to create AppAssignment objects
                         temp_app_assignments = []
                         parse_success = True
-                        for app_dict in assigned_apps_data:
+                        for app_index, app_dict in enumerate(assigned_apps_data):
                              if isinstance(app_dict, dict) and 'appId' in app_dict:
-                                 temp_app_assignments.append(AppAssignment(**app_dict))
+                                 try:
+                                     # Try creating AppAssignment model
+                                     temp_app_assignments.append(AppAssignment(**app_dict))
+                                 except ValidationError as app_ve:
+                                     logger.warning(f"[GET FRAMES] Row {i} App {app_index} - Pydantic Validation Error for AppAssignment: {app_ve}. Data: {app_dict}")
+                                     parse_success = False
                              else:
-                                 logger.warning(f"[GET FRAMES] Row {i} - Invalid item in assigned_apps_data: {app_dict}")
-                                 parse_success = False # Mark failure but continue parsing others if possible
+                                 logger.warning(f"[GET FRAMES] Row {i} App {app_index} - Invalid item in assigned_apps_data: {app_dict}")
+                                 parse_success = False
+
                         if parse_success:
                              assigned_apps_list = temp_app_assignments
                         else:
-                             # Decide if partial success is okay or clear the list
-                             logger.warning(f"[GET FRAMES] Row {i} - Some AppAssignment objects failed to parse.")
-                             # assigned_apps_list = [] # Option: Clear list if any item fails
+                             logger.warning(f"[GET FRAMES] Row {i} - Some AppAssignment objects failed to parse or validate.")
+                             # Decide: skip frame or allow frame with empty/partial apps? For now, allow frame.
+                             assigned_apps_list = temp_app_assignments # Keep successfully parsed ones
+
                     except json.JSONDecodeError:
                         logger.warning(f"[GET FRAMES] Row {i} - Could not decode assigned_apps JSON. Content: {assigned_apps_raw}")
                         assigned_apps_list = [] # Default to empty list on JSON error
 
-                    # Check essential fields for the Frame itself
-                    row_id = row['id'] if 'id' in row else None
-                    row_name = row['name'] if 'name' in row else None
-                    row_order = row['order'] if 'order' in row else None
 
-                    if row_id is not None and row_name is not None and row_order is not None:
-                         logger.debug(f"[GET FRAMES] Row {i} - Basic frame fields OK. Creating Frame object.")
-                         # Construct Frame object
-                         frame_to_add = Frame(
-                             id=row_id, name=row_name,
-                             order=row_order,
-                             assignedApps=assigned_apps_list # Use the parsed list
-                         )
-                         logger.debug(f"[GET FRAMES] Row {i} - Successfully created Frame object.")
-                    else:
-                         # Log row content as dict for better debugging if possible
-                         try: row_dict = dict(row)
-                         except TypeError: row_dict = repr(row)
-                         logger.warning(f"[GET FRAMES] Row {i} - Skipping row due to missing essential frame data (id, name, or order): {row_dict}")
-                    # --- End Enhanced Logging & Validation ---
+                    # --- Log data *before* attempting Pydantic Frame construction ---
+                    log_data = {
+                        "id": frame_id, "id_type": type(frame_id),
+                        "name": frame_name, "name_type": type(frame_name),
+                        "order": frame_order, "order_type": type(frame_order),
+                        "assignedApps": assigned_apps_list
+                    }
+                    logger.debug(f"[GET FRAMES] Row {i} - Attempting Frame construction with data: {log_data}")
 
-                except (KeyError, IndexError, TypeError, Exception) as e:
-                    # Catch potential errors accessing row data or during Pydantic validation
+                    # Construct Frame object with specific validation error catching
+                    try:
+                        frame_to_add = Frame(
+                            id=str(frame_id), # Ensure ID is string
+                            name=str(frame_name),
+                            order=int(frame_order), # Ensure order is int
+                            assignedApps=assigned_apps_list # Pass the constructed list
+                        )
+                        logger.debug(f"[GET FRAMES] Row {i} - Pydantic Frame construction successful.")
+                    except ValidationError as ve:
+                        logger.error(f"[GET FRAMES] Row {i} - Pydantic Validation Error during Frame construction: {ve}. Input data used: {log_data}", exc_info=False) # Log specific error, data, no need for full traceback here usually
+                        frame_to_add = None # Ensure frame is not added on validation error
+                    # --- End Pydantic construction block ---
+
+                except (KeyError, IndexError, TypeError) as e:
+                     # Catch errors from index access or other processing before construction
                      try: row_dict = dict(row)
                      except TypeError: row_dict = repr(row)
-                     logger.error(f"[GET FRAMES] Error processing row {i}: {e}. Row data: {row_dict}", exc_info=True)
-                     frame_to_add = None # Ensure frame is not added on error
+                     logger.error(f"[GET FRAMES] Error processing row {i} before Frame construction: {e}. Row data: {row_dict}", exc_info=True)
+                     frame_to_add = None
+                except Exception as e: # Catch any other unexpected errors
+                    logger.error(f"[GET FRAMES] Unexpected error processing row {i}: {e}", exc_info=True)
+                    frame_to_add = None
 
-                # Add the successfully constructed frame
+
                 if frame_to_add:
                     frames.append(frame_to_add)
+                else:
+                    # Log if appending failed after construction attempt
+                    logger.warning(f"[GET FRAMES] Row {i} - Frame object was not added to the list (remained None).")
+
 
             logger.info(f"[GET FRAMES] Finished processing {len(rows)} rows, constructed {len(frames)} Frame objects for user {user_id}.")
             return frames
@@ -130,26 +155,21 @@ async def get_user_frames(user_id: str) -> List[Frame]:
         return DEFAULT_FRAMES # Return default on error
 
 async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
-    """Save frames for a user, overwriting existing ones."""
+    # (Code remains the same as previous correct version)
     try:
-        # Check health before proceeding
         if not await db.check_health():
             logger.warning(f"Database unavailable. Cannot save frames for user {user_id}")
             return False
 
-        # Use get_connection context manager to ensure connection is available
         async with db.get_connection() as conn:
-            # Delete existing frames for this user
             logger.info(f"[SAVE FRAMES] Deleting existing frames for user {user_id}...")
             await db.execute("DELETE FROM frames WHERE user_id = $1", user_id, fetch_type="status")
             logger.info(f"[SAVE FRAMES] Finished deleting.")
 
-            # Insert new frames
             logger.info(f"[SAVE FRAMES] Inserting {len(frames)} new frames for user {user_id}...")
             for frame in frames:
-                # Serialize assignedApps to JSON string for TEXT column
                 assigned_apps_json = json.dumps([app.model_dump() for app in frame.assignedApps])
-                logger.debug(f"[SAVE FRAMES] Inserting frame ID {frame.id}, Order {frame.order}, Apps JSON: {assigned_apps_json[:100]}...") # Log snippet
+                logger.debug(f"[SAVE FRAMES] Inserting frame ID {frame.id}, Order {frame.order}, Apps JSON: {assigned_apps_json[:100]}...")
                 await db.execute(
                     """
                     INSERT INTO frames(id, user_id, name, "order", assigned_apps)
@@ -158,19 +178,16 @@ async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
                     frame.id or str(uuid.uuid4()),
                     user_id, frame.name,
                     frame.order,
-                    assigned_apps_json, # Pass JSON string
-                    fetch_type="status" # Use status to ensure commit happens in SQLite mode
+                    assigned_apps_json,
+                    fetch_type="status"
                 )
 
-            # --- EXPLICIT COMMIT for SQLite ---
             if db.DB_TYPE == "sqlite":
-                # Ensure conn is the correct type before calling commit
                 if isinstance(conn, aiosqlite.Connection):
                      logger.info("[SAVE FRAMES] Explicitly committing SQLite transaction.")
                      await conn.commit()
                 else:
                      logger.warning("[SAVE FRAMES] Expected aiosqlite.Connection for explicit commit, but got different type. Skipping commit.")
-            # --- END EXPLICIT COMMIT ---
 
         logger.info(f"Successfully saved {len(frames)} frames for user {user_id}")
         return True
@@ -179,7 +196,6 @@ async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
         return False
 
 async def get_available_apps() -> List[AppDefinition]:
-    """Retrieve list of available apps."""
     # (Code remains the same as previous correct version)
     try:
         is_healthy = await db.check_health()
@@ -233,7 +249,6 @@ async def get_available_apps() -> List[AppDefinition]:
         return DEFAULT_AVAILABLE_APPS
 
 async def get_service_endpoints() -> ServiceEndpoints:
-    """Retrieve service endpoint configuration."""
     # (Code remains the same as previous correct version)
     try:
         is_healthy = await db.check_health()
@@ -272,7 +287,6 @@ async def get_service_endpoints() -> ServiceEndpoints:
         return DEFAULT_ENDPOINTS
 
 async def initialize_default_data():
-    """Initialize database with default apps and endpoints if they don't exist."""
     # (Code remains the same as previous correct version)
     try:
         if not await db.check_health():
