@@ -8,6 +8,7 @@
 export * from './types/workorder';
 export * from './types/job';
 export * from './types/config';
+export * from './types/shell'; // <-- ADDED EXPORT for shell types
 
 // Export config registry
 export * from './config/configTypes';
@@ -21,6 +22,6 @@ export { default as TimeAgo } from './components/TimeAgo';
 export { default as DiffViewer } from './components/DiffViewer';
 export { default as RemoteComponent } from './components/RemoteComponent';
 
-// Export API service
-export { apiService, api } from './services/apiService';
+// Export API service AND configuration function
+export { apiService, api, configureApiService } from './services/apiService'; // <-- ADDED configureApiService
 export { API_ENDPOINTS } from './config/api';

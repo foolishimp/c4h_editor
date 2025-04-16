@@ -3,7 +3,7 @@
 // ** IMPORTS **
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'; // Ensure useContext is imported
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
-import { configTypes, apiService } from 'shared'; // Assuming ConfigTypeMetadata is exported from shared
+import { configTypes, apiService, Config } from 'shared'; // Import Config type from shared
 
 // ** INTERFACE & DEFAULT STATE **
 interface ConfigContextState {
@@ -160,100 +160,109 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setSaved(false); // Mark as unsaved whenever YAML changes
   }, []);
 
-  // /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
 
-  const saveConfig = useCallback(async (idFromEditor?: string, commitMessage?: string) => {
+  // File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
+  // Corrected saveConfig function
+  const saveConfig = useCallback(async (idFromEditor?: string, commitMessageFromInput?: string) => { // Renamed commitMessage param to avoid clash
     setLoading(true); setError(null);
 
     if (!currentConfig) {
       setError('No configuration selected to save'); setLoading(false); return null;
     }
 
-    // *** FIX: Determine isNew *before* modifying currentConfig.id ***
-    // Check the original ID state to see if we started in 'new' mode
+    // Determine if it's a new config based on the original state
     const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === '';
 
-    // Determine the ID to use (editor input for new, state for existing)
+    // Determine the ID to use
     const effectiveId = isNew ? idFromEditor?.trim() : currentConfig.id;
 
-    // Validate that an ID exists *before* proceeding
     if (!effectiveId || effectiveId.trim() === '') {
         setError('Configuration ID must be provided via the editor before saving.');
         setLoading(false);
         return null;
     }
 
-    // Update the ID in the currentConfig object *only if it was new* AFTER isNew check
-    // This ensures the correct ID is part of the requestData payload
-    const configToSave = { ...currentConfig }; // Create a copy to modify
-    if (isNew) {
-        configToSave.id = effectiveId; // Set the ID on the copy
-    }
+    // Create a copy to modify and ensure structure
+    const configToSave: Config = {
+        // Start with spread of currentConfig to preserve parent_id, lineage etc.
+        ...currentConfig,
+        id: effectiveId, // Set the effective ID
+        config_type: configType, // Ensure config_type is set from context
+        metadata: { // Ensure metadata structure
+            ...(currentConfig.metadata || {}), // Spread existing metadata
+            author: currentConfig.metadata?.author || "Current User", // Use existing or default author
+            updated_at: new Date().toISOString(),
+            // If it's new, also set created_at
+            created_at: isNew ? new Date().toISOString() : (currentConfig.metadata?.created_at || new Date().toISOString()),
+            // Ensure version, tags, description, archived exist
+            version: currentConfig.metadata?.version || '1.0.0',
+            tags: currentConfig.metadata?.tags || [],
+            description: currentConfig.metadata?.description || '',
+            archived: currentConfig.metadata?.archived || false,
+        },
+        lineage: currentConfig.lineage || [], // Ensure lineage array exists
+    };
+
 
     try {
+      // Parse content from YAML state
       let content;
-      try { content = yamlLoad(yaml); } catch (yamlErr: any) {
-        setError(`Invalid YAML format: ${yamlErr.message}`); setLoading(false); return null;
+      try {
+          content = yamlLoad(yaml) as Record<string, any>;
+          configToSave.content = content; // Assign parsed content to the object we will save
+      } catch (yamlErr: any) {
+          setError(`Invalid YAML format: ${yamlErr.message}`); setLoading(false); return null;
       }
 
-      // Ensure metadata exists on the copy
-      ensureMetadata(configToSave);
+      // Determine commit message and author for the API call
+      const commitMessage = commitMessageFromInput || (isNew ? `Create ${configType} ${effectiveId}` : `Update ${configType} ${effectiveId}`);
+      const author = configToSave.metadata.author; // Author is now part of the config object
 
-      const metadataToSave = {
-        ...(configToSave.metadata), // Use metadata from the copy
-        author: configToSave.metadata?.author || "Current User",
-        updated_at: new Date().toISOString(),
-        // If it's new, also set created_at (ensureMetadata might do this too)
-        created_at: isNew ? new Date().toISOString() : configToSave.metadata?.created_at,
-        // Ensure version is set correctly for new/updates if needed
-        version: isNew ? '1.0.0' : configToSave.metadata?.version || '1.0.0'
-      };
+      let response: Config | null = null; // Use Config type for response
 
-      const requestData = {
-        content,
-        metadata: metadataToSave,
-        commit_message: commitMessage || `Update ${configType} ${effectiveId}`,
-        author: metadataToSave.author
-      };
-
-      let response;
-      // *** FIX: Use the 'isNew' variable determined earlier ***
+      // --- FIX: Call apiService methods with correct arguments ---
       if (isNew) {
         console.log(`ConfigContext: Creating config ${effectiveId}`);
-        // Pass the explicit ID for creation
-        response = await apiService.createConfig(configType, { id: effectiveId, ...requestData });
+        // Pass the full config object, then commit message and author separately
+        response = await apiService.createConfig(configType, configToSave, commitMessage, author);
       } else {
         console.log(`ConfigContext: Updating config ${effectiveId}`);
-        response = await apiService.updateConfig(configType, effectiveId, requestData);
+        // Pass the full config object, then commit message and author separately
+        response = await apiService.updateConfig(configType, effectiveId, configToSave, commitMessage, author);
+      }
+      // --- End Fix ---
+
+      if (!response) {
+          // Handle cases where API might return null/undefined unexpectedly
+          throw new Error("Received no response from save operation.");
       }
 
-      // --- Response handling ---
-      ensureMetadata(response); // Ensure response metadata is good
-      setCurrentConfig(response); // Update state with the response from the server
+      // Ensure metadata exists on the response before accessing it
+      ensureMetadata(response); // Reuse your helper if needed, or access safely
+      setCurrentConfig(response); // Update state with the response
 
       try {
           const updatedYaml = yamlDump(response.content, { lineWidth: -1 });
           setYaml(updatedYaml);
       } catch(e) { console.error("Failed to dump YAML from save response", e); }
 
-      setSaved(true);
-      await loadConfigs();
-      return response;
+      setSaved(true); // Mark as saved
+      await loadConfigs(); // Refresh the list
+      return response; // Return the saved config
 
     } catch (err: any) {
-      // Log the specific error from Axios if available
       let errorDetail = err.message || 'An error occurred while saving';
       if (err.isAxiosError && err.response?.data?.detail) {
           errorDetail = `${err.response.status}: ${err.response.data.detail}`;
       }
       setError(errorDetail);
-      console.error('Error saving configuration:', err.response?.data || err); // Log full error detail
-      setSaved(false);
-      return null;
+      console.error('Error saving configuration:', err.response?.data || err);
+      setSaved(false); // Ensure saved is false on error
+      return null; // Return null on error
     } finally {
       setLoading(false);
     }
-  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata]);
+  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata]); // Added ensureMetadata dependency if needed  ;
   
   // *** FIX: Implement deleteConfig ***
   const deleteConfig = useCallback(async (id: string, commitMessage?: string) => {

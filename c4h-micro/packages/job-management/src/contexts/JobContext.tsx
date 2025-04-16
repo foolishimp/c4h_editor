@@ -64,50 +64,40 @@ export const JobProvider: React.FC<JobProviderProps> = ({ children }) => {
     }
   }, []);
 
-
   // File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/contexts/JobContext.tsx
-  // Fixed to handle dates as strings per the Job interface requirements
 
-  // Load a specific job
+  // Corrected loadJob function
   const loadJob = useCallback(async (id: string) => {
     setLoading(true);
     setError(null);
-    
+    setJob(null); // Clear previous job state while loading
+
     try {
-      const response = await apiService.getJob(id);
-      
-      // Handle different response formats - some endpoints wrap in data, others don't
-      const jobData = response.data || response;
-      
-      if (!jobData || !jobData.id) {
+      // apiService.getJob directly returns the Job object or throws an error
+      const jobData: Job = await apiService.getJob(id); // Assign directly and type as Job
+
+      // --- REMOVED line: const jobData = response.data || response; ---
+
+      if (!jobData || !jobData.id) { // Validate the received job data
         throw new Error(`Invalid job data received for job ID: ${id}`);
       }
-      
+
       // Map response to Job type - maintaining date strings as per the Job interface
-      const mappedJob: Job = {
-        id: jobData.id,
-        configurations: jobData.configurations || {},
-        status: jobData.status as JobStatus,
-        serviceJobId: jobData.service_job_id,
-        createdAt: jobData.created_at || new Date().toISOString(),
-        updatedAt: jobData.updated_at || new Date().toISOString(),
-        submittedAt: jobData.submitted_at || undefined,
-        completedAt: jobData.completed_at || undefined,
-        userId: jobData.user_id,
-        jobConfiguration: jobData.job_configuration || {},
-        result: jobData.result
-      };
-      
-      setJob(mappedJob);
+      // No longer needed to map if apiService returns the correct Job type
+      // const mappedJob: Job = { ... }; // Mapping might be simplified or removed
+
+      // Directly set the fetched job data
+      setJob(jobData); // Use the validated jobData directly
+
     } catch (err: any) {
       const errorMessage = err.message || `Failed to load job: ${id}`;
       console.error('Error loading job:', err);
       setError(errorMessage);
-      setJob(null); // Make sure we clear the job state on error
+      setJob(null); // Ensure job state is cleared on error
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Removed 'loadJob' from dependencies, it's the function itself
 
   // New method that accepts configuration list
   const submitJobConfigurations = useCallback(async (configs: JobConfigReference[]) => {
