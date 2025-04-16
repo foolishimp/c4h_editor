@@ -1,49 +1,59 @@
-import React from 'react'; // Removed unused: Suspense, lazy, useContext
-import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography } from '@mui/material';
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/shell/src/App.tsx
+
+import React, { useEffect, useState, Suspense } from 'react'; // Removed unused useMemo
+import {
+    ThemeProvider,
+    CssBaseline,
+    Box,
+    CircularProgress,
+    Typography,
+    AppBar,
+    Toolbar
+} from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-// Removed unused Router imports: Routes, Route, Navigate, useParams
 import { BrowserRouter as Router } from 'react-router-dom';
 
+// Context and new TabBar import
+import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
+import TabBar from './components/layout/TabBar';
+// Removed unused Frame, AppDefinition types (AppAssignment was already removed)
+import { AppAssignment } from 'shared'; // Keep AppAssignment if needed by logic below
+// Import RemoteComponent loader
+import { RemoteComponent } from 'shared';
 
-// Removed static Navigation import
-// Removed ConfigTypeSelector import
-// Removed lazy imports for ConfigManager, JobManager
-
-import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext'; // Correct context import
-
-// Removed ConfigManagerWrapper - loading will be dynamic later
-// Removed Loading component - using CircularProgress directly
-
-// Create theme (keep as is)
+// --- Theme definition ---
 const theme = createTheme({
-  palette: {
-    primary: { main: '#1976d2' },
-    secondary: { main: '#dc004e' },
-    background: { default: '#f5f7fa' },
-  },
-  typography: {
-    fontFamily: [
-      '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', 'sans-serif',
-    ].join(','),
-  },
+    palette: {
+        primary: { main: '#1976d2' },
+        secondary: { main: '#dc004e' },
+        background: { default: '#f5f7fa' },
+    },
+    typography: {
+        fontFamily: [
+            '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen',
+            'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', 'sans-serif',
+        ].join(','),
+    },
 });
 
-// Error Boundary (keep as is)
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
-   constructor(props: { children: React.ReactNode }) {
+// --- Error Boundary ---
+class ErrorBoundary extends React.Component<{ children: React.ReactNode, message?: string }, { hasError: boolean, error: any }> {
+   constructor(props: { children: React.ReactNode, message?: string }) {
      super(props);
      this.state = { hasError: false, error: null };
    }
    static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
-   componentDidCatch(error: any, errorInfo: any) { console.error("Error in component:", error, errorInfo); }
+   componentDidCatch(error: any, errorInfo: any) { console.error("ErrorBoundary caught:", error, errorInfo); }
    render() {
      if (this.state.hasError) {
        return (
-         <Box sx={{ p: 3, textAlign: 'center' }}>
-           <h2>Something went wrong</h2>
+         <Box sx={{ p: 3, textAlign: 'center', color: 'error.main' }}>
+           <h2>{this.props.message || 'Something went wrong'}</h2>
            <p>There was an error loading this part of the application.</p>
-           <pre>{this.state.error?.toString()}</pre>
+           <details style={{ whiteSpace: 'pre-wrap', marginTop: '1em', textAlign: 'left' }}>
+               <summary>Error Details</summary>
+               {this.state.error?.toString()}
+           </details>
            <button onClick={() => this.setState({ hasError: false, error: null })}>Try again</button>
            {' '}
            <button onClick={() => window.location.reload()}>Reload Page</button>
@@ -55,108 +65,163 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 
-// Main App component logic - uses context
+// --- AppContent Component ---
 function AppContent() {
-  const { config, loading, error } = useShellConfig(); // Use context
-  const drawerWidth = 240; // Keep for placeholder layout
-  const jobsSidebarWidth = Math.round(350 * 1.3); // Keep for placeholder layout
+    const { config, loading, error } = useShellConfig();
+    const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
 
-  // Removed useEffect for logging remotes - can be added back if needed
+    useEffect(() => {
+        if (!loading && !error && config?.frames && config.frames.length > 0 && !activeFrameId) {
+            const sortedFrames = [...config.frames].sort((a, b) => a.order - b.order);
+             if (sortedFrames.length > 0) {
+               setActiveFrameId(sortedFrames[0].id);
+            }
+        }
+    }, [config, loading, error, activeFrameId]);
 
-  return (
-    // Router now wraps this component in App function below
-    <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {/* Placeholder for dynamic TabBar (WO-6) */}
-      <Box sx={{ width: drawerWidth, flexShrink: 0, borderRight: '1px solid lightgray', pt: 8 }}>
-        <Typography variant="h6" sx={{ p: 2 }}>Frames Placeholder</Typography>
-        {/* Placeholder for frame list */}
-      </Box>
+    // Removed unused 'event' parameter from signature
+    const handleTabChange = (newFrameId: string) => {
+        setActiveFrameId(newFrameId);
+    };
 
-       {/* Main area container */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, height: '100vh', overflow: 'hidden' }}>
-           {/* Placeholder AppBar - TODO: integrate with dynamic tabs */}
-          <Box sx={{ height: '64px', width: '100%', borderBottom: '1px solid lightgray', display: 'flex', alignItems: 'center', p: 2, flexShrink: 0 }}>
-              <Typography variant='h6'>C4H Editor Shell</Typography>
-          </Box>
+    // --- Helper function to render the content for the active frame ---
+    const renderActiveFrameContent = () => {
+        if (!config || !activeFrameId) {
+            return <Typography sx={{ p: 3, fontStyle: 'italic' }}>Select a frame to view its content.</Typography>;
+        }
+        const activeFrame = config.frames.find(f => f.id === activeFrameId);
+        if (!activeFrame) {
+            console.warn(`No frame found for activeFrameId: ${activeFrameId}`);
+            return <Typography sx={{ p: 3 }}>Frame not found.</Typography>;
+        }
+        if (!activeFrame.assignedApps || activeFrame.assignedApps.length === 0) {
+            return <Typography sx={{ p: 3 }}>No application assigned to the '{activeFrame.name}' frame.</Typography>;
+        }
+        const assignment: AppAssignment = activeFrame.assignedApps[0];
+        const appDefinition = config.availableApps.find(app => app.id === assignment.appId);
+        if (!appDefinition) {
+             console.error(`App definition missing for app ID: ${assignment.appId}`);
+             return <Typography color="error" sx={{ p: 3 }}>Error: Application definition not found for '{assignment.appId}'. Check Preferences Service configuration.</Typography>;
+        }
+         if (!appDefinition.url) {
+             console.error(`URL missing in App definition for app ID: ${assignment.appId}`);
+             return <Typography color="error" sx={{ p: 3 }}>Error: Application URL is missing for '{appDefinition.name}'. Cannot load microfrontend.</Typography>;
+         }
+        console.log(`Rendering RemoteComponent: scope=${appDefinition.scope}, module=${appDefinition.module}, url=${appDefinition.url}`);
+        return (
+            <ErrorBoundary message={`Error loading application: ${appDefinition.name}`}>
+                <Suspense fallback={<Box sx={{display: 'flex', justifyContent: 'center', p:4}}><CircularProgress /></Box>}>
+                    <RemoteComponent
+                        url={appDefinition.url}
+                        scope={appDefinition.scope}
+                        module={appDefinition.module}
+                    />
+                </Suspense>
+            </ErrorBoundary>
+        );
+    };
+    // --- End Helper Function ---
 
-           {/* Content Display Area */}
-          <Box sx={{ display: 'flex', flexGrow: 1, overflow: 'hidden' }}>
-                {/* Main Content Area */}
-               <Box
-                   component="main"
-                   sx={{
-                       flexGrow: 1,
-                       height: 'calc(100vh - 64px)', // Adjust height based on AppBar/Tabs
-                       display: 'flex', // Use flexbox for columns
-                       overflow: 'hidden'
-                   }}
-               >
-                   {/* --- Loading / Error / Content Logic --- */}
-                   {loading && (
-                       <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                           <CircularProgress />
-                       </Box>
-                   )}
-                   {!loading && error && (
-                       <Box sx={{ flexGrow: 1, p: 3 }}>
-                           <Typography color="error">Error loading shell configuration:</Typography>
-                           <Typography color="error" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{error}</Typography>
-                       </Box>
-                   )}
-                   {!loading && !error && config && (
-                       // Container for Middle + Right Sidebar Columns
-                       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', height: '100%', overflow: 'hidden' }}>
-                           {/* Middle Area (potentially multiple panes later) */}
-                           <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                               <Box sx={{ flexBasis: '100%', overflowY: 'auto', p: 3 }}> {/* Single pane for now */}
-                                   <ErrorBoundary>
-                                      {/* TODO: Replace with dynamic app loading based on active frame (WO-7) */}
-                                      <Typography>Dynamic App Area (Active Frame Content)</Typography>
-                                      {/* Example: <RemoteComponent scope={...} module={...} url={...} /> */}
-                                   </ErrorBoundary>
-                               </Box>
-                               {/* Add more panes here if needed */}
-                           </Box>
+    const verticalTabBarWidth = 200;
+    const jobsSidebarWidth = Math.round(350 * 1.3);
 
-                           {/* Right Jobs Sidebar Placeholder */}
-                           <Box
-                               sx={{
-                                   width: `${jobsSidebarWidth}px`,
-                                   flexShrink: 0,
-                                   borderLeft: '1px solid rgba(0, 0, 0, 0.12)',
-                                   height: '100%',
-                                   overflowY: 'auto',
-                                   p: 2
-                               }}
-                           >
-                               <ErrorBoundary>
-                                   <Typography variant="h6" sx={{ mb: 2 }}>Jobs Placeholder</Typography>
-                                   {/* JobManager or other components might be loaded here dynamically later */}
-                               </ErrorBoundary>
-                           </Box>
-                        </Box> // End Container for Middle + Right Sidebar
-                   )} {/* End conditional rendering for loaded config */}
-               </Box> {/* End Main Content Area */}
-            </Box> {/* End Content Display Area */}
-        </Box> {/* End main area container */}
-    </Box> // End Root Flex container
-  );
+    return (
+        <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+            {/* Main AppBar */}
+            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+                <Toolbar>
+                     <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline' }}>
+                        <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>
+                            Visual Prompt Studio
+                        </Typography>
+                        <Typography variant="subtitle1" noWrap component="div" sx={{ opacity: 0.8 }}>
+                            C4H Editor
+                        </Typography>
+                    </Box>
+                </Toolbar>
+            </AppBar>
+
+            {/* Vertical TabBar / Sidebar */}
+            {!loading && !error && config?.frames && config.frames.length > 0 ? (
+                 <TabBar
+                     frames={config.frames}
+                     activeFrameId={activeFrameId}
+                     // Pass simplified handler matching signature
+                     onTabChange={(_event: React.SyntheticEvent, newFrameId: string) => handleTabChange(newFrameId)}
+                     width={verticalTabBarWidth}
+                 />
+            ) : (
+                 <Box sx={{ width: verticalTabBarWidth, flexShrink: 0, borderRight: 1, borderColor: 'divider', height: '100%', pt: '64px' }} >
+                     {loading && <CircularProgress sx={{m: 2}} size={20}/>}
+                 </Box>
+             )}
+
+            {/* Main content area */}
+            <Box component="main" sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <Toolbar /> {/* AppBar Spacer */}
+
+                {/* Content Display Area */}
+                <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+                    {/* Loading/Error for the whole config fetch */}
+                    {loading && (
+                        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                            <CircularProgress />
+                        </Box>
+                    )}
+                    {!loading && error && (
+                        <Box sx={{ flexGrow: 1, p: 3 }}>
+                            <Typography color="error">Error loading shell configuration:</Typography>
+                            <Typography color="error" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{error}</Typography>
+                        </Box>
+                    )}
+                    {/* Render dynamic content or right sidebar only when config is loaded successfully */}
+                    {!loading && !error && config && (
+                        <>
+                            {/* Middle Content Area - Now uses renderActiveFrameContent */}
+                            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                                <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
+                                    {renderActiveFrameContent()}
+                                </Box>
+                            </Box>
+
+                            {/* Right Jobs Sidebar Placeholder */}
+                            <Box
+                                sx={{
+                                    width: `${jobsSidebarWidth}px`,
+                                    flexShrink: 0,
+                                    borderLeft: 1,
+                                    borderColor: 'divider',
+                                    height: '100%',
+                                    overflowY: 'auto',
+                                    p: 2,
+                                    bgcolor: 'background.paper'
+                                }}
+                            >
+                                <ErrorBoundary message="Error loading Jobs Sidebar">
+                                    <Typography variant="h6" sx={{ mb: 2 }}>Jobs Placeholder</Typography>
+                                </ErrorBoundary>
+                            </Box>
+                        </>
+                    )}
+                 </Box>
+            </Box>
+        </Box>
+    );
 }
 
-// Wrap AppContent with Providers in the main export
+
+// --- App Component (Wrapper) ---
 function App() {
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      {/* Router should wrap the provider if context needs router info, */}
-      {/* but here Provider loads config needed by AppContent which uses Router */}
-      <ShellConfigProvider> {/* Provide context */}
-        <Router> {/* Router wraps AppContent */}
-           <AppContent /> {/* Render main content */}
-        </Router>
-      </ShellConfigProvider>
-    </ThemeProvider>
-  );
+    return (
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <ShellConfigProvider>
+                <Router>
+                    <AppContent />
+                </Router>
+            </ShellConfigProvider>
+        </ThemeProvider>
+    );
 }
 
 export default App;

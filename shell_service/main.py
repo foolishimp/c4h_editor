@@ -9,10 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Assuming routes are in ./api/routes/
-from api.routes import shell as shell_router
-# Database imports
-from database import db
-from database import crud
+from shell_service.api.routes import shell as shell_router
+from shell_service.database import db  # <-- Corrected
+from shell_service.database import crud # <-- Corrected
 
 # Configure basic logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)

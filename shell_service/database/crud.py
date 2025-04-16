@@ -9,8 +9,8 @@ import json
 from pathlib import Path
 import uuid
 
-from database import db
-from models.preferences import Frame, AppDefinition, ServiceEndpoints, AppAssignment
+from . import db # Note the leading dot '.'
+from shell_service.models.preferences import Frame, AppDefinition, ServiceEndpoints, AppAssignment
 
 logger = logging.getLogger(__name__)
 

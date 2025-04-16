@@ -10,8 +10,8 @@ import logging
 import uuid
 
 # Correct import path for database
-from database import crud
-from models.preferences import (
+from shell_service.database import crud
+from shell_service.models.preferences import ( # <-- Use absolute import
     ShellConfigurationResponse,
     ShellPreferencesRequest,
     AppDefinition,
