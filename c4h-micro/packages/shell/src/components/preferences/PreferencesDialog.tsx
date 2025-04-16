@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios'; // <-- Added axios import
+import axios from 'axios'; // <-- Make sure axios is imported
 import {
     Dialog,
     DialogTitle,
@@ -28,10 +28,11 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import DragHandleIcon from '@mui/icons-material/DragHandle';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteIcon from '@mui/icons-material/Delete'; // <-- Ensure DeleteIcon is imported
 import SettingsIcon from '@mui/icons-material/Settings';
 
 import { useShellConfig } from '../../contexts/ShellConfigContext';
+// Ensure all necessary types are imported from shared
 import { Frame, AppAssignment, ShellPreferencesRequest, AppDefinition } from 'shared';
 
 interface PreferencesDialogProps {
@@ -110,33 +111,32 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         // Ensure editedFrames order is up-to-date before saving
         const framesToSave = editedFrames.map((frame, idx) => ({ ...frame, order: idx }));
         const payload: ShellPreferencesRequest = { frames: framesToSave };
-        const saveUrl = `${PREFERENCES_SERVICE_BASE_URL}/api/v1/shell/preferences`; // Construct full URL
+        const saveUrl = `${PREFERENCES_SERVICE_BASE_URL}/api/v1/shell/preferences`;
 
         console.log(`Saving preferences via PUT to: ${saveUrl}`);
         console.log("Payload:", JSON.stringify(payload, null, 2));
 
-        // Use axios directly with the correct URL
         const headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            // Add 'X-User-ID' or other auth headers if your PUT endpoint requires them
             // 'X-User-ID': 'test-user-1' // Example if needed
         };
         const response = await axios.put<{ message: string }>(saveUrl, payload, { headers });
 
         console.log("Save response:", response.data);
         setSuccessMessage(response.data.message || 'Preferences saved successfully!');
-        await fetchConfig(); // Refresh the main config context
+        await fetchConfig();
 
         setTimeout(() => {
+             // Check if still mounted and open before closing
+             // (For simplicity, assuming component is still mounted if 'open' prop is true)
              if (open) {
                onClose();
              }
         }, 1500);
     } catch (err: any) {
-        // Handle potential axios error structure (err.response.data)
         const errorDetail = err.response?.data?.detail || err.message || 'Failed to save preferences.';
-        setSaveError(errorDetail); // Display specific error from backend if available
+        setSaveError(errorDetail);
         console.error("Error saving preferences:", err.response?.data || err);
     } finally {
         setIsSaving(false);
@@ -163,7 +163,11 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
       console.log("Editing frame:", frameToEdit.id);
       const template = frameTemplates.find(t => t.slots === frameToEdit.assignedApps.length);
       setSelectedTemplateId(template ? template.id : '');
-      setEditingFrame({ ...frameToEdit, assignedApps: [...frameToEdit.assignedApps] });
+      // Ensure deep copy of nested assignedApps array
+      setEditingFrame({
+          ...frameToEdit,
+          assignedApps: frameToEdit.assignedApps.map(app => ({ ...app }))
+      });
       setIsEditMode(true);
       setSuccessMessage(null);
       setSaveError(null);
@@ -175,11 +179,11 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
       setSelectedTemplateId('');
   };
 
-  // --- Implement Delete Handler ---
+  // --- Delete Handler Implementation ---
   const handleDeleteFrame = (frameIdToDelete: string) => {
       // Simple confirmation
-      if (window.confirm(`Are you sure you want to delete this tab (ID: ${frameIdToDelete})?`)) {
-          console.log("Deleting frame:", frameIdToDelete);
+      if (window.confirm(`Are you sure you want to delete this tab (ID: ${frameIdToDelete})? This action only takes effect after clicking 'Save All Preferences'.`)) {
+          console.log("Deleting frame locally:", frameIdToDelete);
           setEditedFrames(currentFrames =>
               currentFrames
                   .filter(f => f.id !== frameIdToDelete)
@@ -191,8 +195,6 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
   };
   // --- End Delete Handler ---
 
-  // TODO: Implement handleSaveEdit (saves changes to the specific frame in local state)
-
   const handleTemplateChange = (event: SelectChangeEvent<string>) => {
       const templateId = event.target.value;
       setSelectedTemplateId(templateId);
@@ -201,7 +203,7 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
 
       if (editingFrame) {
           const newAssignedApps: AppAssignment[] = Array(numberOfSlots).fill(null).map(() => ({ appId: '' }));
-          setEditingFrame({ ...editingFrame, assignedApps: newAssignedApps });
+          setEditingFrame(prev => prev ? { ...prev, assignedApps: newAssignedApps } : null);
       }
   };
 
@@ -211,49 +213,41 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
           const updatedApps = [...editingFrame.assignedApps];
           if (slotIndex < updatedApps.length) {
               updatedApps[slotIndex] = { appId: appId };
-              setEditingFrame({ ...editingFrame, assignedApps: updatedApps });
+              setEditingFrame(prev => prev ? { ...prev, assignedApps: updatedApps } : null);
+          } else {
+               console.warn(`Attempted to assign app to non-existent slot index: ${slotIndex}`);
           }
       }
   };
 
   const handleSaveEdit = () => {
       if (!editingFrame) return;
-      // Validation could be added here
       if (!editingFrame.name.trim()) {
-          setSaveError("Tab Name cannot be empty."); // Example basic validation
+          setSaveError("Tab Name cannot be empty.");
           return;
       }
-       // Clear validation error if it passed
        setSaveError(null);
-
 
       setEditedFrames(currentFrames => {
           const existingIndex = currentFrames.findIndex(f => f.id === editingFrame.id);
           let newFrames = [...currentFrames];
+          // Ensure deep copy when saving edited frame
+          const frameToSave = { ...editingFrame, assignedApps: editingFrame.assignedApps.map(app => ({...app})) };
           if (existingIndex !== -1) {
-              newFrames[existingIndex] = { ...editingFrame };
+              newFrames[existingIndex] = frameToSave;
+               console.log("Applied changes to existing frame:", editingFrame.id);
           } else {
-              newFrames.push({ ...editingFrame });
+              newFrames.push(frameToSave);
+               console.log("Applied new frame:", editingFrame.id);
           }
           return newFrames.map((frame, idx) => ({ ...frame, order: idx }));
       });
-      handleCancelEdit(); // Exit edit mode after applying changes locally
+      handleCancelEdit();
   };
 
-  const handleDeleteFrame = (frameIdToDelete: string) => {
-      console.log("Deleting frame:", frameIdToDelete);
-      // TODO: Add confirmation dialog
-      setEditedFrames(currentFrames =>
-          currentFrames
-              .filter(f => f.id !== frameIdToDelete)
-              .map((frame, idx) => ({ ...frame, order: idx }))
-      );
-      setSuccessMessage(null);
-      setSaveError(null);
-  };
+  // --- REMOVED DUPLICATE handleDeleteFrame definition ---
 
 
-  // Determine the number of slots based on the selected template or the editing frame
   const getNumberOfSlots = (): number => {
       if (editingFrame) {
           const template = frameTemplates.find(t => t.id === selectedTemplateId);
@@ -276,15 +270,11 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         <IconButton onClick={onClose} aria-label="close"><CloseIcon /></IconButton>
       </DialogTitle>
       <DialogContent dividers>
-        {/* Show loading/error related to fetching the initial config */}
         {configLoading && <CircularProgress />}
         {!configLoading && configError && <Alert severity="warning" sx={{ mb: 2 }}>Could not load initial config: {configError}</Alert>}
-
-        {/* Show messages related to saving OR local validation errors */}
         {successMessage && <Alert severity="success" sx={{ mb: 2 }}>{successMessage}</Alert>}
         {saveError && <Alert severity="error" sx={{ mb: 2 }}>{saveError}</Alert>}
 
-        {/* Ensure config is loaded before rendering UI */}
         {!configLoading && !configError && config && (
           <Box>
             {/* --- Edit/Create View --- */}
@@ -293,19 +283,16 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                  <Typography variant="h6" gutterBottom>
                    {editingFrame.id.startsWith('new-') ? 'Create New Tab' : `Edit Tab: ${editingFrame.name}`}
                  </Typography>
-
                  <TextField
                      label="Tab Name"
                      value={editingFrame.name}
-                     // Update editingFrame state directly on change
                      onChange={(e) => setEditingFrame(prev => prev ? { ...prev, name: e.target.value } : null)}
                      fullWidth
                      margin="normal"
                      required
-                     error={!editingFrame?.name?.trim()} // Basic validation feedback
+                     error={!editingFrame?.name?.trim()}
                      helperText={!editingFrame?.name?.trim() ? "Tab name is required." : ""}
                  />
-
                  <FormControl fullWidth margin="normal">
                      <InputLabel id="frame-layout-label">Frame Layout</InputLabel>
                      <Select
@@ -320,8 +307,6 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                          ))}
                      </Select>
                  </FormControl>
-
-                 {/* App Assignment Dropdowns */}
                  {numberOfSlots > 0 && (
                      <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Assign Applications:</Typography>
                  )}
@@ -332,7 +317,7 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                             <InputLabel id={`app-select-label-${index}`}>Select App</InputLabel>
                              <Select
                                 labelId={`app-select-label-${index}`}
-                                value={editingFrame.assignedApps[index]?.appId || ''}
+                                value={editingFrame.assignedApps && editingFrame.assignedApps[index] ? editingFrame.assignedApps[index].appId : ''}
                                 label="Select App"
                                 onChange={(e) => handleAppAssignmentChange(index, e)}
                              >
@@ -344,19 +329,12 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                          </FormControl>
                      </Box>
                  ))}
-
-
                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                     <Button onClick={handleCancelEdit} disabled={isSaving}>Cancel Edit</Button>
-                    {/* Apply changes locally */}
                     <Button variant="contained" onClick={handleSaveEdit} disabled={isSaving || !editingFrame?.name?.trim()}>Apply Changes</Button>
                  </Box>
                  <Divider sx={{ my: 3 }} />
-
               </Box>
-            ) : (
-              /* --- List View --- */
-              <Box   </Box>
             ) : (
               /* --- List View --- */
               <Box>
@@ -395,26 +373,26 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                                     <IconButton
                                         aria-label={`Edit ${frame.name}`}
                                         size="small"
-                                        onClick={() => handleEditFrame(frame)}
+                                        onClick={() => handleEditFrame(frame)} // Connect edit handler
                                         disabled={isSaving || isEditMode}
                                     ><SettingsIcon fontSize="inherit" /></IconButton>
-                                    {/* --- Connect Delete Button --- */}
+                                    {/* Delete Button Connected */}
                                     <IconButton
                                         aria-label={`Delete ${frame.name}`}
                                         size="small"
                                         onClick={() => handleDeleteFrame(frame.id)} // Connect delete handler
-                                        disabled={isSaving || isEditMode}><DeleteIcon fontSize="inherit" /></IconButton>
+                                        disabled={isSaving || isEditMode}
+                                    ><DeleteIcon fontSize="inherit" /></IconButton>
                                 </>
                             }
-                            sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 }, opacity: isEditMode ? 0.5 : 1 }} // Dim list when editing
+                            sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 } }}
                         >
                             <ListItemIcon sx={{ minWidth: '30px', cursor: 'grab' }} aria-hidden="true"><DragHandleIcon fontSize='small' /></ListItemIcon>
                             <ListItemText primary={frame.name || '(Unnamed Frame)'} secondary={`ID: ${frame.id || '(new)'}`} />
                         </ListItem>
                     ))}
                  </List>
-                 {/* Display message if no frames exist */}
-                 {editedFrames?.length === 0 && (
+                 {editedFrames?.length === 0 && !isEditMode && (
                     <Typography sx={{mt: 2, fontStyle: 'italic', textAlign: 'center'}}>
                         No tabs configured. Click "Create New Tab" to get started.
                     </Typography>
@@ -427,9 +405,9 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
       <DialogActions>
         <Button onClick={onClose} disabled={isSaving}>Cancel</Button>
         <Button
-            onClick={handleSave} // This button now saves the state of editedFrames
+            onClick={handleSave}
             variant="contained"
-            disabled={isSaving || isEditMode || configLoading || !!configError} // Disable save if actively editing a frame
+            disabled={isSaving || isEditMode || configLoading || !!configError}
         >
           {isSaving ? <CircularProgress size={24} color="inherit"/> : 'Save All Preferences'}
         </Button>

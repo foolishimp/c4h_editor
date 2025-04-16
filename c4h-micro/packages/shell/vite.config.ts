@@ -17,50 +17,46 @@ export default defineConfig({
         jobManagement: 'http://localhost:3004/assets/remoteEntry.js'
       },
       shared: {
-        react: { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        'react-dom': { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        '@mui/material': { 
-          singleton: true, 
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        '@mui/icons-material': { 
-          singleton: true, 
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
+        react: { singleton: true, requiredVersion: '*', eager: true },
+        'react-dom': { singleton: true, requiredVersion: '*', eager: true },
+        '@mui/material': { singleton: true, requiredVersion: '^5.0.0', eager: true },
+        '@mui/icons-material': { singleton: true, requiredVersion: '^5.0.0', eager: true },
         'shared': {
-          singleton: true,
-          eager: true
+            singleton: true,
+            eager: true
         }
       }
     })
   ],
+  optimizeDeps: {
+      esbuildOptions: {
+          target: 'es2022'
+      }
+  },
+  esbuild: {
+    target: 'es2022'
+  },
   build: {
     modulePreload: false,
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
     rollupOptions: {
-      output: {
-        format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js'
-      }
+        output: {
+            format: 'esm',
+            entryFileNames: 'assets/[name].js',
+            chunkFileNames: 'assets/[name].js',
+            assetFileNames: 'assets/[name].[ext]'
+        }
     }
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      // --- CORRECTED ALIAS ---
+      // Point to the root of the shared package, not its src directory
+      'shared': path.resolve(__dirname, '../shared')
+      // --- END CORRECTION ---
     }
   },
   server: {
