@@ -15,6 +15,7 @@ lib64/
 parts/
 sdist/
 var/
+.venv/
 wheels/
 *.egg-info/
 .installed.cfg
@@ -93,3 +94,6 @@ Thumbs.db
 /backup_txt/
 /data/
 workspaces/
+repositories/workorders
+repositories/teamconfigs
+repositories/runtimeconfigs
