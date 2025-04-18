@@ -4,7 +4,7 @@ Defines the structure for Frames, App Definitions, and overall Shell Configurati
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 import uuid
 
 # --- Models for UI Configuration ---
@@ -30,6 +30,11 @@ class AppDefinition(BaseModel):
     scope: str = Field(..., description="Module Federation scope (e.g., 'configSelector').")
     module: str = Field(..., description="Module Federation module name (e.g., './ConfigManager').")
     url: Optional[str] = Field(None, description="URL for the remoteEntry.js if not standard.") # Potentially derived from service discovery
+
+class AppConfig(BaseModel):
+    """Configuration for an app in a specific environment."""
+    url: Optional[str] = Field(None, description="URL for the app's remoteEntry.js in this environment.")
+    # Add other environment-specific app config fields here
 
 class ServiceEndpoints(BaseModel):
     """Defines endpoints for backend services the Shell needs to contact."""

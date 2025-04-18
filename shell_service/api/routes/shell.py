@@ -7,14 +7,17 @@ and save user preferences.
 from fastapi import APIRouter, HTTPException, Body, Depends, Header, Query
 from typing import List, Dict, Any, Optional
 import logging
+import copy
 import uuid
 
 # Correct import path for database
 from shell_service.database import crud
+from shell_service.config import CURRENT_ENV_CONFIG
 from shell_service.models.preferences import ( # <-- Use absolute import
     ShellConfigurationResponse,
     ShellPreferencesRequest,
     AppDefinition,
+    AppConfig,
     ServiceEndpoints,
     Frame
 )
@@ -43,8 +46,28 @@ async def get_shell_configuration(user_id: str = Depends(get_current_user)):
     try:
         # Fetch data using CRUD functions
         user_frames = await crud.get_user_frames(user_id)
-        available_apps = await crud.get_available_apps()
-        service_endpoints = await crud.get_service_endpoints()
+        db_available_apps = await crud.get_available_apps()
+        db_service_endpoints = await crud.get_service_endpoints()
+        
+        # Update app URLs with environment-specific values
+        available_apps = []
+        for app_def in db_available_apps:
+            # Create a deep copy to avoid modifying the original
+            app = copy.deepcopy(app_def)
+            
+            # Check if this app has environment-specific config
+            if app.id in CURRENT_ENV_CONFIG:
+                env_app_config = CURRENT_ENV_CONFIG[app.id]
+                if isinstance(env_app_config, dict) and "url" in env_app_config:
+                    app.url = env_app_config["url"]
+                    logger.info(f"Using environment-specific URL for app {app.id}: {app.url}")
+            available_apps.append(app)
+        
+        # Override service endpoint URLs with environment config
+        service_endpoints = db_service_endpoints
+        if "main_backend" in CURRENT_ENV_CONFIG:
+            service_endpoints.jobConfigServiceUrl = CURRENT_ENV_CONFIG["main_backend"]
+            logger.info(f"Using environment-specific URL for main backend: {service_endpoints.jobConfigServiceUrl}")
 
         return ShellConfigurationResponse(
             frames=user_frames,

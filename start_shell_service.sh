@@ -7,6 +7,7 @@
 # Store the root directory where the script is executed
 ROOT_DIR=$(pwd)
 LOG_CONFIG_FILE="log_config.yaml" # Define log config file name (expects it in ROOT_DIR)
+ENV_FILE="environments.json"      # Environment configuration file
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -15,7 +16,8 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Shell Service Configuration
+# Shell Service Configuration - Basic defaults
+# (These may be overridden by environments.json)
 SERVICE_NAME="shell_service"
 PORT=8001 # Default port for shell_service
 LOG_FILE="${SERVICE_NAME}_server.log" # Log file name
@@ -23,6 +25,53 @@ UVICORN_TARGET="${SERVICE_NAME}.main:app" # Target for uvicorn
 
 # PID tracking (only one service now)
 PID=""
+
+# Environment selection
+APP_ENV=${APP_ENV:-development}  # Default to development if not set
+
+# Function to process environment configuration
+process_environment_config() {
+  local env_file="$ROOT_DIR/$ENV_FILE"
+  
+  # Check if jq is installed
+  if ! command -v jq &> /dev/null; then
+    echo -e "${RED}❌ jq is not installed but is required for parsing JSON config.${NC}"
+    echo -e "${RED}   Please install jq using your package manager (e.g., brew install jq).${NC}"
+    return 1
+  fi
+  
+  # Check if environments.json exists
+  if [ ! -f "$env_file" ]; then
+    echo -e "${RED}❌ Environment configuration file not found: $env_file${NC}"
+    echo -e "${RED}   Cannot load environment-specific configuration.${NC}"
+    return 1
+  fi
+  
+  # Check if the specified environment exists in the file
+  if ! jq -e --arg env "$APP_ENV" '.[$env]' "$env_file" > /dev/null; then
+    echo -e "${RED}❌ Environment '$APP_ENV' not found in $ENV_FILE${NC}"
+    echo -e "${YELLOW}   Available environments: $(jq -r 'keys | join(", ")' "$env_file")${NC}"
+    return 1
+  fi
+  
+  echo -e "${GREEN}Loading configuration for environment: ${BLUE}$APP_ENV${NC}"
+  
+  # Extract and export configuration values
+  # For the shell service, we primarily need the main_backend URL
+  MAIN_BACKEND_URL=$(jq -r --arg env "$APP_ENV" '.[$env].main_backend // "http://localhost:8000"' "$env_file")
+  
+  # Optional: Look for a shell_service port if specified (using default if not found)
+  PORT_FROM_CONFIG=$(jq -r --arg env "$APP_ENV" '.[$env].shell_service.port // empty' "$env_file")
+  if [ ! -z "$PORT_FROM_CONFIG" ]; then
+    PORT=$PORT_FROM_CONFIG
+  fi
+  
+  # Export variables for the service to use
+  export MAIN_BACKEND_URL
+  export PORT
+  
+  echo -e "${GREEN}✅ Environment configuration loaded${NC}"
+}
 
 # Function to print section header
 print_header() {
@@ -123,6 +172,14 @@ if [ ! -d "$ROOT_DIR/$SERVICE_NAME" ]; then
     exit 1
 fi
 
+# Process environment configuration
+print_header "LOADING ENVIRONMENT CONFIGURATION"
+if ! process_environment_config; then
+  echo -e "${YELLOW}⚠️ Continuing with default configuration values${NC}"
+else
+  echo -e "${BLUE}PORT=${NC}$PORT ${BLUE}MAIN_BACKEND_URL=${NC}$MAIN_BACKEND_URL"
+fi
+
 # Reminder for virtual environment
 if [ -z "$VIRTUAL_ENV" ]; then
     echo -e "${YELLOW}⚠️ Reminder: Make sure you have activated the correct Python virtual environment!${NC}"
@@ -153,3 +210,4 @@ echo -e "\n${YELLOW}Press Ctrl+C to stop the server${NC}"
 
 # Wait for the background process to prevent script exit
 wait $PID
+]]]]]

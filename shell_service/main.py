@@ -4,6 +4,7 @@ Main FastAPI application for the Preferences Shell Service.
 
 import logging
 import sys
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Assuming routes are in ./api/routes/
 from shell_service.api.routes import shell as shell_router
 from shell_service.database import db  # <-- Corrected
+from shell_service.config import CURRENT_ENV, CURRENT_ENV_CONFIG  # Import environment config
 from shell_service.database import crud # <-- Corrected
 
 # Configure basic logging
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Preferences Shell Service starting up...")
+    logger.info(f"Running in environment: {CURRENT_ENV}")
     # Connect to database
     connected = await db.connect() # Check connection result
     logger.info(f"Database connection attempt during startup successful: {connected}") # Log result

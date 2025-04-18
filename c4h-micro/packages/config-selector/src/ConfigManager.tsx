@@ -1,6 +1,6 @@
 // File: /packages/config-selector/src/ConfigManager.tsx
 import { useState, useEffect } from 'react';
-import { Box, Typography, CircularProgress } from '@mui/material';
+import { Box, Typography, CircularProgress, CssBaseline, Container } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ConfigProvider } from './contexts/ConfigContext';
 import ConfigList from './components/ConfigList';
@@ -10,6 +10,7 @@ import { configTypes } from 'shared';
 interface ConfigManagerProps {
   configType?: string;
   configId?: string;
+  domElement?: HTMLElement; // Required for single-spa
 }
 
 function ConfigManager(props: ConfigManagerProps) {
@@ -17,11 +18,12 @@ function ConfigManager(props: ConfigManagerProps) {
   const params = useParams<{ configType?: string, id?: string }>();
   
   // Use navigate if available (inside Router context)
-  let navigate: ReturnType<typeof useNavigate>;
+  let navigate: ReturnType<typeof useNavigate> | undefined;
   try {
     navigate = useNavigate();
   } catch (e) {
     // Navigation is handled through direct props in non-Router context
+    console.debug('Router context not available, navigation will use direct state updates');
   }
   
   // Use the config type from props or URL params
@@ -126,26 +128,54 @@ function ConfigManager(props: ConfigManagerProps) {
     );
   }
   
+  if (navigate) {
+    return (
+      <ConfigProvider configType={configType}>
+        <Box sx={{ p: 3, height: '100%' }}>
+          <Typography variant="h4" gutterBottom data-testid="config-heading">
+            {configTypes[configType].name} Management
+          </Typography>
+          
+          {view === 'editor' ? (
+            <ConfigEditor 
+              configId={currentConfigId || 'new'} 
+              onBack={handleBackToList} 
+            />
+          ) : (
+            <ConfigList 
+              onEdit={handleEditConfig}
+              onCreateNew={handleCreateNew}
+            />
+          )}
+        </Box>
+      </ConfigProvider>
+    );
+  }
+  
   return (
-    <ConfigProvider configType={configType}>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          {configTypes[configType].name} Management
-        </Typography>
-        
-        {view === 'editor' ? (
-          <ConfigEditor 
-            configId={currentConfigId || 'new'} 
-            onBack={handleBackToList} 
-          />
-        ) : (
-          <ConfigList 
-            onEdit={handleEditConfig}
-            onCreateNew={handleCreateNew}
-          />
-        )}
-      </Box>
-    </ConfigProvider>
+    <CssBaseline>
+      <Container maxWidth="lg" sx={{ mt: 4, height: '100%' }}>
+        <ConfigProvider configType={configType}>
+          <Box sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h4" gutterBottom data-testid="config-heading">
+              {configTypes[configType].name} Management
+            </Typography>
+            
+            {view === 'editor' ? (
+              <ConfigEditor 
+                configId={currentConfigId || 'new'} 
+                onBack={handleBackToList} 
+              />
+            ) : (
+              <ConfigList 
+                onEdit={handleEditConfig}
+                onCreateNew={handleCreateNew}
+              />
+            )}
+          </Box>
+        </ConfigProvider>
+      </Container>
+    </CssBaseline>
   );
 }
 

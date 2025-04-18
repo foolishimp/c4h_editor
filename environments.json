@@ -1,0 +1,32 @@
+{
+  "development": {
+    "main_backend": "http://localhost:8000",
+    "config-selector-workflows": {
+      "url": "http://localhost:3003/assets/remoteEntry.js"
+    },
+    "config-selector-teams": {
+      "url": "http://localhost:3003/assets/remoteEntry.js"
+    },
+    "config-selector-runtime": {
+      "url": "http://localhost:3003/assets/remoteEntry.js"
+    },
+    "job-management": {
+      "url": "http://localhost:3004/assets/remoteEntry.js"
+    }
+  },
+  "production": {
+    "main_backend": "https://api.c4h.example.com",
+    "config-selector-workflows": {
+      "url": "https://config-selector.c4h.example.com/assets/remoteEntry.js"
+    },
+    "config-selector-teams": {
+      "url": "https://config-selector.c4h.example.com/assets/remoteEntry.js"
+    },
+    "config-selector-runtime": {
+      "url": "https://config-selector.c4h.example.com/assets/remoteEntry.js"
+    },
+    "job-management": {
+      "url": "https://job-manager.c4h.example.com/assets/remoteEntry.js"
+    }
+  }
+}

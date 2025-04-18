@@ -1,63 +1,36 @@
-// File: packages/config-selector/vite.config.ts
 /// <reference path="../shared/src/types/federation.d.ts" />
 
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
 export default defineConfig({
   plugins: [
     react(),
-    federation({
-      name: 'configSelector',
-      filename: 'remoteEntry.js',
-      exposes: {
-        './ConfigManager': './src/ConfigManager.tsx'
-      },
-      remotes: {
-        yamlEditor: 'http://localhost:3102/assets/remoteEntry.js'
-      },
-      shared: {
-        react: { 
-          singleton: true,
-          requiredVersion: '*',  // Change to '*'
-          eager: true
-        },
-        'react-dom': {
-          singleton: true,
-          requiredVersion: '*',  // Change to '*'
-          eager: true
-        },
-        '@mui/material': {
-          singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        '@mui/icons-material': {
-          singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        'shared': {
-          singleton: true,
-          eager: true
-        }
-      }
-    })
   ],
   build: {
-    modulePreload: false,
-    target: 'esnext',
-    minify: false,
+    lib: {
+      entry: './src/main.tsx',
+      name: 'configSelectorApp',
+      formats: ['system'],
+      fileName: () => 'config-selector.js'
+    },
     cssCodeSplit: false,
     rollupOptions: {
-      output: {
-        format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js'
-      }
-    }
+      external: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'single-spa',
+        'single-spa-react',
+        'single-spa-react',
+        '@mui/material',
+        '@mui/icons-material',
+        'shared'
+      ],
+    },
+    target: 'esnext',
+    minify: false,
   },
   server: {
     port: 3003,
@@ -72,7 +45,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      'shared': path.resolve(__dirname, '../shared/dist'),
+      'yaml-editor': path.resolve(__dirname, '../yaml-editor/src')
     }
   }
 });
