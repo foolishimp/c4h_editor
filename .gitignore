@@ -82,6 +82,7 @@ data/backups/*
 logs/
 *.db
 *.sqlite3
+*.txt
 
 # OS specific
 .DS_Store
