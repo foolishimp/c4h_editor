@@ -1,18 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { 
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
+
+import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
+import {
   Alert,
-  Box, 
-  Typography, 
-  Button, 
-  Card, 
-  CardContent, 
-  FormControl, 
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  FormControl,
   InputLabel,
   CircularProgress,
-  Select, 
+  Select,
   MenuItem
-} from '@mui/material'; 
-import { configTypes, api, JobConfigReference } from 'shared';
+} from '@mui/material';
+// *** ADD eventBus import ***
+import { configTypes, api, JobConfigReference, eventBus } from 'shared'; // [cite: 917]
 import { useJobContext } from '../contexts/JobContext';
 
 interface ConfigOption {
@@ -25,131 +28,150 @@ interface ConfigOption {
 const REQUIRED_CONFIG_TYPES = ['workorder', 'teamconfig', 'runtimeconfig'];
 
 const JobCreator: React.FC = () => {
-  const { submitJobConfigurations, loading, error } = useJobContext();
-  
-  // State for selected config IDs - with strict typing for required configs
-  const [workorderId, setWorkorderId] = useState<string>(""); 
+  const { submitJobConfigurations, loading, error: submissionError } = useJobContext(); // Rename context error
+  const [workorderId, setWorkorderId] = useState<string>("");
   const [teamconfigId, setTeamconfigId] = useState<string>("");
   const [runtimeconfigId, setRuntimeconfigId] = useState<string>("");
-  
-  // State for available configs by type
   const [configOptions, setConfigOptions] = useState<Record<string, ConfigOption[]>>({});
-  
-  // State for form validity
   const [isFormValid, setIsFormValid] = useState<boolean>(false);
-  
-  // Load available configs for each type 
-  useEffect(() => {
-    const loadConfigOptions = async () => {
-      // Initialize options with empty arrays for all required config types
-      const options: Record<string, ConfigOption[]> = {};
-      
-      // Initialize all options with empty arrays
-      REQUIRED_CONFIG_TYPES.forEach(type => {
-        options[type] = [];
-      });
-      
-      for (const configType of REQUIRED_CONFIG_TYPES) {
-        try {
-          // Get the API endpoint for this config type
-          const endpoint = configTypes[configType]?.apiEndpoints.list;
-          if (endpoint) {
-            // Make the API call
-            const response = await api.get(endpoint);
-            
-            const configs = Array.isArray(response.data) ? response.data : [];
+  const [loadingOptions, setLoadingOptions] = useState<boolean>(false); // State for loading options
+  const [optionsError, setOptionsError] = useState<string | null>(null); // State for options loading error
 
-            if (Array.isArray(configs)) {
-              // Map to ConfigOption format first
-              let mappedOptions: ConfigOption[] = configs.map(item => {
-                // Handle different response structures safely - checking all possible locations for descriptions
-                const description = (item.metadata?.description?.trim() || item.title?.trim() || 
-                                   item.description?.trim() || '').trim() || 'No description';
-                // Include updated_at for sorting
-                return { 
-                  id: item.id, 
-                  description: description,
-                  updated_at: item.updated_at // Assuming API returns this field directly now
-                };
-              });
+  // --- Refactored function to load config options ---
+  const loadConfigOptions = useCallback(async () => {
+    console.log("JobCreator: Loading config options...");
+    setLoadingOptions(true);
+    setOptionsError(null);
+    const options: Record<string, ConfigOption[]> = {};
+    REQUIRED_CONFIG_TYPES.forEach(type => { options[type] = []; });
 
-              // Sort by updated_at descending (newest first)
-              mappedOptions.sort((a, b) => {
-                const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-                const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-                return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA); // Descending sort
-              });
+    let fetchErrorOccurred = false;
 
-              options[configType] = mappedOptions;
-            }
+    for (const configType of REQUIRED_CONFIG_TYPES) {
+      try {
+        const endpoint = configTypes[configType]?.apiEndpoints.list;
+        if (endpoint) {
+          const response = await api.get(endpoint); // [cite: 963]
+          const configs = Array.isArray(response.data) ? response.data : [];
+
+          if (Array.isArray(configs)) {
+            let mappedOptions: ConfigOption[] = configs.map(item => {
+              const description = (item.metadata?.description?.trim() || item.title?.trim() || item.description?.trim() || '').trim() || 'No description';
+              return {
+                id: item.id,
+                description: description,
+                updated_at: item.updated_at // Expecting backend to provide this [cite: 1950]
+              };
+            }).filter(item => item.id); // Ensure ID exists
+
+            // Sort by updated_at descending (newest first)
+            mappedOptions.sort((a, b) => {
+              const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+              const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+              return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA); // Descending sort [cite: 1205, 1206]
+            });
+
+            options[configType] = mappedOptions;
+          } else {
+             console.warn(`JobCreator: Unexpected response format for ${configType}`, response.data);
           }
-        } catch (err) {
-          console.error(`Error loading ${configType} options:`, err);
-          // Already initialized to empty array above
         }
+      } catch (err: any) {
+        console.error(`JobCreator: Error loading ${configType} options:`, err);
+        fetchErrorOccurred = true;
+        // Set error for specific type or a general one
+        setOptionsError(`Failed to load options for ${configType}. Please refresh or check the console.`);
       }
-      
-      setConfigOptions(options);
-    };
-    
+    }
+
+    if (!fetchErrorOccurred) {
+       setOptionsError(null); // Clear error if all fetches succeed
+    }
+    setConfigOptions(options);
+    setLoadingOptions(false);
+    console.log("JobCreator: Config options loaded.", options);
+  }, []); // Empty dependency array means this function definition doesn't change
+
+  // --- Load options on initial mount ---
+  useEffect(() => {
     loadConfigOptions();
-  }, []);
-  
+  }, [loadConfigOptions]); // Depend on the memoized load function
+
+  // --- Subscribe to eventBus for updates ---
+  useEffect(() => {
+    const handleConfigUpdate = (data: { configType: string }) => {
+      // Check if the updated type is one we care about
+      if (REQUIRED_CONFIG_TYPES.includes(data?.configType)) {
+        console.log(`JobCreator: Received configListUpdated event for ${data.configType}. Refreshing options.`);
+        loadConfigOptions(); // Reload options when relevant config type changes
+      }
+    };
+
+    console.log("JobCreator: Subscribing to configListUpdated event.");
+    // Subscribe returns an unsubscribe function
+    const unsubscribe = eventBus.subscribe('configListUpdated', handleConfigUpdate); // [cite: 985]
+
+    // Cleanup function to unsubscribe when component unmounts
+    return () => {
+      console.log("JobCreator: Unsubscribing from configListUpdated event.");
+      unsubscribe(); // [cite: 987]
+    };
+  }, [loadConfigOptions]); // Depend on loadConfigOptions
+
   // Validate form
   useEffect(() => {
-    // Form is valid when all three required config types are selected
-    const isValid = Boolean(workorderId) && Boolean(teamconfigId) && Boolean(runtimeconfigId); 
-    
+    const isValid = Boolean(workorderId) && Boolean(teamconfigId) && Boolean(runtimeconfigId);
     setIsFormValid(isValid);
   }, [workorderId, teamconfigId, runtimeconfigId]);
-  
+
   // Handle form submission
   const handleSubmit = () => {
     if (isFormValid) {
       try {
-        // Create a list of configurations in the order they should be applied
-        // Order matters - items later in the list have precedence in merges
         const configList: JobConfigReference[] = [
-          // List from lowest to highest precedence
-          {
-            id: runtimeconfigId,
-            config_type: 'runtimeconfig'
-          },
-          {
-            id: teamconfigId,
-            config_type: 'teamconfig'
-          },
-          {
-            id: workorderId,
-            config_type: 'workorder'
-          }
+          { id: runtimeconfigId, config_type: 'runtimeconfig' }, // [cite: 1211]
+          { id: teamconfigId, config_type: 'teamconfig' },       // [cite: 1211]
+          { id: workorderId, config_type: 'workorder' }         // [cite: 1212]
         ];
-        submitJobConfigurations(configList);
+        submitJobConfigurations(configList); // [cite: 1213]
       } catch (err) { /* Error is handled by the context */ }
     }
   };
-  
+
   return (
     <Card>
       <CardContent>
         <Typography variant="h5" gutterBottom>
           Create New Job
         </Typography>
-        
-        {error && (
+
+        {/* Display options loading/error state */}
+        {loadingOptions && (
+           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+               <CircularProgress size={20} sx={{ mr: 1 }} />
+               <Typography>Loading configuration options...</Typography>
+           </Box>
+        )}
+        {optionsError && !loadingOptions && (
+           <Alert severity="warning" sx={{ mb: 2 }}>
+             {optionsError}
+             <Button size="small" onClick={loadConfigOptions} sx={{ ml: 1 }}>Retry</Button>
+           </Alert>
+        )}
+        {submissionError && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {submissionError}
           </Alert>
         )}
-        
+
         <Box>
           {/* Workorder Selection */}
-          <FormControl 
-            fullWidth 
+          <FormControl
+            fullWidth
             sx={{ mb: 2 }}
-            disabled={loading}
+            disabled={loading || loadingOptions} // Disable during submission or options loading
           >
-            <InputLabel id="workorder-label"> 
+            <InputLabel id="workorder-label">
               {configTypes['workorder'].name}
             </InputLabel>
             <Select
@@ -168,14 +190,14 @@ const JobCreator: React.FC = () => {
               ))}
             </Select>
           </FormControl>
-          
+
           {/* Team Configuration Selection */}
-          <FormControl 
-            fullWidth 
+           <FormControl
+            fullWidth
             sx={{ mb: 2 }}
-            disabled={loading}
+            disabled={loading || loadingOptions}
           >
-            <InputLabel id="teamconfig-label"> 
+            <InputLabel id="teamconfig-label">
               {configTypes['teamconfig'].name}
             </InputLabel>
             <Select
@@ -194,14 +216,14 @@ const JobCreator: React.FC = () => {
               ))}
             </Select>
           </FormControl>
-          
+
           {/* Runtime Configuration Selection */}
-          <FormControl 
-            fullWidth 
+           <FormControl
+            fullWidth
             sx={{ mb: 2 }}
-            disabled={loading}
+            disabled={loading || loadingOptions}
           >
-            <InputLabel id="runtimeconfig-label"> 
+            <InputLabel id="runtimeconfig-label">
               {configTypes['runtimeconfig'].name}
             </InputLabel>
             <Select
@@ -220,13 +242,13 @@ const JobCreator: React.FC = () => {
               ))}
             </Select>
           </FormControl>
-          
+
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
             <Button
               variant="contained"
               onClick={handleSubmit}
-              disabled={!isFormValid || loading}
-            > 
+              disabled={!isFormValid || loading || loadingOptions} // Also disable if options are loading
+            >
               {loading ? <CircularProgress size={24} /> : 'Submit Job'}
             </Button>
           </Box>

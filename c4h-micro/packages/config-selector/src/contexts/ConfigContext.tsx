@@ -1,11 +1,13 @@
-// /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
+// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
+// CORRECTED VERSION: Based on original code + eventBus integration
 
 // ** IMPORTS **
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'; // Ensure useContext is imported
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
-import { configTypes, apiService } from 'shared'; // Assuming ConfigTypeMetadata is exported from shared
+// *** ADD eventBus import ***
+import { configTypes, apiService, eventBus } from 'shared'; // Assuming ConfigTypeMetadata is exported from shared
 
-// ** INTERFACE & DEFAULT STATE **
+// ** INTERFACE & DEFAULT STATE ** (From Original)
 interface ConfigContextState {
   configType: string;
   configs: any[];
@@ -14,18 +16,17 @@ interface ConfigContextState {
   loading: boolean;
   error: string | null;
   saved: boolean; // Tracks if the current state matches the last saved/loaded state
-
-  // Functions
   loadConfigs: () => Promise<void>;
   loadConfig: (id: string) => Promise<void>;
   createNewConfig: () => void;
   updateYaml: (yaml: string) => void;
-  saveConfig: (commitMessage?: string) => Promise<any | null>; // commitMessage is optional
+  saveConfig: (idFromEditor?: string, commitMessage?: string) => Promise<any | null>; // commitMessage is optional
   deleteConfig: (id: string, commitMessage?: string) => Promise<void>;
   archiveConfig: (id: string, archive: boolean, author?: string) => Promise<void>;
   cloneConfig: (id: string, newId: string, author?: string) => Promise<void>;
 }
 
+// Default state with stubs (From Original)
 const defaultContextState: ConfigContextState = {
   configType: '',
   configs: [],
@@ -34,8 +35,6 @@ const defaultContextState: ConfigContextState = {
   loading: false,
   error: null,
   saved: false, // Initial state is not 'saved'
-
-  // Default stub functions
   loadConfigs: async () => {},
   loadConfig: async () => {},
   createNewConfig: () => {},
@@ -46,7 +45,7 @@ const defaultContextState: ConfigContextState = {
   cloneConfig: async () => {}
 };
 
-// *** FIX: Create the actual context using createContext ***
+// Create the context (From Original)
 const ConfigContext = createContext<ConfigContextState>(defaultContextState);
 
 // ** PROVIDER COMPONENT **
@@ -63,7 +62,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<boolean>(false);
 
-  // Helper function to ensure metadata structure
+  // --- ensureMetadata (Original Implementation) ---
   const ensureMetadata = useCallback((config: any) => {
     if (!config) return;
     if (!config.metadata) {
@@ -81,15 +80,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       if (!config.metadata.updated_at) config.metadata.updated_at = new Date().toISOString();
       if (!config.metadata.version) config.metadata.version = '1.0.0';
     }
-  }, []);
+  }, []); // [cite: 1382]
 
-  // Function to load all configs
+  // --- loadConfigs (Original Implementation) ---
   const loadConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiService.getConfigs(configType);
-      setConfigs(response || []);
+      const response = await apiService.getConfigs(configType); // [cite: 1384]
+      setConfigs(response || []); // [cite: 1384]
     } catch (err: any) {
       setError(err.message || 'Failed to load configurations');
       console.error('Error loading configurations:', err);
@@ -97,15 +96,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [configType]);
+  }, [configType]); // [cite: 1384]
 
-  // Function to create a new blank config state
+  // --- createNewConfig (Original Implementation) ---
   const createNewConfig = useCallback(() => {
-    const defaultContent = configTypes[configType]?.defaultContent || {};
+    const defaultContent = configTypes[configType]?.defaultContent || {}; // [cite: 1385]
     const emptyConfig = {
       id: '', config_type: configType, content: defaultContent, metadata: {} // Metadata will be populated by ensureMetadata
     };
-    ensureMetadata(emptyConfig); // Ensure standard metadata structure
+    ensureMetadata(emptyConfig); // Ensure standard metadata structure [cite: 1385]
     setCurrentConfig(emptyConfig);
     try {
       const initialYaml = yamlDump(defaultContent, { lineWidth: -1 });
@@ -117,228 +116,212 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     setLoading(false);
     setSaved(false); // New config isn't saved yet
-  }, [configType, ensureMetadata]);
+  }, [configType, ensureMetadata]); // [cite: 1386]
 
-  // Function to load a specific config
+  // --- loadConfig (Original Implementation) ---
   const loadConfig = useCallback(async (id: string) => {
     if (id === 'new') {
-      createNewConfig();
+      createNewConfig(); // [cite: 1387]
       return;
     }
     setLoading(true); setError(null); setSaved(false);
     try {
-      const response = await apiService.getConfig(configType, id);
+      const response = await apiService.getConfig(configType, id); // [cite: 1387]
       if (!response) throw new Error(`Received null/undefined response for config ID: ${id}`);
-      const config = response as any;
+      const config = response as any; // [cite: 1387]
       if (!config || typeof config !== 'object' || !config.metadata || !('content' in config)) {
         console.error("ConfigContext: Invalid config structure received", { configResponse: config });
         throw new Error(`Invalid configuration structure received for ID: ${id}`);
       }
-      ensureMetadata(config); // Ensure metadata structure is valid
-      setCurrentConfig(config);
+      ensureMetadata(config); // Ensure metadata structure is valid [cite: 1388]
+      setCurrentConfig(config); // [cite: 1389]
       try {
-        const yamlString = yamlDump(config.content, { lineWidth: -1 });
+        const yamlString = yamlDump(config.content, { lineWidth: -1 }); // [cite: 1389]
         setYaml(yamlString);
-        setSaved(true); // Mark as saved on successful load
+        setSaved(true); // Mark as saved on successful load [cite: 1389]
       } catch (yamlErr: any) {
         console.error('Error converting to YAML:', yamlErr);
-        setError(`Failed to convert configuration to YAML: ${yamlErr.message}`);
+        setError(`Failed to convert configuration to YAML: ${yamlErr.message}`); // [cite: 1390]
         setYaml('');
       }
     } catch (err: any) {
-      setError(err.message || `Failed to load configuration: ${id}`);
+      setError(err.message || `Failed to load configuration: ${id}`); // [cite: 1391]
       console.error('Error loading configuration:', err);
       setCurrentConfig(null); setYaml('');
     } finally {
       setLoading(false);
     }
-  }, [configType, createNewConfig, ensureMetadata]); // Correct dependencies
+  }, [configType, createNewConfig, ensureMetadata]); // [cite: 1392]
 
-  // Function to update YAML state from editor changes
+  // --- updateYaml (Original Implementation) ---
   const updateYaml = useCallback((newYaml: string) => {
     setYaml(newYaml);
-    setSaved(false); // Mark as unsaved whenever YAML changes
-  }, []);
+    setSaved(false); // Mark as unsaved whenever YAML changes [cite: 1392]
+  }, []); // [cite: 1392]
 
-  // /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
-
-  const saveConfig = useCallback(async (idFromEditor?: string, commitMessage?: string) => {
+  // --- MODIFIED Save Function (Original Logic + eventBus) ---
+  const saveConfig = useCallback(async (idFromEditor?: string, commitMessage?: string) => { // [cite: 1393]
     setLoading(true); setError(null);
 
     if (!currentConfig) {
       setError('No configuration selected to save'); setLoading(false); return null;
     }
+    const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === ''; // [cite: 1393]
+    const effectiveId = isNew ? idFromEditor?.trim() : currentConfig.id; // [cite: 1394]
 
-    // *** FIX: Determine isNew *before* modifying currentConfig.id ***
-    // Check the original ID state to see if we started in 'new' mode
-    const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === '';
-
-    // Determine the ID to use (editor input for new, state for existing)
-    const effectiveId = isNew ? idFromEditor?.trim() : currentConfig.id;
-
-    // Validate that an ID exists *before* proceeding
     if (!effectiveId || effectiveId.trim() === '') {
         setError('Configuration ID must be provided via the editor before saving.');
         setLoading(false);
         return null;
     }
-
-    // Update the ID in the currentConfig object *only if it was new* AFTER isNew check
-    // This ensures the correct ID is part of the requestData payload
-    const configToSave = { ...currentConfig }; // Create a copy to modify
-    if (isNew) {
-        configToSave.id = effectiveId; // Set the ID on the copy
-    }
+    const configToSave = { ...currentConfig }; // [cite: 1395]
+    if (isNew) { configToSave.id = effectiveId; } // [cite: 1397]
 
     try {
-      let content;
-      try { content = yamlLoad(yaml); } catch (yamlErr: any) {
-        setError(`Invalid YAML format: ${yamlErr.message}`); setLoading(false); return null;
+      let content; // [cite: 1398]
+      try { content = yamlLoad(yaml); } catch (yamlErr: any) { // [cite: 1398]
+        setError(`Invalid YAML format: ${yamlErr.message}`); // [cite: 1398]
+        setLoading(false); return null;
       }
-
-      // Ensure metadata exists on the copy
-      ensureMetadata(configToSave);
-
+      ensureMetadata(configToSave); // [cite: 1399]
       const metadataToSave = {
-        ...(configToSave.metadata), // Use metadata from the copy
-        author: configToSave.metadata?.author || "Current User",
-        updated_at: new Date().toISOString(),
-        // If it's new, also set created_at (ensureMetadata might do this too)
-        created_at: isNew ? new Date().toISOString() : configToSave.metadata?.created_at,
-        // Ensure version is set correctly for new/updates if needed
-        version: isNew ? '1.0.0' : configToSave.metadata?.version || '1.0.0'
+        ...(configToSave.metadata), // [cite: 1400]
+        author: configToSave.metadata?.author || "Current User", // [cite: 1400]
+        updated_at: new Date().toISOString(), // [cite: 1401]
+        created_at: isNew ? new Date().toISOString() : configToSave.metadata?.created_at, // [cite: 1402]
+        version: isNew ? '1.0.0' : configToSave.metadata?.version || '1.0.0' // [cite: 1403]
       };
-
-      const requestData = {
+      const requestData = { // [cite: 1404]
         content,
         metadata: metadataToSave,
-        commit_message: commitMessage || `Update ${configType} ${effectiveId}`,
+        commit_message: commitMessage || `Update ${configType} ${effectiveId}`, // [cite: 1405]
         author: metadataToSave.author
       };
 
-      let response;
-      // *** FIX: Use the 'isNew' variable determined earlier ***
-      if (isNew) {
+      let response; // [cite: 1405]
+      if (isNew) { // [cite: 1406]
         console.log(`ConfigContext: Creating config ${effectiveId}`);
-        // Pass the explicit ID for creation
-        response = await apiService.createConfig(configType, { id: effectiveId, ...requestData });
-      } else {
+        response = await apiService.createConfig(configType, { id: effectiveId, ...requestData }); // [cite: 1407]
+      } else { // [cite: 1408]
         console.log(`ConfigContext: Updating config ${effectiveId}`);
-        response = await apiService.updateConfig(configType, effectiveId, requestData);
+        response = await apiService.updateConfig(configType, effectiveId, requestData); // [cite: 1408]
       }
 
-      // --- Response handling ---
-      ensureMetadata(response); // Ensure response metadata is good
-      setCurrentConfig(response); // Update state with the response from the server
+      ensureMetadata(response); // [cite: 1409]
+      setCurrentConfig(response); // [cite: 1410]
 
       try {
           const updatedYaml = yamlDump(response.content, { lineWidth: -1 });
-          setYaml(updatedYaml);
+          setYaml(updatedYaml); // [cite: 1412]
       } catch(e) { console.error("Failed to dump YAML from save response", e); }
 
-      setSaved(true);
-      await loadConfigs();
+      setSaved(true); // [cite: 1412]
+      await loadConfigs(); // [cite: 1413]
+      // *** Publish event after successful save and list reload ***
+      eventBus.publish('configListUpdated', { configType });
+      console.log(`ConfigContext: Published configListUpdated event for type ${configType} after save.`);
       return response;
 
     } catch (err: any) {
-      // Log the specific error from Axios if available
-      let errorDetail = err.message || 'An error occurred while saving';
+      let errorDetail = err.message || 'An error occurred while saving'; // [cite: 1414]
       if (err.isAxiosError && err.response?.data?.detail) {
-          errorDetail = `${err.response.status}: ${err.response.data.detail}`;
+          errorDetail = `${err.response.status}: ${err.response.data.detail}`; // [cite: 1414]
       }
-      setError(errorDetail);
-      console.error('Error saving configuration:', err.response?.data || err); // Log full error detail
-      setSaved(false);
+      setError(errorDetail); // [cite: 1416]
+      console.error('Error saving configuration:', err.response?.data || err);
+      setSaved(false); // [cite: 1416]
       return null;
     } finally {
-      setLoading(false);
+      setLoading(false); // [cite: 1417]
     }
-  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata]);
-  
-  // *** FIX: Implement deleteConfig ***
-  const deleteConfig = useCallback(async (id: string, commitMessage?: string) => {
+  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata]); // [cite: 1417]
+
+  // --- MODIFIED Delete Function (Original Logic + eventBus) ---
+  const deleteConfig = useCallback(async (id: string, commitMessage?: string) => { // [cite: 1418]
     setLoading(true); setError(null);
     try {
-      await apiService.deleteConfig(configType, id, commitMessage || `Deleted ${configType} ${id} via UI`, 'Current User');
-      await loadConfigs(); // Refresh list
-      if (currentConfig && currentConfig.id === id) { // Clear state if current config was deleted
+      await apiService.deleteConfig(configType, id, commitMessage || `Deleted ${configType} ${id} via UI`, 'Current User'); // [cite: 1418]
+      await loadConfigs(); // Refresh list [cite: 1418]
+      if (currentConfig && currentConfig.id === id) { // Clear state if current config was deleted [cite: 1418]
         setCurrentConfig(null);
         setYaml('');
         setSaved(false);
       }
+      // *** Publish event after successful delete and list reload ***
+      eventBus.publish('configListUpdated', { configType });
+      console.log(`ConfigContext: Published configListUpdated event for type ${configType} after delete.`);
     } catch (err: any) {
-      setError(err.message || `Failed to delete configuration: ${id}`); console.error('Error deleting configuration:', err);
+      setError(err.message || `Failed to delete configuration: ${id}`); console.error('Error deleting configuration:', err); // [cite: 1419]
     } finally {
-      setLoading(false);
+      setLoading(false); // [cite: 1419]
     }
-  }, [configType, loadConfigs, currentConfig]); // Added currentConfig dependency
+  }, [configType, loadConfigs, currentConfig]); // [cite: 1419]
 
-  // *** FIX: Implement archiveConfig ***
-  const archiveConfig = useCallback(async (id: string, archive: boolean, author: string = "Current User") => {
+  // --- MODIFIED Archive Function (Original Logic + eventBus) ---
+  const archiveConfig = useCallback(async (id: string, archive: boolean, author: string = "Current User") => { // [cite: 1420]
     setLoading(true); setError(null);
     try {
       if (archive) {
-        await apiService.archiveConfig(configType, id, author);
+        await apiService.archiveConfig(configType, id, author); // [cite: 1420]
       } else {
-        await apiService.unarchiveConfig(configType, id, author);
+        await apiService.unarchiveConfig(configType, id, author); // [cite: 1420]
       }
-      await loadConfigs(); // Refresh list
-      // Optionally reload current config if it was the one archived/unarchived
-      if (currentConfig && currentConfig.id === id) {
-        await loadConfig(id); // Reload to get updated metadata
+      await loadConfigs(); // Refresh list [cite: 1421]
+      if (currentConfig && currentConfig.id === id) { // [cite: 1421]
+        await loadConfig(id); // Reload to get updated metadata [cite: 1421]
       }
+      // *** Publish event after successful archive/unarchive and list reload ***
+      eventBus.publish('configListUpdated', { configType });
+      console.log(`ConfigContext: Published configListUpdated event for type ${configType} after archive/unarchive.`);
     } catch (err: any) {
       const action = archive ? 'archive' : 'unarchive';
-      setError(err.message || `Failed to ${action} configuration: ${id}`); console.error(`Error ${action}ing configuration:`, err);
+      setError(err.message || `Failed to ${action} configuration: ${id}`); console.error(`Error ${action}ing configuration:`, err); // [cite: 1421]
     } finally {
-      setLoading(false);
+      setLoading(false); // [cite: 1421]
     }
-  }, [configType, loadConfigs, currentConfig, loadConfig]); // Added loadConfig dependency
+  }, [configType, loadConfigs, currentConfig, loadConfig]); // [cite: 1421]
 
-  // *** FIX: Implement cloneConfig ***
-  const cloneConfig = useCallback(async (id: string, newId: string) => {
+  // --- MODIFIED Clone Function (Original Logic + eventBus) ---
+  const cloneConfig = useCallback(async (id: string, newId: string) => { // [cite: 1422]
     setLoading(true); setError(null);
     if (!newId || !newId.trim()) {
-         setError("New ID must be provided for cloning.");
+         setError("New ID must be provided for cloning."); // [cite: 1422]
          setLoading(false);
-         return; // Or throw error?
+         return;
     }
     try {
-      const clonedConfig = await apiService.cloneConfig(configType, id, newId.trim()); // Pass author too if API supports it
-      await loadConfigs(); // Refresh list
-      // Optionally navigate or load the new cloned config into the editor
-      // await loadConfig(clonedConfig.id); // Example: load the new clone
-      // For now, just log success
-       console.log(`ConfigContext: Cloned ${id} to ${newId}`, clonedConfig);
+      const clonedConfig = await apiService.cloneConfig(configType, id, newId.trim()); // [cite: 1423]
+      await loadConfigs(); // Refresh list [cite: 1423]
+      // *** Publish event after successful clone and list reload ***
+      eventBus.publish('configListUpdated', { configType });
+      console.log(`ConfigContext: Cloned ${id} to ${newId}. Published configListUpdated event for type ${configType}.`, clonedConfig); // [cite: 1423]
     } catch (err: any) {
-      setError(err.message || `Failed to clone configuration: ${id}`); console.error('Error cloning configuration:', err);
+      setError(err.message || `Failed to clone configuration: ${id}`); console.error('Error cloning configuration:', err); // [cite: 1423]
     } finally {
-      setLoading(false);
+      setLoading(false); // [cite: 1424]
     }
-  }, [configType, loadConfigs /* loadConfig if loading clone */]);
+  }, [configType, loadConfigs /* loadConfig if loading clone */]); // [cite: 1424]
 
-  // Context value provided to consumers
+  // Context value provided to consumers (From Original)
   const contextValue: ConfigContextState = {
     configType, configs, currentConfig, yaml, loading, error, saved,
     loadConfigs, loadConfig, createNewConfig, updateYaml, saveConfig,
-    deleteConfig, archiveConfig, cloneConfig // Add implemented functions
-  };
+    deleteConfig, archiveConfig, cloneConfig
+  }; // [cite: 1425]
 
+  // Return provider with value (From Original)
   return (
-    // *** FIX: Use ConfigContext.Provider ***
-    <ConfigContext.Provider value={contextValue}>
+    <ConfigContext.Provider value={contextValue}> {/* [cite: 1426] */}
       {children}
     </ConfigContext.Provider>
   );
 };
 
-// *** FIX: Export the useConfigContext hook correctly ***
-export const useConfigContext = (): ConfigContextState => {
-  // *** FIX: Use useContext hook ***
-  const context = useContext(ConfigContext);
-  if (context === undefined) {
-    // This error means the hook is used outside of a ConfigProvider
-    throw new Error('useConfigContext must be used within a ConfigProvider');
+// Hook to use the context (From Original)
+export const useConfigContext = (): ConfigContextState => { // [cite: 1427]
+  const context = useContext(ConfigContext); // [cite: 1427]
+  if (context === undefined) { // [cite: 1428]
+    throw new Error('useConfigContext must be used within a ConfigProvider'); // [cite: 1428]
   }
-  return context;
+  return context; // [cite: 1429]
 };
