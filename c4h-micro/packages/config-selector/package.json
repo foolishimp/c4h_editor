@@ -8,18 +8,19 @@
     "build": "../../node_modules/.bin/tsc && ../../node_modules/.bin/vite build",
     "preview": "../../node_modules/.bin/vite preview --port 3003 --strictPort"
   },
-  "dependencies": {
+"dependencies": {
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.14",
     "@mui/material": "^5.15.14",
-    "axios": "^1.6.7",
+    "axios": "^1.6.7", 
     "js-yaml": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.22.3",
+
     "date-fns": "^3.6.0",
-    "shared": "*"
+    "shared": "*",
+    "yaml-editor": "file:../yaml-editor"
   },
   "devDependencies": {
     "@originjs/vite-plugin-federation": "^1.3.5",

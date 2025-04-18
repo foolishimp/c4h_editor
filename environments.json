@@ -2,16 +2,16 @@
   "development": {
     "main_backend": "http://localhost:8000",
     "config-selector-workflows": {
-      "url": "http://localhost:3003/assets/remoteEntry.js"
+      "url": "http://localhost:3101/assets/remoteEntry.js"
     },
     "config-selector-teams": {
-      "url": "http://localhost:3003/assets/remoteEntry.js"
+      "url": "http://localhost:3102/assets/remoteEntry.js"
     },
     "config-selector-runtime": {
-      "url": "http://localhost:3003/assets/remoteEntry.js"
+      "url": "http://localhost:3103/assets/remoteEntry.js"
     },
     "job-management": {
-      "url": "http://localhost:3004/assets/remoteEntry.js"
+      "url": "http://localhost:3104/assets/remoteEntry.js"
     }
   },
   "production": {

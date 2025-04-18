@@ -1,119 +1,105 @@
-// File: /packages/config-selector/src/ConfigManager.tsx
+// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/ConfigManager.tsx
 import { useState, useEffect } from 'react';
-import { Box, Typography, CircularProgress, CssBaseline, Container } from '@mui/material';
-import { useParams, useNavigate } from 'react-router-dom';
+// Removed unused CssBaseline, Container imports
+import { Box, Typography } from '@mui/material';
+// Removed unused useParams, useNavigate imports
 import { ConfigProvider } from './contexts/ConfigContext';
 import ConfigList from './components/ConfigList';
 import ConfigEditor from './components/ConfigEditor';
 import { configTypes } from 'shared';
 
 interface ConfigManagerProps {
-  configType?: string;
+  configType: string; // Now required
   configId?: string;
-  domElement?: HTMLElement; // Required for single-spa
+  onNavigateBack?: () => void; // Callback prop
+  onNavigateTo?: (configId: string) => void; // Callback prop
+  domElement?: HTMLElement; // Standard single-spa prop
 }
 
+/**
+ * A microfrontend component for managing various configuration types
+ */
 function ConfigManager(props: ConfigManagerProps) {
-  const { configType: propConfigType, configId: propConfigId } = props;
-  const params = useParams<{ configType?: string, id?: string }>();
-  
-  // Use navigate if available (inside Router context)
-  let navigate: ReturnType<typeof useNavigate> | undefined;
-  try {
-    navigate = useNavigate();
-  } catch (e) {
-    // Navigation is handled through direct props in non-Router context
-    console.debug('Router context not available, navigation will use direct state updates');
-  }
-  
-  // Use the config type from props or URL params
-  const configType = propConfigType || params?.configType;
-  // Use the config ID from props or URL params
-  const configId = propConfigId || params?.id;
-  
+  // Read configType/Id ONLY from props now
+  const {
+    configType: propConfigType,
+    configId: propConfigId,
+    onNavigateBack,
+    onNavigateTo
+  } = props;
+
+  // Use prop values directly
+  const configType = propConfigType;
+  const configId = propConfigId;
+
   // State to track UI view
   const [view, setView] = useState<'list' | 'editor'>(configId ? 'editor' : 'list');
   const [currentConfigId, setCurrentConfigId] = useState<string | undefined>(configId);
-  const [loading, setLoading] = useState<boolean>(true);
-  
-  // Debug log
-  console.log('ConfigManager mounted with:', { 
-    propConfigType, 
-    propConfigId,
-    params,
-    configType,
-    configId,
-    view,
-    currentConfigId
-  });
-  
+  // Removed unused 'loading' state and 'setLoading' setter
+
   useEffect(() => {
-    // Reset view when configId changes
+    // Reset view when configId prop changes
     if (configId) {
       setView('editor');
       setCurrentConfigId(configId);
     } else {
-      // Only reset to list if we're not already in editor view with a currentConfigId
-      // This prevents losing editor state when props/params don't have configId yet
-      if (view === 'editor' && !currentConfigId) {
-        setView('list');
-      }
+      // If propConfigId becomes undefined (e.g., shell navigates back), switch to list
+      setView('list');
+      setCurrentConfigId(undefined); // Clear current ID when showing list
     }
-    
-    setLoading(false);
-  }, [configId]);
-  
-  // Handle navigation
-  const handleEditConfig = (configId: string) => {
-    if (navigate) {
-      navigate(`/configs/${configType}/${configId}`);
+    // Removed setLoading(false)
+  }, [configId]); // Depend only on configId prop
+
+  // Navigation handlers that use callbacks
+  const handleEditConfig = (id: string) => {
+    console.log(`ConfigManager: Requesting navigation to edit ${id}`);
+    if (onNavigateTo) {
+      onNavigateTo(id); // Signal to parent/shell
     } else {
+      // Fallback to internal state change if no callback provided (less ideal)
+      console.warn("ConfigManager: onNavigateTo prop not provided, handling internally.");
       setView('editor');
-      setCurrentConfigId(configId);
+      setCurrentConfigId(id);
     }
   };
-  
+
   const handleCreateNew = () => {
-    console.log('Creating new config of type:', configType);
-    if (navigate) {
-      navigate(`/configs/${configType}/new`);
+    console.log('ConfigManager: Requesting navigation to create new');
+    if (onNavigateTo) {
+      onNavigateTo('new'); // Signal to parent/shell
     } else {
-      // Directly set the view and ID even without navigation
+      // Fallback
+      console.warn("ConfigManager: onNavigateTo prop not provided, handling internally.");
       setView('editor');
       setCurrentConfigId('new');
     }
   };
-  
+
   const handleBackToList = () => {
-    if (navigate) {
-      navigate(`/configs/${configType}`);
+    console.log('ConfigManager: Requesting navigation back to list');
+    if (onNavigateBack) {
+      onNavigateBack(); // Signal to parent/shell
     } else {
+      // Fallback
+      console.warn("ConfigManager: onNavigateBack prop not provided, handling internally.");
       setView('list');
       setCurrentConfigId(undefined);
     }
   };
-  
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-  
+
+  // Removed loading state check as it's handled by context now?
+  // if (loading) { ... }
+
   if (!configType) {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" color="error">
-          No configuration type specified
-        </Typography>
-        <Typography variant="body1">
-          Please specify a configuration type to manage.
+          Configuration type not provided via props.
         </Typography>
       </Box>
     );
   }
-  
+
   // Check if the config type is valid
   if (!configTypes[configType]) {
     return (
@@ -127,55 +113,28 @@ function ConfigManager(props: ConfigManagerProps) {
       </Box>
     );
   }
-  
-  if (navigate) {
-    return (
-      <ConfigProvider configType={configType}>
-        <Box sx={{ p: 3, height: '100%' }}>
-          <Typography variant="h4" gutterBottom data-testid="config-heading">
-            {configTypes[configType].name} Management
-          </Typography>
-          
-          {view === 'editor' ? (
-            <ConfigEditor 
-              configId={currentConfigId || 'new'} 
-              onBack={handleBackToList} 
-            />
-          ) : (
-            <ConfigList 
-              onEdit={handleEditConfig}
-              onCreateNew={handleCreateNew}
-            />
-          )}
-        </Box>
-      </ConfigProvider>
-    );
-  }
-  
+
+  // Main component render
   return (
-    <CssBaseline>
-      <Container maxWidth="lg" sx={{ mt: 4, height: '100%' }}>
-        <ConfigProvider configType={configType}>
-          <Box sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h4" gutterBottom data-testid="config-heading">
-              {configTypes[configType].name} Management
-            </Typography>
-            
-            {view === 'editor' ? (
-              <ConfigEditor 
-                configId={currentConfigId || 'new'} 
-                onBack={handleBackToList} 
-              />
-            ) : (
-              <ConfigList 
-                onEdit={handleEditConfig}
-                onCreateNew={handleCreateNew}
-              />
-            )}
-          </Box>
-        </ConfigProvider>
-      </Container>
-    </CssBaseline>
+    <ConfigProvider configType={configType}>
+      <Box sx={{ p: 3, height: '100%' }}>
+        <Typography variant="h4" gutterBottom data-testid="config-heading">
+          {configTypes[configType].name} Management
+        </Typography>
+
+        {view === 'editor' ? (
+          <ConfigEditor
+            configId={currentConfigId || 'new'} // Pass current internal ID state
+            onBack={handleBackToList} // Pass internal back handler
+          />
+        ) : (
+          <ConfigList
+            onEdit={handleEditConfig} // Pass internal edit handler
+            onCreateNew={handleCreateNew} // Pass internal create handler
+          />
+        )}
+      </Box>
+    </ConfigProvider>
   );
 }
 
