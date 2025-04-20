@@ -1,4 +1,4 @@
-/// <reference path="../shared/src/types/federation.d.ts" />
+// Removed federation reference path
 
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
