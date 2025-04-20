@@ -1,9 +1,7 @@
-// /Users/jim/src/apps/c4h_editor/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
-
 // ** IMPORTS **
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'; // Ensure useContext is imported
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
-import { configTypes, apiService, Config } from 'shared'; // Import Config type from shared
+import { configTypes, apiService, Config, eventBus } from 'shared'; // Import Config type and eventBus from shared
 
 // ** INTERFACE & DEFAULT STATE **
 interface ConfigContextState {
@@ -62,6 +60,14 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<boolean>(false);
+  
+  // Emit config-related events to the event bus for cross-MFE communication
+  const emitConfigChange = useCallback((action: 'loaded' | 'saved' | 'deleted', config: Config | null) => {
+    eventBus.publish('config:change', {
+      source: 'config-selector',
+      payload: { action, configType, config }
+    });
+  }, [configType]);
 
   // Helper function to ensure metadata structure
   const ensureMetadata = useCallback((config: any) => {
@@ -88,6 +94,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setLoading(true);
     setError(null);
     try {
+      // Use the shared apiService instance configured by the shell
       const response = await apiService.getConfigs(configType);
       setConfigs(response || []);
     } catch (err: any) {
@@ -127,6 +134,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     }
     setLoading(true); setError(null); setSaved(false);
     try {
+      // Use the shared apiService instance configured by the shell
       const response = await apiService.getConfig(configType, id);
       if (!response) throw new Error(`Received null/undefined response for config ID: ${id}`);
       const config = response as any;
@@ -136,6 +144,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       }
       ensureMetadata(config); // Ensure metadata structure is valid
       setCurrentConfig(config);
+      
+      // Emit an event to the event bus when a config is loaded
+      emitConfigChange('loaded', config);
+      
       try {
         const yamlString = yamlDump(config.content, { lineWidth: -1 });
         setYaml(yamlString);
@@ -152,7 +164,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [configType, createNewConfig, ensureMetadata]); // Correct dependencies
+  }, [configType, createNewConfig, ensureMetadata, emitConfigChange]); // Added emitConfigChange to dependencies
 
   // Function to update YAML state from editor changes
   const updateYaml = useCallback((newYaml: string) => {
@@ -232,6 +244,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       }
       // --- End Fix ---
 
+      // Emit an event to the event bus when a config is saved
+      emitConfigChange('saved', response);
+
       if (!response) {
           // Handle cases where API might return null/undefined unexpectedly
           throw new Error("Received no response from save operation.");
@@ -262,13 +277,17 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata]); // Added ensureMetadata dependency if needed  ;
+  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata, emitConfigChange]); // Added emitConfigChange dependency if needed  ;
   
   // *** FIX: Implement deleteConfig ***
   const deleteConfig = useCallback(async (id: string, commitMessage?: string) => {
     setLoading(true); setError(null);
     try {
       await apiService.deleteConfig(configType, id, commitMessage || `Deleted ${configType} ${id} via UI`, 'Current User');
+      
+      // Emit an event to the event bus when a config is deleted
+      emitConfigChange('deleted', currentConfig && currentConfig.id === id ? currentConfig : null);
+      
       await loadConfigs(); // Refresh list
       if (currentConfig && currentConfig.id === id) { // Clear state if current config was deleted
         setCurrentConfig(null);
@@ -280,7 +299,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [configType, loadConfigs, currentConfig]); // Added currentConfig dependency
+  }, [configType, loadConfigs, currentConfig, emitConfigChange]); // Added emitConfigChange dependency
 
   // *** FIX: Implement archiveConfig ***
   const archiveConfig = useCallback(async (id: string, archive: boolean, author: string = "Current User") => {

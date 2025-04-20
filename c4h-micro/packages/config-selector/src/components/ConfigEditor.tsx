@@ -1,4 +1,3 @@
-// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/components/ConfigEditor.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Snackbar, Alert, TextField, Button, CircularProgress } from '@mui/material'; // Added TextField, Button, CircularProgress
 import { useConfigContext } from '../contexts/ConfigContext';
@@ -71,6 +70,11 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
       setSnackbarMessage("Configuration saved successfully!");
       setSnackbarSeverity("success");
       setCommitMessage(""); // Clear commit message after save
+      
+      // If it was new and we have the navigation callback, navigate to the newly created config
+      if (isNew && onBack && result) {
+        setTimeout(() => onBack(), 1500); // Navigate back after showing success message
+      }
        // If it was new, we might want to navigate back or update the URL/state
        // For now, just show success. Parent component (ConfigManager) handles view change via props.
     } else {

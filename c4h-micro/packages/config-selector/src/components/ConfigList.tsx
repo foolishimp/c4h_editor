@@ -91,15 +91,7 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     return description;
   }, []);
 
-  // Custom navigation handler (example, adjust if using React Router differently)
-  const handleNavigate = (path: string) => {
-    // This might need adjustment based on whether Shell uses Router or direct props
-    if (window.location.pathname.includes(path)) {
-        window.location.reload(); // Reload if already on the path (simple approach)
-    } else {
-        window.location.href = path; // Navigate otherwise
-    }
-  };
+  // Remove handleNavigate as we now use callback props from parent
 
   // Load configs on mount and when configType changes
   useEffect(() => {
@@ -170,17 +162,14 @@ const ConfigList: React.FC<ConfigListProps> = ({ onEdit, onCreateNew }) => {
     if (onCreateNew) {
       onCreateNew();
     } else {
-      // Fallback or default navigation if prop not provided
-      handleNavigate(`/configs/${configType}/new`);
+      console.warn("ConfigList: onCreateNew callback not provided by parent");
     }
   };
 
   const handleRowClick = (id: string) => {
+    // Use the callback prop for navigation
     if (onEdit) {
       onEdit(id);
-    } else {
-      // Fallback or default navigation if prop not provided
-      handleNavigate(`/configs/${configType}/${id}`);
     }
   };
 

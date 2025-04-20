@@ -10,7 +10,8 @@ export default defineConfig({
     cssCodeSplit: false,
     lib: {
       entry: './src/main.tsx',
-      formats: ['es'],
+      formats: ['es'], // ESM format for direct browser import
+      name: 'ConfigSelector', // Global name (if used in UMD/IIFE)
       fileName: (format) => 'config-selector.js'
     },
     rollupOptions: {
