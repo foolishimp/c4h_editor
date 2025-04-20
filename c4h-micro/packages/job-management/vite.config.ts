@@ -14,13 +14,13 @@ export default defineConfig({
     cssCodeSplit: false,
     lib: {
       entry: './src/main.tsx',
-      name: 'jobManagementApp',
-      formats: ['system'],
-      fileName: 'job-management'
+      formats: ['es'],
+      fileName: (format) => 'job-management.js'
     },
     rollupOptions: {
       external: ['react', 'react-dom', 'single-spa', 'single-spa-react', '@mui/material', '@mui/icons-material', 'shared'],
       output: {
+        format: 'esm',
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'

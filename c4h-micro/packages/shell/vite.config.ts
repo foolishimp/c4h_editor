@@ -2,14 +2,12 @@
 
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-// Removed: import { systemjs } from 'vite-plugin-systemjs';
 import path from 'path';
 
 export default defineConfig({
   plugins: [
     react()
-    // Removed: systemjs()
-  ],
+  ], 
   optimizeDeps: {
       esbuildOptions: {
           target: 'es2022'
@@ -35,8 +33,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Keep the alias correction from previous step or adjust as needed
-      'shared': path.resolve(__dirname, '../shared')
+      // Point to shared package's built output directory
+      'shared': path.resolve(__dirname, '../shared/dist')
     }
   },
   server: {

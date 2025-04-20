@@ -2,23 +2,33 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  root: '.',                // serve index.html from project root
   plugins: [react()],
   build: {
+    target: 'esnext',
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
-      // give the entry chunk the name "test-app" so we emit assets/test‑app.js
-      input: { 'test-app': 'index.html' },
-      output: {
-        entryFileNames:    'assets/[name].js',
-        chunkFileNames:    'assets/[name].js',
-        assetFileNames:    'assets/[name].[ext]',
-      },
+    minify: false,
+    cssCodeSplit: false,
+    lib: {
+      entry: './src/main.tsx',
+      formats: ['es'],
+      fileName: () => 'test-app.js'
     },
-  },
-  server: {
-    port: 3005,
-    strictPort: true,
+    rollupOptions: {
+      external: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'single-spa',
+        'single-spa-react',
+        'shared'
+      ],
+      output: {
+        format: 'esm',
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[ext]'
+      }
+    }
   },
 });

@@ -1,6 +1,5 @@
-// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
-
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import * as ReactDOM from 'react-dom/client';
 import {
     ThemeProvider,
     CssBaseline,
@@ -14,6 +13,7 @@ import {
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router } from 'react-router-dom';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { eventBus } from 'shared'; // Import eventBus from shared
 import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
 import TabBar from './components/layout/TabBar';
 import { AppAssignment } from 'shared'; // Import AppDefinition if not already
@@ -64,13 +64,31 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, message
    }
 }
 
+// Create EventBus context to provide the singleton instance to components
+interface EventBusContextValue {
+    eventBus: typeof eventBus;
+}
+
+const EventBusContext = React.createContext<EventBusContextValue>({
+    eventBus: eventBus
+});
+
+// Hook to provide easy access to the event bus
+export const useEventBus = () => {
+    const context = React.useContext(EventBusContext);
+    if (!context) {
+        throw new Error('useEventBus must be used within EventBusProvider');
+    }
+    return context.eventBus;
+};
 // --- AppContent Component ---
 function AppContent() {
     const { config, loading, error } = useShellConfig();
     const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
     const [isPrefsDialogOpen, setIsPrefsDialogOpen] = useState<boolean>(false);
-    const mountedParcelsRef = useRef<Record<string, any>>({});
 
+    // References to hold the dynamically loaded modules
+    const loadedModulesRef = useRef<Record<string, any>>({});
     const handleOpenPrefsDialog = useCallback(() => {
         setIsPrefsDialogOpen(true);
     }, []);
@@ -105,17 +123,17 @@ function AppContent() {
     }, [config, loading, error, activeFrameId]);
 
     // Clean up parcels when activeFrameId changes or component unmounts
-    useEffect(() => {
-        const previousActiveFrameId = activeFrameId;
-        return () => {
-            const parcelToUnmount = mountedParcelsRef.current[previousActiveFrameId!];
-            if (parcelToUnmount && typeof parcelToUnmount.unmount === 'function') {
-                console.log(`Unmounting parcel for previous frame: ${previousActiveFrameId}`);
-                parcelToUnmount.unmount().catch((err: Error) => {
-                    console.error(`Error unmounting parcel for frame ${previousActiveFrameId}:`, err);
-                });
-                delete mountedParcelsRef.current[previousActiveFrameId!];
+    useEffect(() => {                                    
+        // Clean up effect for handling module unmounting if needed
+        return () => { 
+            // For ESM modules, we might not need explicit cleanup as they don't have lifecycle methods
+            // But we can clear references and trigger cleanup functions if modules expose them
+            const previousModule = loadedModulesRef.current[activeFrameId!];
+            if (previousModule && typeof previousModule.cleanup === 'function') {
+                console.log(`Calling cleanup for module in frame: ${activeFrameId}`);
+                previousModule.cleanup();
             }
+            // Keep track of loaded modules if needed
         };
     }, [activeFrameId]);
 
@@ -167,78 +185,93 @@ function AppContent() {
 
         console.log(`Preparing to mount Single-SPA parcel for app: ${appDefinition.id} from URL: ${appDefinition.url}`);
 
-        // Mount function to be passed to the ref
-        const mountParcel = (el: HTMLDivElement | null) => {
-            if (!el || !(window as any).mountRootParcel || !activeFrameId) {
-                console.error('Cannot mount parcel: DOM element, mountRootParcel, or activeFrameId not available', { el, mountFn: (window as any).mountRootParcel, activeFrameId });
+        // Reference to hold the DOM element where we'll mount the module
+        const containerRef = useRef<HTMLDivElement | null>(null);
+        
+        // Function to load and mount the module
+        const loadModule = async () => {
+            if (!containerRef.current || !activeFrameId || !appDefinition.url) {
+                console.error('Cannot load module: DOM element or activeFrameId not available');
                 return;
             }
 
-            // Load the parcel's lifecycle functions using the DYNAMIC URL from config service
-            const parcelConfig = () => (window as any).System.import(appDefinition.url!) // Use non-null assertion as we checked above
-              .catch((err: Error) => {
-                 console.error(`Error loading microfrontend '${appDefinition.id}' from URL '${appDefinition.url}' via System.import:`, err);
-                 throw err;
-              });
-
-            // --- UPDATED: Construct parcelProps with customProps nesting ---
-            // Base props common to all parcels (or recognized by single-spa)
-            const baseParcelProps: Record<string, any> = {
-                domElement: el,
-                name: appDefinition.name, // Optional: For debugging
-            };
-
-            // Prepare custom props specifically for config-selector
-            let customPropsForMFE = {};
-            if (appDefinition.id.startsWith('config-selector-')) {
-                const configType = appDefinition.id.replace('config-selector-', '');
-
-                const handleMfeNavigateBack = () => {
-                    console.log(`Shell: MFE (${appDefinition.id}) requested navigation back.`);
-                    // TODO: Implement shell logic for navigating back (e.g., update state, change route)
-                };
-
-                const handleMfeNavigateTo = (configId: string) => {
-                    console.log(`Shell: MFE (${appDefinition.id}) requested navigation to config: ${configId}`);
-                    // TODO: Implement shell logic for navigating to specific config (e.g., update state, change route)
-                };
-
-                customPropsForMFE = {
-                    configType,
-                    // configId: undefined, // Pass specific ID from shell state/route if needed
-                    onNavigateBack: handleMfeNavigateBack,
-                    onNavigateTo: handleMfeNavigateTo
-                };
+            // Clean up any previously loaded module for this frame if needed
+            const previousModule = loadedModulesRef.current[activeFrameId];
+            if (previousModule && typeof previousModule.cleanup === 'function') {
+                console.log(`Cleaning up previous module for frame ${activeFrameId}`);
+                previousModule.cleanup();
             }
-             // --- END Construct parcelProps ---
 
-            // Unmount existing parcel logic...
-            const existingParcel = mountedParcelsRef.current[activeFrameId];
-            if (existingParcel) {
-                console.log(`Unmounting existing parcel in frame ${activeFrameId} before mounting ${appDefinition.id}`);
-                existingParcel.unmount().then(() => {
-                    delete mountedParcelsRef.current[activeFrameId];
-                    console.log(`Mounting new parcel for app: ${appDefinition.id} in frame: ${activeFrameId}`);
-                    // Mount with the combined standard and custom props
-                    const parcel = (window as any).mountRootParcel(parcelConfig, { ...baseParcelProps, customProps: customPropsForMFE });
-                    mountedParcelsRef.current[activeFrameId] = parcel;
-                }).catch((unmountErr: Error) => {
-                    console.error(`Error unmounting previous parcel for frame ${activeFrameId}:`, unmountErr);
-                    console.log(`Attempting to mount new parcel for app: ${appDefinition.id} despite previous unmount error.`);
-                    const parcel = (window as any).mountRootParcel(parcelConfig, { ...baseParcelProps, customProps: customPropsForMFE });
-                    mountedParcelsRef.current[activeFrameId] = parcel;
-                 });
-            } else {
-                 console.log(`Mounting new parcel for app: ${appDefinition.id} in frame: ${activeFrameId}`);
-                 const parcel = (window as any).mountRootParcel(parcelConfig, { ...baseParcelProps, customProps: customPropsForMFE });
-                 mountedParcelsRef.current[activeFrameId] = parcel;
-             }
+            try {
+                console.log(`Dynamically importing module from URL: ${appDefinition.url}`);
+                // Use dynamic import to load the module
+                
+                const module = await import(/* @vite-ignore */ appDefinition.url);
+                console.log(`Module successfully loaded:`, module);
+                
+                // Store reference to the loaded module
+                loadedModulesRef.current[activeFrameId] = module;
+                
+                // Prepare props based on the MFE type
+                let customProps = {};
+                if (appDefinition.id.startsWith('config-selector-')) {
+                    const configType = appDefinition.id.replace('config-selector-', '');
+                    
+                    const handleMfeNavigateBack = () => {
+                        console.log(`Shell: MFE (${appDefinition.id}) requested navigation back.`);
+                        // Implement shell logic for navigation
+                    };
+                    
+                    const handleMfeNavigateTo = (configId: string) => {
+                        console.log(`Shell: MFE (${appDefinition.id}) requested navigation to config: ${configId}`);
+                        // Implement shell logic for specific config navigation
+                    };
+                    
+                    customProps = {
+                        configType,
+                        onNavigateBack: handleMfeNavigateBack,
+                        onNavigateTo: handleMfeNavigateTo,
+                        eventBus // Pass the eventBus instance
+                    };
+                } else {
+                    // Default props for other MFEs
+                    customProps = {
+                        eventBus // Always pass the eventBus
+                    };
+                }
+                
+                // Render the component if the module exports a React component
+                if (module.default && typeof module.default === 'function') {
+                    const MfeComponent = module.default;
+                    // Render the component into the container
+                    ReactDOM.createRoot(containerRef.current).render(
+                        <React.StrictMode>
+                            <MfeComponent {...customProps} />
+                        </React.StrictMode>
+                    );
+                } else if (module.mount && typeof module.mount === 'function') {
+                    // If module exports a mount function (framework-agnostic)
+                    module.mount(containerRef.current, customProps);
+                } else {
+                    console.error(`Module loaded but doesn't export expected interface:`, module);
+                }
+            } catch (err) {
+                console.error(`Error loading microfrontend '${appDefinition.id}' from URL '${appDefinition.url}':`, err);
+            }
+        };
+        
+        // Mount the component when the ref is set and whenever activeFrameId changes
+        const setContainerRef = (el: HTMLDivElement | null) => {
+            containerRef.current = el;
+            if (el) {
+                loadModule();
+            }
         };
 
-        // Container div where the parcel will be mounted
+        // Container div where the module will be mounted
         return (
           <ErrorBoundary message={`Error loading application: ${appDefinition.name}`}>
-              <div ref={mountParcel} id={`single-spa-parcel-${activeFrame.id}-${appDefinition.id}`} style={{height: '100%', width: '100%'}} />
+              <div ref={setContainerRef} id={`esm-module-${activeFrame.id}-${appDefinition.id}`} style={{height: '100%', width: '100%'}} />
           </ErrorBoundary>
         );
     };
@@ -326,9 +359,11 @@ function App() {
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <ShellConfigProvider>
-                <Router>
-                    <AppContent />
-                </Router>
+                <EventBusContext.Provider value={{ eventBus }}>
+                    <Router>
+                        <AppContent />
+                    </Router>
+                </EventBusContext.Provider>
              </ShellConfigProvider>
         </ThemeProvider>
     );

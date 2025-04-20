@@ -10,9 +10,8 @@ export default defineConfig({
     cssCodeSplit: false,
     lib: {
       entry: './src/main.tsx',
-      name: 'configSelectorApp',
-      formats: ['system'],
-      fileName: () => 'config-selector.js'
+      formats: ['es'],
+      fileName: (format) => 'config-selector.js'
     },
     rollupOptions: {
       // Make sure your shell loads only what it needs
@@ -27,7 +26,8 @@ export default defineConfig({
         'shared'
       ],
       output: {
-        entryFileNames: 'assets/config-selector.js',
+        format: 'esm',
+        entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }

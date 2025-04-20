@@ -5,31 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>C4H Editor</title>
 
-    <script type="systemjs-importmap">
-      {
-        "imports": {
-          "react":       "https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js",
-          "react-dom":   "https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js",
-          "single-spa":  "https://cdn.jsdelivr.net/npm/single-spa@5.9.3/lib/system/single-spa.min.js",
-          "single-spa-react": "https://cdn.jsdelivr.net/npm/single-spa-react@6.0.2/lib/system/single-spa-react.min.js",
-          "@mui/material":       "https://cdn.jsdelivr.net/npm/@mui/material@5.15.14/umd/material-ui.production.min.js",
-          "@mui/icons-material": "https://cdn.jsdelivr.net/npm/@mui/icons-material@5.15.14/umd/material-ui-icons.production.min.js",
-
-          // Microfrontends:
-          "yaml-editor":          "http://localhost:3002/assets/yaml-editor.js",
-          "config-selector":      "http://localhost:3003/assets/config-selector.js",
-          "job-management":       "http://localhost:3004/assets/job-management.js",
-          "test-app":             "http://localhost:3005/assets/test-app.js"
-        }
-      }
-    </script>
-
-    <script src="https://cdn.jsdelivr.net/npm/systemjs@6.14.3/dist/s.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/systemjs@6.14.3/dist/extras/amd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/systemjs@6.14.3/dist/extras/named-exports.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/systemjs@6.14.3/dist/extras/use-default.min.js"></script>
+    <!-- DYNAMIC IMPORT MAP: Will be populated at runtime with shared dependencies -->
+    <!-- 
+    <script type="importmap" id="c4h-importmap">
+      <!-- Import map will be dynamically inserted here based on shell config -->
+    <!-- </script> -->
   </head>
-  <body>
+  <body> 
     <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
   </body>

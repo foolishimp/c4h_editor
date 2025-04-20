@@ -1,4 +1,3 @@
-// File: packages/shared/src/index.ts
 /**
  * Main entry point for shared package
  * Exports all shared types, utilities, components and services
@@ -15,7 +14,7 @@ export * from './config/configTypes';
 export * from './config/remotes';
 
 // Export utils
-export { default as eventBus } from './utils/eventBus';
+export { eventBus, EventDetail } from './utils/eventBus';
 
 // Export shared components
 export { default as TimeAgo } from './components/TimeAgo';

@@ -1,4 +1,3 @@
-// File: packages/shell/src/contexts/ShellConfigContext.tsx
 import React, {
   createContext, useContext, useState, useEffect, ReactNode, useCallback
 } from 'react';
@@ -49,7 +48,9 @@ const fetchConfig = useCallback(async () => {
   try {
       const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
       if (response.data) {
-          console.log('ShellConfigContext: Received config:', JSON.stringify(response.data, null, 2));
+          console.log('ShellConfigContext: Received config with frames:', 
+            response.data.frames?.length, 
+            'apps:', response.data.availableApps?.length);
           setConfig(response.data);
           const backendUrl = response.data.serviceEndpoints?.jobConfigServiceUrl;
           console.log(`ShellConfigContext: Configuring apiService with backend URL: ${backendUrl}`);
