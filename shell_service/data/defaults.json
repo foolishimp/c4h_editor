@@ -1,35 +1,42 @@
 {
-    "availableApps": [
-      {
-        "id": "config-selector-workflows",
-        "name": "Workflow Config Manager",
-        "scope": "configSelector",
-        "module": "./ConfigManager",
-        "url": "http://localhost:3003/assets/remoteEntry.js"
-      },
-      {
-        "id": "config-selector-teams",
-        "name": "Team Config Manager",
-        "scope": "configSelector",
-        "module": "./ConfigManager",
-        "url": "http://localhost:3003/assets/remoteEntry.js"
-      },
-      {
-        "id": "config-selector-runtime",
-        "name": "Runtime Config Manager",
-        "scope": "configSelector",
-        "module": "./ConfigManager",
-        "url": "http://localhost:3003/assets/remoteEntry.js"
-      },
-      {
-        "id": "job-management",
-        "name": "Job Manager",
-        "scope": "jobManagement",
-        "module": "./JobManager",
-        "url": "http://localhost:3004/assets/remoteEntry.js"
-      }
-    ],
-    "defaultEndpoints": {
-      "jobConfigServiceUrl": "http://localhost:8000"
+  "availableApps": [
+    {
+      "id": "config-selector-workorders",
+      "name": "Workorder Config Manager",
+      "scope": "configSelector",
+      "module": "./ConfigManager",
+      "url": "http://localhost:3101/assets/config-selector.js"
+    },
+    {
+      "id": "config-selector-teams",
+      "name": "Team Config Manager",
+      "scope": "configSelector",
+      "module": "./ConfigManager",
+      "url": "http://localhost:3102/assets/config-selector.js"
+    },
+    {
+      "id": "config-selector-runtime",
+      "name": "Runtime Config Manager",
+      "scope": "configSelector",
+      "module": "./ConfigManager",
+      "url": "http://localhost:3103/assets/config-selector.js"
+    },
+    {
+      "id": "job-management",
+      "name": "Job Manager",
+      "scope": "jobManagement",
+      "module": "./JobManager",
+      "url": "http://localhost:3104/assets/job-management.js"
+    },
+    {
+      "id": "test-app",
+      "name": "Test App",
+      "scope": "testApp",
+      "module": "./TestApp",
+      "url": "http://localhost:3005/assets/test-app.js"
     }
+  ],
+  "defaultEndpoints": {
+    "jobConfigServiceUrl": "http://localhost:8000"
   }
+}

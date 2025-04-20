@@ -47,12 +47,10 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3002,
     strictPort: true,
     cors: true
   },
   preview: {
-    port: 3002,
     strictPort: true,
     cors: true
   },

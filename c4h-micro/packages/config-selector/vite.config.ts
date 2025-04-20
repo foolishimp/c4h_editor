@@ -8,28 +8,45 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    lib: {
+      entry: './src/main.tsx',
+      name: 'configSelectorApp',
+      formats: ['system'],
+      fileName: () => 'config-selector.js'
+    },
     rollupOptions: {
+      // Make sure your shell loads only what it needs
+      external: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'single-spa',
+        'single-spa-react',
+        '@mui/material',
+        '@mui/icons-material',
+        'shared'
+      ],
       output: {
         entryFileNames: 'assets/config-selector.js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]',
-      },
-    },
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[ext]'
+      }
+    }
   },
   server: {
     port: 3003,
     strictPort: true,
-    cors: true,
+    cors: true
   },
   preview: {
     port: 3003,
     strictPort: true,
-    cors: true,
+    cors: true
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist'),
-    },
-  },
+      shared: path.resolve(__dirname, '../shared/dist')
+    }
+  }
 });

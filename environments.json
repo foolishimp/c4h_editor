@@ -1,54 +1,15 @@
 {
   "development": {
-    "main_backend": {
-      "url": "http://localhost:8011"
-    },
-    "prefs_service": {
-      "url": "http://localhost:8010"
-    },
-    "shell": {
-       "url": "http://localhost:3100" 
-    },
-    "yaml-editor": {
-       "url": "http://localhost:3102/assets/remoteEntry.js"
-    },
-    "config-selector-workflows": {
-      "url": "http://localhost:3101/assets/remoteEntry.js"
-    },
-    "config-selector-teams": {
-      "url": "http://localhost:3102/assets/remoteEntry.js"
-    },
-    "config-selector-runtime": {
-      "url": "http://localhost:3103/assets/remoteEntry.js"
-    },
-    "job-management": {
-      "url": "http://localhost:3104/assets/remoteEntry.js"
-    }
-  },
-  "production": {
-    "main_backend": {
-        "url": "https://api.c4h.example.com"
-    },
-    "prefs_service": {
-        "url": "https://prefs.c4h.example.com"
-    },
-     "shell": {
-         "url": "https://shell.c4h.example.com"
-     },
-    "yaml-editor": {
-       "url": "https://yaml-editor.c4h.example.com/assets/remoteEntry.js"
-    },
-    "config-selector-workflows": {
-      "url": "https://config-selector.c4h.example.com/assets/remoteEntry.js"
-    },
-    "config-selector-teams": {
-      "url": "https://config-selector.c4h.example.com/assets/remoteEntry.js"
-    },
-    "config-selector-runtime": {
-      "url": "https://config-selector.c4h.example.com/assets/remoteEntry.js"
-    },
-    "job-management": {
-      "url": "https://job-manager.c4h.example.com/assets/remoteEntry.js"
-    }
+    "main_backend":  { "url": "http://localhost:8011" },
+    "prefs_service": { "url": "http://localhost:8010" },
+    "shell":         { "url": "http://localhost:3100" },
+
+    "yaml-editor":            { "url": "http://localhost:3105/assets/yaml-editor.js" },
+    "config-selector-workorder": { "url": "http://localhost:3103/assets/config-selector.js" },
+    "config-selector-teams":  { "url": "http://localhost:3103/assets/config-selector.js" },
+    "config-selector-runtime":{ "url": "http://localhost:3103/assets/config-selector.js" },
+    "job-management":         { "url": "http://localhost:3104/assets/job-management.js" },
+
+    "test-app":               { "url": "http://localhost:3005/assets/test-app.js" }
   }
 }

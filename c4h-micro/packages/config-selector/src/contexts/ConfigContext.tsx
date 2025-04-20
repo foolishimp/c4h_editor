@@ -20,7 +20,7 @@ interface ConfigContextState {
   loadConfig: (id: string) => Promise<void>;
   createNewConfig: () => void;
   updateYaml: (yaml: string) => void;
-  saveConfig: (commitMessage?: string) => Promise<any | null>; // commitMessage is optional
+  saveConfig: (idToSave?: string, commitMessage?: string) => Promise<Config | null>;
   deleteConfig: (id: string, commitMessage?: string) => Promise<void>;
   archiveConfig: (id: string, archive: boolean, author?: string) => Promise<void>;
   cloneConfig: (id: string, newId: string, author?: string) => Promise<void>;

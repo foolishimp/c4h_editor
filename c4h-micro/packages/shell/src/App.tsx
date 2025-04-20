@@ -64,7 +64,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, message
    }
 }
 
-
 // --- AppContent Component ---
 function AppContent() {
     const { config, loading, error } = useShellConfig();

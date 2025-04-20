@@ -1,4 +1,4 @@
-# File: start_frontends.py
+# File: start_frontends.py (Revised v3)
 import argparse
 import json
 import os
@@ -10,50 +10,47 @@ import time
 import re
 from typing import Dict, List, Optional, Tuple
 
-# --- Configuration ---
+# --- Configuration (Ensure SERVICES_CONFIG matches your needs) ---
 ROOT_DIR = os.getcwd()
 ENV_FILE = os.path.join(ROOT_DIR, "environments.json")
 MFE_ROOT = os.path.join(ROOT_DIR, "c4h-micro/packages")
 
 # Service definitions: (package_name, default_port, start_command_type, json_config_key_hint)
-# json_config_key_hint helps find the right URL in environments.json
-# start_command_type: 'preview' for MFEs, 'start' for shell
 SERVICES_CONFIG: List[Tuple[str, int, str, str]] = [
     # MFEs first
-    ("config-selector", 3003, "preview", "config-selector-teams"), # Assuming this uses port 3003
-    ("job-management", 3004, "preview", "job-management"),
-    ("yaml-editor", 3002, "preview", "yaml-editor"), # Add yaml-editor if needed
+    # Ensure json_config_key_hint maps to the CORRECT entry in environments.json for the port
+    ("config-selector", 3003, "preview", "config-selector-teams"), # Maps to port 3102 in your JSON
+    ("job-management", 3004, "preview", "job-management"),         # Maps to port 3104 in your JSON
+    ("yaml-editor", 3002, "preview", "yaml-editor"),             # Maps to port 3002 (needs matching key in JSON)
     # Shell last
-    ("shell", 3000, "start", "shell"), # 'shell' key might not exist in JSON, relies on default port
+    ("shell", 3000, "start", "shell"),                         # Maps to port 3000 (needs matching key in JSON)
 ]
 
-# --- Colors ---
+# --- Colors (Keep GREEN, YELLOW, RED, BLUE, NC) ---
 GREEN = '\033[0;32m'
 YELLOW = '\033[1;33m'
 RED = '\033[0;31m'
 BLUE = '\033[0;34m'
-NC = '\033[0m' # No Color
+NC = '\033[0m'
 
 # --- Global State ---
 running_processes: Dict[str, subprocess.Popen] = {}
 environment_config: Dict = {}
+is_shutting_down = False # Flag to prevent cleanup recursion
 
-# --- Helper Functions (Shared with backend script, could be refactored) ---
+# --- Helper Functions (print_header, is_port_in_use, check_port, load_environment_config - keep as before) ---
 def print_header(title: str):
-    """Prints a formatted header."""
     print(f"\n{BLUE}========== {title} =========={NC}")
 
 def is_port_in_use(port: int) -> bool:
-    """Checks if a TCP port is already in use."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            s.bind(("127.0.0.1", port)) # Check specifically on localhost for Node servers
+            s.bind(("127.0.0.1", port))
             return False
         except socket.error:
             return True
 
 def check_port(port: int, service_name: str) -> bool:
-    """Checks port and prompts user to kill if necessary."""
     print(f"Checking port {BLUE}{port}{NC} for service {BLUE}{service_name}{NC}...")
     if is_port_in_use(port):
         print(f"{YELLOW}⚠️ Port {port} is in use{NC}")
@@ -63,29 +60,18 @@ def check_port(port: int, service_name: str) -> bool:
                 print(f"Attempting to kill process on port {port}...")
                 try:
                     if sys.platform == "win32":
-                         print(f"{YELLOW}Automatic killing not implemented for Windows. Please kill the process manually.{NC}")
+                         print(f"{YELLOW}Automatic killing not implemented for Windows...{NC}")
                          return False
                     else: # Linux/macOS
-                        # Use pkill for Node processes listening on the port
                         cmd = f"lsof -ti tcp:{port} | xargs kill -9"
-                        subprocess.run(cmd, shell=True, check=False, capture_output=True) # Allow failure
-                    time.sleep(1) # Give kill command time
+                        subprocess.run(cmd, shell=True, check=False, capture_output=True)
+                    time.sleep(1)
                     if not is_port_in_use(port):
                         print(f"{GREEN}✅ Process killed successfully.{NC}")
                         return True
                     else:
-                        # Sometimes lsof is slow, try pkill as fallback on non-windows
-                        if sys.platform != "win32":
-                             print(f"{YELLOW}lsof kill might have failed, trying pkill...{NC}")
-                             cmd_pkill = f"pkill -f 'port {port}'" # Try finding node process by port arg
-                             subprocess.run(cmd_pkill, shell=True, check=False, capture_output=True)
-                             time.sleep(1)
-                             if not is_port_in_use(port):
-                                print(f"{GREEN}✅ Process killed successfully (using pkill).{NC}")
-                                return True
-
-                        print(f"{RED}❌ Failed to kill process automatically.{NC}")
-                        return False
+                         print(f"{RED}❌ Failed to kill process automatically.{NC}")
+                         return False
                 except Exception as e:
                     print(f"{RED}❌ Error killing process: {e}{NC}")
                     return False
@@ -106,10 +92,14 @@ def load_environment_config(app_env: str) -> bool:
     if not os.path.exists(ENV_FILE):
         print(f"{RED}❌ {ENV_FILE} not found. Using default ports/URLs.{NC}")
         environment_config = {}
-        # Set defaults required by services even if file missing
         os.environ['VITE_MAIN_BACKEND_URL'] = "http://localhost:8000"
         os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8001"
-        return True # Continue with defaults
+        os.environ['VITE_YAML_EDITOR_MFE_URL'] = ""
+        os.environ['VITE_CONFIG_SELECTOR_WORKFLOWS_URL'] = ""
+        os.environ['VITE_CONFIG_SELECTOR_TEAMS_URL'] = ""
+        os.environ['VITE_CONFIG_SELECTOR_RUNTIME_URL'] = ""
+        os.environ['VITE_JOB_MANAGEMENT_MFE_URL'] = ""
+        return True
 
     try:
         with open(ENV_FILE, 'r') as f:
@@ -123,19 +113,20 @@ def load_environment_config(app_env: str) -> bool:
             environment_config = {}
             os.environ['VITE_MAIN_BACKEND_URL'] = "http://localhost:8000"
             os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8001"
-            return True # Continue with defaults
+            os.environ['VITE_YAML_EDITOR_MFE_URL'] = ""
+            os.environ['VITE_CONFIG_SELECTOR_WORKFLOWS_URL'] = ""
+            os.environ['VITE_CONFIG_SELECTOR_TEAMS_URL'] = ""
+            os.environ['VITE_CONFIG_SELECTOR_RUNTIME_URL'] = ""
+            os.environ['VITE_JOB_MANAGEMENT_MFE_URL'] = ""
+            return True
 
         print(f"{GREEN}Loading configuration for environment: {BLUE}{app_env}{NC}")
         environment_config = all_envs[app_env]
 
-        # Export VITE_ variables (Backend URLs)
-        # Use .get() to handle potentially missing keys gracefully
-        os.environ['VITE_MAIN_BACKEND_URL'] = environment_config.get('main_backend', "http://localhost:8000") # Direct string access
-        os.environ['VITE_PREFS_SERVICE_URL'] = environment_config.get('prefs_service', {}).get('url', "http://localhost:8001")
-
-        # Export VITE_ variables (MFE URLs from environment)
-        # Iterate through known MFE keys or use a mapping
-        os.environ['VITE_YAML_EDITOR_MFE_URL'] = environment_config.get('yaml-editor', {}).get('url', '') # Add if needed
+        # Export VITE_ variables
+        os.environ['VITE_MAIN_BACKEND_URL'] = environment_config.get('main_backend', {}).get('url', 'http://localhost:8000')
+        os.environ['VITE_PREFS_SERVICE_URL'] = environment_config.get('prefs_service', {}).get('url', 'http://localhost:8001')
+        os.environ['VITE_YAML_EDITOR_MFE_URL'] = environment_config.get('yaml-editor', {}).get('url', '')
         os.environ['VITE_CONFIG_SELECTOR_WORKFLOWS_URL'] = environment_config.get('config-selector-workflows', {}).get('url', '')
         os.environ['VITE_CONFIG_SELECTOR_TEAMS_URL'] = environment_config.get('config-selector-teams', {}).get('url', '')
         os.environ['VITE_CONFIG_SELECTOR_RUNTIME_URL'] = environment_config.get('config-selector-runtime', {}).get('url', '')
@@ -143,10 +134,10 @@ def load_environment_config(app_env: str) -> bool:
 
 
         print(f"{GREEN}✅ Environment configuration loaded and VITE_ variables exported.{NC}")
-        print(f"   {BLUE}VITE_MAIN_BACKEND_URL={NC}{os.environ['VITE_MAIN_BACKEND_URL']}")
-        print(f"   {BLUE}VITE_PREFS_SERVICE_URL={NC}{os.environ['VITE_PREFS_SERVICE_URL']}")
-        print(f"   {BLUE}VITE_CONFIG_SELECTOR_TEAMS_URL={NC}{os.environ['VITE_CONFIG_SELECTOR_TEAMS_URL']}") # Example MFE URL
-        print(f"   {BLUE}VITE_JOB_MANAGEMENT_MFE_URL={NC}{os.environ['VITE_JOB_MANAGEMENT_MFE_URL']}") # Example MFE URL
+        print(f"   {BLUE}VITE_MAIN_BACKEND_URL={NC}{os.environ.get('VITE_MAIN_BACKEND_URL', 'Not Set')}")
+        print(f"   {BLUE}VITE_PREFS_SERVICE_URL={NC}{os.environ.get('VITE_PREFS_SERVICE_URL', 'Not Set')}")
+        print(f"   {BLUE}VITE_CONFIG_SELECTOR_TEAMS_URL={NC}{os.environ.get('VITE_CONFIG_SELECTOR_TEAMS_URL', 'Not Set')}")
+        print(f"   {BLUE}VITE_JOB_MANAGEMENT_MFE_URL={NC}{os.environ.get('VITE_JOB_MANAGEMENT_MFE_URL', 'Not Set')}")
 
         return True
 
@@ -156,43 +147,42 @@ def load_environment_config(app_env: str) -> bool:
     except Exception as e:
         print(f"{RED}❌ Error processing {ENV_FILE}: {e}{NC}")
         return False
+# --- End unchanged helpers ---
 
-# Import re at the top
-import re
-
+# --- CORRECTED Port Finding Logic ---
 def get_port_for_frontend_service(service_name: str, default_port: int, json_key_hint: str) -> int:
     """Gets port for frontend service by parsing URL from config or returns default."""
+    port = default_port # Start with default
+    url = None
     try:
-        # Find the URL using the hint or the service name itself as a key
+        # Use the specific hint first (e.g., "config-selector-teams", "yaml-editor")
         url = environment_config.get(json_key_hint, {}).get('url')
+        # If hint didn't work, try the service name itself as the key
         if not url:
-             url = environment_config.get(service_name, {}).get('url') # Fallback to service name key
+             url = environment_config.get(service_name, {}).get('url')
 
         if url:
-            # Extract port using regex
-            match = re.search(r':([0-9]+)', url) # Find :<numbers>
+            match = re.search(r':([0-9]+)', url)
             if match:
                 port = int(match.group(1))
+                # print(f"Debug: Found port {port} for {service_name} from URL {url} using hint {json_key_hint}")
                 return port
-            else:
-                 # Handle default ports for http/https if no explicit port in URL
-                 if url.startswith("https://"):
-                     return 443
-                 elif url.startswith("http://"):
-                     return 80
-                 else:
-                     print(f"{YELLOW}⚠️ Could not extract port from URL '{url}' for {service_name} (hint: {json_key_hint}) and scheme unknown. Using default: {default_port}{NC}")
-                     return default_port
-        else:
-            # Handle case where URL might be missing (e.g. shell might just use default)
-            # print(f"{YELLOW}URL not found for {service_name} (hint: {json_key_hint}). Using default: {default_port}{NC}")
-            return default_port
+            else: # Handle default http/https ports if no explicit port
+                 url_lower = url.lower()
+                 if url_lower.startswith("https://"): return 443
+                 if url_lower.startswith("http://"): return 80
+                 print(f"{YELLOW}⚠️ Could not extract port from URL '{url}' for {service_name}. Using default: {default_port}{NC}")
+        # else:
+        #      print(f"{YELLOW}URL not found for {service_name} (hint: {json_key_hint}). Using default: {default_port}{NC}")
 
     except Exception as e:
         print(f"{YELLOW}Error parsing URL/port for {service_name}: {e}. Using default: {default_port}{NC}")
-        return default_port
-    
 
+    # print(f"Debug: Returning default port {port} for {service_name}")
+    return port # Return default if URL/port not found or parsing failed
+# --- End CORRECTED Port Finding Logic ---
+
+# --- start_frontend_service function remains the same ---
 def start_frontend_service(service_name: str, port: int, command_type: str):
     """Starts a frontend service using npm."""
     log_file = os.path.join(ROOT_DIR, f"{service_name}_log.txt")
@@ -202,11 +192,7 @@ def start_frontend_service(service_name: str, port: int, command_type: str):
         print(f"{RED}❌ Frontend package directory '{service_dir}' not found. Skipping.{NC}")
         return False
 
-    # Ensure package.json scripts DO NOT contain hardcoded --port
     npm_command = "start" if command_type == "start" else "preview"
-
-    # Command construction for npm run <script> -- --port <port> --strictPort
-    # Note the extra '--' which tells npm to pass the following args to the script, not npm itself
     cmd = [
         "npm", "run", npm_command, "--",
         "--port", str(port),
@@ -215,19 +201,17 @@ def start_frontend_service(service_name: str, port: int, command_type: str):
 
     try:
         print(f"{YELLOW}🚀 Starting {service_name} on port {port} (CMD: {' '.join(cmd)})...{NC}")
-        # Run npm command from the service's directory
         process = subprocess.Popen(
             cmd,
             stdout=open(log_file, 'w'),
             stderr=subprocess.STDOUT,
-            cwd=service_dir, # Run from the package directory
-            # Use shell=True ONLY if necessary (e.g. complex commands not handled by list arg),
-            # prefer shell=False for security and control. NPM usually works well without shell=True.
-            # shell=True (on Windows might be needed sometimes)
-            shell=(sys.platform == "win32") # Be cautious with shell=True
+            cwd=service_dir,
+            # Create a new process group on Unix-like systems
+            preexec_fn=os.setsid if sys.platform != "win32" else None,
+            shell=(sys.platform == "win32") # Needed on Win often for npm
         )
         running_processes[service_name] = process
-        time.sleep(3) # Frontend builds can take longer
+        time.sleep(3)
 
         if process.poll() is not None:
             print(f"{RED}❌ Failed to start {service_name} (PID {process.pid}). Check {log_file} for details.{NC}")
@@ -238,66 +222,72 @@ def start_frontend_service(service_name: str, port: int, command_type: str):
     except Exception as e:
         print(f"{RED}❌ Exception starting {service_name}: {e}{NC}")
         return False
+# --- End start_frontend_service ---
 
+
+# --- REVISED Cleanup Logic ---
 def cleanup(signum=None, frame=None):
     """Gracefully terminates running frontend processes."""
+    global is_shutting_down
+    # Prevent recursive calls or multiple signals running cleanup simultaneously
+    if is_shutting_down:
+        return
+    is_shutting_down = True
+
     print_header("SHUTTING DOWN FRONTEND SERVICES")
     print(f"{YELLOW}Stopping all servers...{NC}")
-    for name, process in list(running_processes.items()):
-        if process.poll() is None:
+    # Iterate over a copy of the keys/items to avoid modification issues
+    processes_to_stop = list(running_processes.items())
+    running_processes.clear() # Clear global dict immediately
+
+    for name, process in processes_to_stop:
+        if process.poll() is None: # Check if process is still running
             print(f"Stopping {name} (PID: {process.pid})...")
             try:
-                # On Windows, terminate might not kill child processes (npm script).
-                # On Unix, sending SIGTERM to the parent (npm) should often signal children.
-                if sys.platform == "win32":
-                     # Use taskkill to kill the process tree
-                     subprocess.run(f"taskkill /PID {process.pid} /T /F", shell=True, check=False, capture_output=True)
+                # Send SIGTERM to the process group (more likely to kill npm children)
+                if sys.platform != "win32":
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
                 else:
-                     os.killpg(os.getpgid(process.pid), signal.SIGTERM) # Send SIGTERM to process group
+                    # On Windows, subprocess Popen with shell=True might make this tricky
+                    # Using taskkill on the parent PID might be necessary if terminate fails
+                    process.terminate() # Try standard terminate first
 
+                # Wait for process to terminate
+                process.wait(timeout=5) # Wait up to 5 seconds
+                print(f"{GREEN}Process {process.pid} for {name} terminated.{NC}")
+
+            except subprocess.TimeoutExpired:
+                print(f"{YELLOW}Process {process.pid} for {name} did not terminate, sending SIGKILL...{NC}")
                 try:
-                    process.wait(timeout=5)
-                    print(f"{GREEN}Process {process.pid} terminated gracefully.{NC}")
-                except subprocess.TimeoutExpired:
-                     print(f"{YELLOW}Process {process.pid} did not terminate gracefully, sending SIGKILL...{NC}")
-                     if sys.platform == "win32":
-                          subprocess.run(f"taskkill /PID {process.pid} /T /F", shell=True, check=False, capture_output=True)
-                     else:
-                          os.killpg(os.getpgid(process.pid), signal.SIGKILL) # Send SIGKILL to process group
-                     process.wait() # Wait for kill
-                     print(f"{GREEN}Process {process.pid} killed.{NC}")
+                    if sys.platform != "win32":
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    else:
+                        # Force kill on windows if terminate failed
+                        subprocess.run(f"taskkill /PID {process.pid} /T /F", shell=True, check=False, capture_output=True)
+                    process.wait(timeout=2) # Short wait after kill
+                    print(f"{GREEN}Process {process.pid} for {name} killed.{NC}")
+                except Exception as kill_err:
+                    print(f"{RED}Error sending SIGKILL to {name} (PID: {process.pid}): {kill_err}{NC}")
+            except ProcessLookupError:
+                 print(f"{YELLOW}Process {process.pid} for {name} not found (already terminated?).{NC}")
             except Exception as e:
-                print(f"{RED}Error terminating process {process.pid}: {e}{NC}")
-                # Try final kill just in case
-                try:
-                     process.kill()
-                     process.wait()
-                except Exception as ke:
-                     print(f"{RED}Error killing process {process.pid}: {ke}{NC}")
+                print(f"{RED}Error terminating {name} (PID: {process.pid}): {e}{NC}")
         else:
-            print(f"Process for {name} (PID: {process.pid}) already stopped.")
-        del running_processes[name]
+            print(f"Process for {name} (PID: {process.pid}) was already stopped.")
 
     print(f"{GREEN}✅ Frontend shutdown sequence complete.{NC}")
-    sys.exit(0)
+    # Allow the script to exit naturally after cleanup
+    sys.exit(0) # Ensure exit after cleanup
 
-# --- Main Execution ---
+# --- Main Execution (remains mostly the same, uses corrected functions) ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start C4H frontend services.")
-    parser.add_argument(
-        "--env",
-        default=os.environ.get("APP_ENV", "development"),
-        help="Environment to load from environments.json (default: development or APP_ENV)",
-    )
-    parser.add_argument(
-        "--services",
-        nargs='+',
-        help="Optional: Specify which frontend services to start by name (e.g., --services shell config-selector)",
-        default=None # Start all if not specified
-    )
+    parser.add_argument( "--env", default=os.environ.get("APP_ENV", "development"), help="Environment")
+    parser.add_argument( "--services", nargs='+', help="Services to start", default=None)
     args = parser.parse_args()
     APP_ENV = args.env
 
+    # Register signal handlers BEFORE starting processes
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
 
@@ -306,11 +296,10 @@ if __name__ == "__main__":
     if not load_environment_config(APP_ENV):
         sys.exit(1)
 
-    # Determine which services to start
+    # Determine services to start
     services_to_start_info = []
     all_service_names = [cfg[0] for cfg in SERVICES_CONFIG]
     target_service_names = args.services if args.services else all_service_names
-
     for name in target_service_names:
         found = False
         for cfg in SERVICES_CONFIG:
@@ -318,13 +307,10 @@ if __name__ == "__main__":
                 services_to_start_info.append(cfg)
                 found = True
                 break
-        if not found:
-             print(f"{YELLOW}⚠️ Specified service '{name}' not found in SERVICES_CONFIG. Skipping.{NC}")
-
+        if not found: print(f"{YELLOW}⚠️ Service '{name}' not found in config. Skipping.{NC}")
     if not services_to_start_info:
-         print(f"{RED}❌ No valid services selected to start. Exiting.{NC}")
-         sys.exit(1)
-
+        print(f"{RED}❌ No valid services selected. Exiting.{NC}")
+        sys.exit(1)
     print(f"Services to start: {', '.join([info[0] for info in services_to_start_info])}")
 
 
@@ -332,12 +318,14 @@ if __name__ == "__main__":
     print_header("CHECKING PORTS")
     ports_ok = True
     final_ports = {}
+    # Iterate using tuple unpacking from services_to_start_info
     for service_name, default_port, _, json_key_hint in services_to_start_info:
+        # Use the helper function to get the final port
         target_port = get_port_for_frontend_service(service_name, default_port, json_key_hint)
         if not check_port(target_port, service_name):
             ports_ok = False
             break
-        final_ports[service_name] = target_port
+        final_ports[service_name] = target_port # Store by service dir name
 
     if not ports_ok:
         print(f"{RED}❌ Port conflict detected. Aborting startup.{NC}")
@@ -345,14 +333,18 @@ if __name__ == "__main__":
 
     # Start services
     print_header("STARTING SERVICES")
-    start_failed = False
-    # Start MFEs first, then shell (services_to_start_info is already ordered this way)
+    # Start MFEs first, then shell (services_to_start_info should maintain order from SERVICES_CONFIG)
     for service_name, _, command_type, _ in services_to_start_info:
-        port = final_ports[service_name]
+        port = final_ports[service_name] # Get the final port determined earlier
         if not start_frontend_service(service_name, port, command_type):
-            start_failed = True
             print(f"{RED}❌ Failed to start {service_name}. Stopping already started services...{NC}")
-            cleanup()
+            # Don't exit immediately, let cleanup handle it
+            cleanup() # Trigger cleanup explicitly
+
+    # If we reach here and processes are running, keep script alive
+    if not running_processes:
+         print(f"{RED}❌ No services were started successfully.{NC}")
+         sys.exit(1)
 
     print_header("FRONTEND SERVICES RUNNING")
     print(f"{GREEN}All selected frontend services should now be running:{NC}")
@@ -363,15 +355,24 @@ if __name__ == "__main__":
 
     print(f"\n{YELLOW}Press Ctrl+C to stop all services{NC}")
 
+    # Keep main script alive while checking processes
     try:
         while True:
-            time.sleep(1)
+            all_stopped = True
             for name, process in list(running_processes.items()):
-                 if process.poll() is not None:
+                 if process.poll() is None:
+                    all_stopped = False # At least one is still running
+                 else:
+                    # Process terminated unexpectedly
                     print(f"{RED}❌ Service '{name}' (PID: {process.pid}) terminated unexpectedly. Exit code: {process.returncode}{NC}")
+                    # Remove it so we don't try to kill it later
                     del running_processes[name]
-                    # Decide if you want to stop everything if one MFE dies
-                    # cleanup()
-
+            # If all tracked processes have stopped (maybe due to errors), exit
+            if all_stopped and not is_shutting_down:
+                 print(f"{YELLOW}All started services have stopped. Exiting script.{NC}")
+                 break # Exit the loop, will lead to script exit
+            time.sleep(2) # Check every 2 seconds
     except KeyboardInterrupt:
-        cleanup()
+        # This might not be strictly necessary if signal handler works, but good fallback
+        if not is_shutting_down:
+             cleanup()

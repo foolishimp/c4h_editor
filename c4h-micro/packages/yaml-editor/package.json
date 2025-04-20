@@ -4,9 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "vite --port 3002 --strictPort",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 3002 --strictPort"
+    "preview": "vite preview --strictPort"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",
