@@ -20,9 +20,8 @@ import {
     type FrameDefinition,
     type IframeMessage, 
     type EventDetail,
-    type MFEType
 } from 'shared';
-import { useShellConfig, ShellConfigProvider, type ShellConfigContextState } from './contexts/ShellConfigContext';
+import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
 import TabBar from './components/layout/TabBar';
 import PreferencesDialog from './components/preferences/PreferencesDialog';
 

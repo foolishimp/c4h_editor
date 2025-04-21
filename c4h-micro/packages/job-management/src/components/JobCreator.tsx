@@ -12,7 +12,7 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
-import { configTypes, api, JobConfigReference, eventBus } from 'shared';
+import { configTypes, api, JobConfigReference, eventBus, EventDetail } from 'shared';
 import { useJobContext } from '../contexts/JobContext';
 
 interface ConfigOption {
@@ -96,13 +96,14 @@ const JobCreator: React.FC = () => {
 
   // --- Subscribe to eventBus for updates ---
   useEffect(() => {
-    const handleConfigUpdate = (event: CustomEvent<{ source: string; payload: { configType: string } }>) => {
-      // Check if the updated type is one we care about
-      if (REQUIRED_CONFIG_TYPES.includes(event.detail?.payload?.configType)) {
-        console.log(`JobCreator: Received configListUpdated event for ${event.detail.payload.configType}. Refreshing options.`);
-        loadConfigOptions(); // Reload options when relevant config type changes
-      }
+      const handleConfigUpdate = (detail: EventDetail) => {
+        // Check if the updated type is one we care about
+        if (REQUIRED_CONFIG_TYPES.includes(detail?.payload?.configType)) {
+            console.log(`JobCreator: Received configListUpdated event for ${detail.payload.configType}. Refreshing options.`);
+            loadConfigOptions();
+        }
     };
+    eventBus.subscribe('configListUpdated', handleConfigUpdate);
 
     console.log("JobCreator: Subscribing to configListUpdated event.");
     const unsubscribe = eventBus.subscribe('configListUpdated', handleConfigUpdate); // [cite: 985]

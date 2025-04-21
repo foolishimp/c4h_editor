@@ -1,7 +1,7 @@
 // File: packages/shell/src/contexts/ShellConfigContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-import { AppDefinition, FrameDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Using correct imports
+import { AppDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Using correct imports
 import { configureApiService } from 'shared'; // Import configuration function
 
 // Define the shape of the context state

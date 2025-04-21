@@ -40,9 +40,8 @@ export interface AppDefinition {
 // Preferences represents user-specific shell configuration
 export interface Preferences {
   frames: Frame[];
-  // Add other user preference fields if needed
+  availableApps?: AppDefinition[]; // Add this property
 }
-
 export interface ServiceEndpoints {
   jobConfigServiceUrl?: string; // Base URL for the Job/Config Service API.
   // Add other service endpoints here as needed

@@ -1,3 +1,4 @@
+// /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
 /**
  * EventBus for cross-microfrontend communication
  * Provides a type-safe pub/sub mechanism based on EventTarget
@@ -12,11 +13,14 @@ export interface EventDetail<T = any> {
 type DetailCallback<T = any> = (detail: EventDetail<T>) => void;
 type EventTargetCallback = (event: Event) => void;
 
-// Store callbacks in their consumer-friendly form
-type EventCallbackRecord = { callback: DetailCallback; listener: EventTargetCallback };
+// Track wrapper functions so we can properly unsubscribe
+interface CallbackPair<T = any> {
+  detailCallback: DetailCallback<T>;
+  eventCallback: EventTargetCallback;
+}
 
 class EventBus extends EventTarget {
-  private events: Map<string, Set<EventCallback>> = new Map();
+  private callbacks: Map<string, CallbackPair[]> = new Map();
 
   constructor() {
     super();
@@ -29,8 +33,8 @@ class EventBus extends EventTarget {
    * @returns Unsubscribe function
    */
   subscribe<T = any>(event: string, callback: DetailCallback<T>): () => void {
-    if (!this.events.has(event)) {
-      this.events.set(event, new Set());
+    if (!this.callbacks.has(event)) {
+      this.callbacks.set(event, []);
     }
 
     // Create wrapper to convert EventTarget events to strongly-typed callback
@@ -43,25 +47,35 @@ class EventBus extends EventTarget {
       }
     };
     
-    // Store callback in our registry with safe type handling
-    const record: EventCallbackRecord = { callback, listener: wrappedCallback };
-    this.events.get(event)?.add(record as unknown as EventCallback);
+    // Store both callbacks for cleanup
+    const pair: CallbackPair<T> = {
+      detailCallback: callback,
+      eventCallback: wrappedCallback
+    };
+    this.callbacks.get(event)?.push(pair);
     
     // Add event listener to EventTarget
     this.addEventListener(event, wrappedCallback);
 
-    const subscriberCount = this.events.get(event)?.size || 0;
+    const subscriberCount = this.callbacks.get(event)?.length || 0;
     console.log(`EventBus: Subscribed to '${event}', total subscribers: ${subscriberCount}`);
 
     // Return function to unsubscribe
     return () => {
-      this.removeEventListener(event, wrappedCallback);
-      this.events.get(event)?.delete(callback as EventCallback);
-      const remainingCount = this.events.get(event)?.size || 0;
+      const callbackArray = this.callbacks.get(event);
+      if (!callbackArray) return;
+
+      const index = callbackArray.findIndex(p => p.detailCallback === callback);
+      if (index >= 0) {
+        const [removed] = callbackArray.splice(index, 1);
+        this.removeEventListener(event, removed.eventCallback);
+      }
+
+      const remainingCount = callbackArray.length;
       console.log(`EventBus: Unsubscribed from '${event}', remaining subscribers: ${remainingCount}`);
 
       if (remainingCount === 0) {
-        this.events.delete(event);
+        this.callbacks.delete(event);
       }
     };
   }
