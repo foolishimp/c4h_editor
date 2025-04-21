@@ -1,107 +1,115 @@
-import React, {
-  createContext, useContext, useState, useEffect, ReactNode, useCallback
-} from 'react';
+// File: packages/shell/src/contexts/ShellConfigContext.tsx
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-// Import necessary types and functions
-import { configureApiService, ShellConfigurationResponse } from 'shared'; // Added ServiceEndpoints
-import { defaultShellConfiguration } from '../config/defaults';
+import { AppDefinition, FrameDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Assuming Preferences is defined in shared/types/shell or similar
+import { configureApiService } from 'shared'; // Import configuration function
 
-// --- Define Context State ---
-interface ShellConfigContextState {
-config: ShellConfigurationResponse | null;
-loading: boolean;
-error: string | null;
-fetchConfig: () => Promise<void>;
-prefsServiceUrl: string; // <-- ADDED: URL for the preferences service
+// Define the shape of the context state
+// Add 'export' here to make it available for import in App.tsx
+export interface ShellConfigContextState {
+    config: Preferences | null;
+    loading: boolean;
+    error: string | null;
+    availableApps: AppDefinition[] | null; // Add availableApps here
+    prefsServiceUrl: string | null;       // Add prefsServiceUrl here
+    fetchConfig: () => Promise<void>;
 }
 
-// --- Get Prefs Service URL (using correct fallback) ---
-const PREFERENCES_SERVICE_URL =
-import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8010'; // Use 8010 fallback
+// Create the context with a default undefined value
+const ShellConfigContext = createContext<ShellConfigContextState | undefined>(undefined);
 
-// Axios instance specifically for fetching initial config from Prefs service
-const configFetcher = axios.create({ baseURL: PREFERENCES_SERVICE_URL });
-
-// --- Define Default Context Value ---
-const defaultContextValue: ShellConfigContextState = {
-  config: null,
-  loading: true,
-  error: null,
-  fetchConfig: async () => {},
-  prefsServiceUrl: PREFERENCES_SERVICE_URL // <-- ADDED: Use the determined URL
-};
-
-const ShellConfigContext = createContext<ShellConfigContextState>(defaultContextValue);
-
-
-export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ children }) => {
-const [config, setConfig] = useState<ShellConfigurationResponse | null>(null);
-const [loading, setLoading] = useState<boolean>(true);
-const [error, setError] = useState<string | null>(null);
-// The prefs URL is now determined outside and passed in context value
-const prefsServiceUrl = PREFERENCES_SERVICE_URL;
-
-const fetchConfig = useCallback(async () => {
-  setLoading(true);
-  setError(null);
-  console.log(`ShellConfigContext: Attempting to fetch shell configuration from ${prefsServiceUrl}/api/v1/shell/configuration`);
-  try {
-      const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
-      if (response.data) {
-          console.log('ShellConfigContext: Received config with frames:', 
-            response.data.frames?.length, 
-            'apps:', response.data.availableApps?.length);
-          setConfig(response.data);
-          const backendUrl = response.data.serviceEndpoints?.jobConfigServiceUrl;
-          console.log(`ShellConfigContext: Configuring apiService with backend URL: ${backendUrl}`);
-          configureApiService(backendUrl); // Configure the main apiService
-      } else {
-          throw new Error('Received empty response from configuration service');
-      }
-  } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to fetch shell configuration';
-      console.error('ShellConfigContext: Error fetching config, falling back to defaults.', err);
-      setError(errorMessage + `. Falling back to default configuration.`);
-      const fallbackConfig = defaultShellConfiguration as ShellConfigurationResponse; // Cast if needed
-      setConfig(fallbackConfig);
-      const defaultBackendUrl = fallbackConfig.serviceEndpoints?.jobConfigServiceUrl;
-      console.log(`ShellConfigContext: Configuring apiService with DEFAULT backend URL: ${defaultBackendUrl}`);
-      configureApiService(defaultBackendUrl);
-  } finally {
-      setLoading(false);
-  }
-}, [prefsServiceUrl]); // Depend on prefsServiceUrl
-
-useEffect(() => {
-    fetchConfig();
-}, [fetchConfig]);
-
-// --- Provide the Prefs URL in the context value ---
-const contextValue: ShellConfigContextState = {
-  config,
-  loading,
-  error,
-  fetchConfig,
-  prefsServiceUrl // <-- Provide it here
-};
-
-return (
-  <ShellConfigContext.Provider value={contextValue}>
-    {children}
-  </ShellConfigContext.Provider>
-);
-};
-
-// --- Hook remains the same ---
-export const useShellConfig = (): ShellConfigContextState => {
-const context = useContext(ShellConfigContext);
-if (context === undefined) {
-  throw new Error('useShellConfig must be used within a ShellConfigProvider');
-}
-return context;
-};
-
-// Define ShellConfigProviderProps if not already defined or imported
+// Define the provider component props
 interface ShellConfigProviderProps {
-children: ReactNode;
+    children: ReactNode;
 }
+
+// Create the provider component
+export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ children }) => {
+    const [config, setConfig] = useState<Preferences | null>(null);
+    const [availableApps, setAvailableApps] = useState<AppDefinition[] | null>(null);
+    const [prefsServiceUrl, setPrefsServiceUrl] = useState<string | null>(null);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchConfig = async () => {
+        setLoading(true);
+        setError(null);
+        // Default Prefs Service URL - could be overridden by env var
+        const effectivePrefsServiceUrl = import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8001';
+        setPrefsServiceUrl(effectivePrefsServiceUrl); // Store the URL used
+
+        // Create a dedicated axios instance for fetching config
+        const configFetcher = axios.create({ baseURL: effectivePrefsServiceUrl });
+
+        try {
+            console.log(`Fetching shell configuration from: ${effectivePrefsServiceUrl}/api/v1/shell/configuration`);
+            const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
+            const data = response.data;
+
+            console.log("Shell configuration received:", data);
+
+            // Set state based on fetched data
+            setConfig(data.preferences);
+            setAvailableApps(data.availableApps); // Store available apps
+
+            // Configure the shared apiService with the main backend URL
+            if (data.mainBackendUrl) {
+                configureApiService(data.mainBackendUrl);
+                console.log(`Shared apiService configured with base URL: ${data.mainBackendUrl}`);
+            } else {
+                console.warn("Main backend URL not provided in shell configuration.");
+                // Optionally configure with a default/fallback URL if needed
+                // configureApiService('http://localhost:8000'); // Example fallback
+            }
+
+        } catch (err: any) {
+            console.error("Error fetching shell configuration:", err);
+            let errorMessage = "Failed to fetch configuration.";
+            if (axios.isAxiosError(err)) {
+                 errorMessage = err.response?.data?.detail || err.message || errorMessage;
+                 // Handle specific status codes if needed
+                 if(err.response?.status === 404) {
+                     errorMessage = `Configuration endpoint not found at ${effectivePrefsServiceUrl}/api/v1/shell/configuration. Is the preferences service running?`;
+                 }
+            } else if (err instanceof Error) {
+                 errorMessage = err.message;
+            }
+            setError(errorMessage);
+            // Fallback to default preferences on error? Or show error state?
+            // setConfig(DEFAULT_PREFERENCES); // Consider fallback strategy
+            setConfig(null); // Or set to null to indicate failure
+            setAvailableApps(null);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchConfig();
+    }, []); // Fetch on initial mount
+
+    // Memoize the context value to prevent unnecessary re-renders
+    const contextValue = React.useMemo(() => ({
+        config,
+        loading,
+        error,
+        availableApps, // Provide availableApps
+        prefsServiceUrl, // Provide prefsServiceUrl
+        fetchConfig
+    }), [config, loading, error, availableApps, prefsServiceUrl]);
+
+    return (
+        <ShellConfigContext.Provider value={contextValue}>
+            {children}
+        </ShellConfigContext.Provider>
+    );
+};
+
+// Custom hook to use the shell config context
+export const useShellConfig = (): ShellConfigContextState => {
+    const context = useContext(ShellConfigContext);
+    if (context === undefined) {
+        throw new Error('useShellConfig must be used within a ShellConfigProvider');
+    }
+    return context;
+};

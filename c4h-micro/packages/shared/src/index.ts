@@ -1,26 +1,30 @@
+// File: packages/shared/src/index.ts
 /**
  * Main entry point for shared package
  * Exports all shared types, utilities, components and services
  */
 
-// Export shared types
-export * from './types/workorder';
-export * from './types/job';
-export * from './types/config';
-export * from './types/shell'; // <-- ADDED EXPORT for shell types
+// Use 'export type' for modules that primarily export types,
+// required when 'isolatedModules' is true in tsconfig.
+export type * from './types/workorder';
+export type * from './types/job';
+export type * from './types/config';
+export type * from './types/shell';       // Exports AppDefinition, FrameDefinition, AppAssignment etc.
+export type * from './types/iframe';      // Exports IframeMessage (ensure defined in ./types/iframe.ts)
+export type * from './types/events';      // Exports EventDetail (ensure defined in ./types/events.ts)
 
-// Export config registry
+// Use regular 'export' for modules that export runtime values (or mixed)
 export * from './config/configTypes';
-export * from './config/remotes';
+export * from './config/remotes';        // Ensure this doesn't ONLY export types
 
-// Export utils
-export { eventBus, EventDetail } from './utils/eventBus';
+// Export runtime utilities/values
+export { eventBus } from './utils/eventBus';
 
-// Export shared components
+// Export shared components (runtime values)
 export { default as TimeAgo } from './components/TimeAgo';
 export { default as DiffViewer } from './components/DiffViewer';
 export { default as RemoteComponent } from './components/RemoteComponent';
 
-// Export API service AND configuration function
-export { apiService, api, configureApiService } from './services/apiService'; // <-- ADDED configureApiService
+// Export API service (runtime values) AND configuration function
+export { apiService, api, configureApiService } from './services/apiService';
 export { API_ENDPOINTS } from './config/api';

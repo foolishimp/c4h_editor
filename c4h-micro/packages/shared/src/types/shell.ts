@@ -1,4 +1,3 @@
-// File: packages/shared/src/types/shell.ts
 /**
  * Type definitions mirroring the Preferences Shell Service API models.
  */
@@ -26,6 +25,7 @@ export interface AppDefinition {
   scope: string; // Module Federation scope (e.g., 'configSelector').
   module: string; // Module Federation module name (e.g., './ConfigManager').
   url?: string; // Optional URL for the remoteEntry.js if not standard.
+  type: 'ESM' | 'Iframe' | 'WebComponent'; // Type of microfrontend
 }
 
 export interface ServiceEndpoints {
