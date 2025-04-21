@@ -4,19 +4,13 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite",                     
     "build": "tsc && vite build",
-    "preview": "vite preview --strictPort"
+    "preview": "vite preview --strictPort" 
   },
   "dependencies": {
-    "@emotion/react": "^11.11.4",
-    "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.15.14",
-    "@mui/material": "^5.15.14",
     "axios": "^1.6.7",
     "js-yaml": "^4.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "date-fns": "^3.6.0",
     "shared": "*",
     "yaml-editor": "file:../yaml-editor"
@@ -29,5 +23,13 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.3.3",
     "vite": "^5.4.14"
+  },
+  "peerDependencies": {
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.14",
+    "@mui/material": "^5.15.14",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   }
 }
