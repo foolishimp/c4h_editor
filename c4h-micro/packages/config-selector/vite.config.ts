@@ -1,12 +1,17 @@
 /**
  * /packages/config-selector/vite.config.ts
  * Vite configuration for config-selector microfrontend
- * --- UPDATED: Added @emotion packages to externals ---
- * --- UPDATED: Removed server/preview port config (handled by startup script) ---
+ * --- UPDATED: Correct externals, explicit filename, ports removed ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
 
 export default defineConfig({
   plugins: [react()],
@@ -14,58 +19,40 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist', // Standard output directory
     lib: {
-      entry: './src/main.tsx',
-      formats: ['es'], // ESM format for direct browser import
-      name: 'ConfigSelector', // Global name (if used in UMD/IIFE)
-      fileName: (format) => 'config-selector.js'
+      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
+      name: 'ConfigSelector',
+      formats: ['es'],
+      // fileName removed here, handled in rollupOptions.output
     },
     rollupOptions: {
-      // Make sure to externalize dependencies provided by the shell's import map
-      external: [
+      external: [ // Ensure this list is correct
         'react',
         'react-dom',
-        'react/jsx-runtime', // Also good to externalize jsx-runtime
+        'react/jsx-runtime',
         '@mui/material',
         '@mui/icons-material',
-        '@emotion/react',   // Externalized
-        '@emotion/styled',  // Externalized
+        '@emotion/react',
+        '@emotion/styled',
         'shared'
+        // Add 'js-yaml', 'date-fns', 'yaml-editor' if needed & provided by shell/import map
       ],
       output: {
         format: 'esm',
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].[hash].js', // Keep hash for chunks
+        // Force the output filename
+        entryFileNames: 'assets/config-selector.js',
+        // Keep chunk/asset names standard
+        chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
-  // Removed server section previously defining port/strictPort/cors
-  // server: {
-  //   // port: 3003, // Handled by startup script
-  //   // strictPort: true, // Handled by startup script
-  //   cors: true // Keep CORS if needed for direct access, but likely handled by script proxy/setup
-  // },
-  // Removed preview section previously defining port/strictPort/cors
-  // preview: {
-  //   // port: 3003, // Handled by startup script
-  //   // strictPort: true, // Handled by startup script
-  //   cors: true
-  // },
+  // Removed server/preview sections
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/src') // Ensure alias points to src
+      'shared': path.resolve(__dirname, '../shared/src')
     }
-    // Keep dedupe here if it helps resolve other dev server issues,
-    // though it might also be redundant if externals/import map work correctly.
-    // Can be removed if proven unnecessary after fixing externals.
-    // dedupe: [
-    //     'react',
-    //     'react-dom',
-    //     '@mui/material',
-    //     '@emotion/react',
-    //     '@emotion/styled'
-    // ]
   }
 });

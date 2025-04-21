@@ -3,13 +3,11 @@
     "main_backend":  { "url": "http://localhost:8011" },
     "prefs_service": { "url": "http://localhost:8010" },
     "shell":         { "url": "http://localhost:3100" },
-
-    "yaml-editor":            { "url": "http://localhost:3105/src/main.tsx" },
-    "config-selector-workorder": { "url": "http://localhost:3103/src/main.tsx" }, 
-    "config-selector-teams":  { "url": "http://localhost:3103/src/main.tsx" }, 
-    "config-selector-runtime":{ "url": "http://localhost:3103/src/main.tsx" }, 
-    "job-management":         { "url": "http://localhost:3104/src/main.tsx" }, 
-
-    "test-app":               { "url": "http://localhost:3106/src/main.tsx" }
+    "yaml-editor":            { "url": "http://localhost:3105/assets/yaml-editor.js" }, 
+    "config-selector-workorder": { "url": "http://localhost:3103/assets/config-selector.js" },
+    "config-selector-teams":  { "url": "http://localhost:3103/assets/config-selector.js" },
+    "config-selector-runtime":{ "url": "http://localhost:3103/assets/config-selector.js" },
+    "job-management":         { "url": "http://localhost:3104/assets/job-management.js" },
+    "test-app":               { "url": "http://localhost:3106/assets/test-app.js" }
   }
 }

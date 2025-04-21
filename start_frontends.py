@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # File: start_frontends.py (ESM Microfrontend Architecture)
-# --- MODIFIED TO USE 'npm run dev' CONSISTENTLY ---
+# --- MODIFIED TO USE 'npm run preview' for MFEs and pass 'is_shell' ---
 import argparse
 import json
 import os
@@ -23,9 +23,10 @@ MFE_ROOT = os.path.join(ROOT_DIR, "c4h-micro/packages")
 SERVICES_CONFIG: List[Tuple[str, int, bool]] = [
     ("shared", 0, True),
     ("yaml-editor", 3002, True),
-    ("config-selector", 3003, True), # This package might serve multiple logical apps on the same port
+    # Assuming config-selector serves all its variants from one process
+    ("config-selector", 3003, True),
     ("job-management", 3004, True),
-    ("test-app", 3005, True),
+    ("test-app", 3005, True), # Default port, will be overridden by env if possible
     ("shell", 3000, True),
 ]
 
@@ -57,17 +58,14 @@ def is_port_in_use(port: int) -> bool:
         return False
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         try:
-            # Try to bind to the port
             s.bind(("127.0.0.1", port))
-            # If bind succeeds, port is free
             return False
         except socket.error:
-            # If bind fails, port is likely in use
             return True
 
 def check_port(port: int, service_name: str) -> bool:
     """Checks if a port is available and optionally tries to kill the process using it."""
-    if port == 0: # Port 0 means the service doesn't need a port (e.g., shared library)
+    if port == 0:
         return True
 
     print(f"Checking port {BLUE}{port}{NC} for service {BLUE}{service_name}{NC}...")
@@ -98,7 +96,7 @@ def check_port(port: int, service_name: str) -> bool:
                         subprocess.run(cmd, shell=True, check=False, capture_output=True)
 
                     print(f"{YELLOW}Waiting a moment after attempting kill...{NC}")
-                    time.sleep(2) # Increased wait time
+                    time.sleep(2)
                     if not is_port_in_use(port):
                          print(f"{GREEN}✅ Port {port} is now free.{NC}")
                          return True
@@ -111,52 +109,46 @@ def check_port(port: int, service_name: str) -> bool:
                     return False
             else:
                  print(f"{RED}❌ Port conflict not resolved.{NC}")
-                 return False # User chose not to kill
-        except EOFError: # Handle case where input stream is closed (e.g., running non-interactively)
+                 return False
+        except EOFError:
              print(f"{RED}❌ Cannot prompt for input (EOFError). Port conflict not resolved.{NC}")
              return False
     else:
         print(f"{GREEN}✅ Port {port} is free{NC}")
         return True
 
-
 def fix_typescript_config(package_dir: str) -> bool:
     """Modifies tsconfig.json to disable strict unused checks."""
     tsconfig_path = os.path.join(package_dir, "tsconfig.json")
     if not os.path.exists(tsconfig_path):
         print(f"{YELLOW}No tsconfig.json found in {package_dir}, skipping fix.{NC}")
-        return True # Return True as there's nothing to fix
+        return True
 
     print(f"{YELLOW}Adjusting TypeScript configuration in {tsconfig_path}...{NC}")
     try:
         with open(tsconfig_path, 'r', encoding='utf-8') as f:
-            # Use regex to remove trailing commas before attempting JSON load
             content = f.read()
-            # Remove trailing commas from objects and arrays
             content = re.sub(r',\s*([}\]])', r'\1', content)
-            config = json.loads(content) # Load the cleaned content
+            config = json.loads(content)
 
-        # Ensure compilerOptions exists
         if 'compilerOptions' not in config:
             config['compilerOptions'] = {}
 
-        # Disable noUnusedLocals and noUnusedParameters
         config['compilerOptions']['noUnusedLocals'] = False
         config['compilerOptions']['noUnusedParameters'] = False
 
         with open(tsconfig_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2) # Write back with indentation
+            json.dump(config, f, indent=2)
 
         print(f"{GREEN}✅ Successfully adjusted tsconfig.json for {os.path.basename(package_dir)}.{NC}")
         return True
     except json.JSONDecodeError as e:
         print(f"{RED}❌ Error decoding JSON in {tsconfig_path}: {e}{NC}")
-        print(f"{YELLOW}   Please check the file for syntax errors (e.g., trailing commas, missing quotes).{NC}")
+        print(f"{YELLOW}   Please check the file for syntax errors.{NC}")
         return False
     except Exception as e:
         print(f"{RED}❌ Error modifying tsconfig.json in {package_dir}: {e}{NC}")
         return False
-
 
 def load_environment_config(app_env: str) -> bool:
     global environment_config
@@ -165,8 +157,6 @@ def load_environment_config(app_env: str) -> bool:
     if not os.path.exists(ENV_FILE):
         print(f"{YELLOW}⚠️ {ENV_FILE} not found. Using default configurations.{NC}")
         environment_config = {}
-        # Set default environment variables if file is missing
-        os.environ['VITE_IMPORT_MAP_URL'] = "http://localhost:3000/import-map.json" # Default shell import map
         os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8010" # Default prefs service
         return True
 
@@ -177,22 +167,16 @@ def load_environment_config(app_env: str) -> bool:
         if app_env not in all_envs:
             print(f"{YELLOW}⚠️ Environment '{app_env}' not found in {ENV_FILE}. Using defaults.{NC}")
             environment_config = {}
-            # Set default environment variables if env key is missing
-            os.environ['VITE_IMPORT_MAP_URL'] = "http://localhost:3000/import-map.json"
             os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8010"
             return True
 
         print(f"Loading configuration for environment: {BLUE}{app_env}{NC}")
         environment_config = all_envs[app_env]
 
-        # Set environment variables needed by the shell/MFEs
-        # Use .get() with defaults for safety
-        os.environ['VITE_IMPORT_MAP_URL'] = environment_config.get('shell', {}).get('url', "http://localhost:3000") + "/import-map.json" # Assuming import map is relative to shell URL
         os.environ['VITE_PREFS_SERVICE_URL'] = environment_config.get('prefs_service', {}).get('url', 'http://localhost:8010')
 
         print(f"{GREEN}✅ Environment configuration loaded{NC}")
         print(f"   - Prefs Service URL: {os.environ['VITE_PREFS_SERVICE_URL']}")
-        # print(f"   - Import Map URL: {os.environ['VITE_IMPORT_MAP_URL']}") # Debugging
         return True
     except json.JSONDecodeError as e:
         print(f"{RED}❌ Error parsing {ENV_FILE}: {e}. Please check the JSON syntax.{NC}")
@@ -209,62 +193,67 @@ def build_package(service_name: str) -> bool:
         print(f"{RED}❌ Package directory '{service_dir}' not found.{NC}")
         return False
 
-    # Fix TypeScript config before building
-    if not fix_typescript_config(service_dir):
-         # If fixing failed, maybe still try to build but warn
-         print(f"{YELLOW}⚠️ Could not modify tsconfig for {service_name}, build might fail due to strict checks.{NC}")
-         # Decide if you want to proceed or fail here. Let's proceed for now.
+    # Skip TSConfig fix for shared, as tsc handles its own config
+    if service_name != "shared":
+        if not fix_typescript_config(service_dir):
+            print(f"{YELLOW}⚠️ Could not modify tsconfig for {service_name}, build might fail.{NC}")
 
     log_file = os.path.join(ROOT_DIR, f"{service_name}_build_log.txt")
     print(f"{YELLOW}🔧 Building {service_name}... (Log: {log_file}){NC}")
 
-    # Determine the correct build command
+    cmd = ["npm", "run", "build"]
     if service_name == "shared":
-        # For 'shared', we typically just need to compile TypeScript
+        # Use npx for tsc to ensure it uses the locally resolved version
         cmd = ["npx", "tsc", "--project", "tsconfig.json"]
-    else:
-        # For other MFEs, run the standard build script from package.json
-        cmd = ["npm", "run", "build"]
 
     try:
-        # Run the build command
-        process = subprocess.Popen(
-            cmd,
-            stdout=open(log_file, 'w'),
-            stderr=subprocess.STDOUT,
-            cwd=service_dir,
-            shell=(sys.platform == "win32"),
-            env=os.environ # Pass environment variables
-        )
-        process.wait() # Wait for the build process to complete
+        # Open log file for writing
+        with open(log_file, 'w') as lf:
+            # Run the process, capturing stdout and stderr separately
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE, # Capture stdout
+                stderr=subprocess.PIPE, # Capture stderr
+                cwd=service_dir,
+                shell=(sys.platform == "win32"),
+                env=os.environ,
+                text=True # Decode stdout/stderr as text
+            )
 
+            # Read and write stdout/stderr to the log file in real-time (optional but helpful)
+            stdout_data, stderr_data = process.communicate()
+            lf.write("--- STDOUT ---\n")
+            lf.write(stdout_data)
+            lf.write("\n--- STDERR ---\n")
+            lf.write(stderr_data)
+
+        # Check the return code AFTER the process finishes
         if process.returncode != 0:
-            print(f"{RED}❌ Failed to build {service_name}. Check {log_file}{NC}")
-            # Allow shared build issues to pass with a warning
-            if service_name == "shared":
-                 print(f"{YELLOW}Warning: Shared package build failed/had issues but continuing... Check log.{NC}")
-                 # Attempt to create the output directory if it doesn't exist, might help subsequent steps
-                 dist_dir = os.path.join(service_dir, "dist", "build")
-                 try:
-                      os.makedirs(dist_dir, exist_ok=True)
-                      print(f"{YELLOW}Ensured shared output directory exists: {dist_dir}{NC}")
-                 except OSError as e:
-                      print(f"{YELLOW}Could not create shared output directory {dist_dir}: {e}{NC}")
-                 return True # Continue despite shared build failure
-            return False # Fail for other packages
+            # Print stderr specifically if build failed
+            print(f"{RED}❌ Failed to build {service_name}. Exit Code: {process.returncode}. Check {log_file}{NC}")
+            if stderr_data:
+                 print(f"{RED}--- Error Output (from stderr) ---{NC}\n{stderr_data.strip()}\n{RED}---------------------------------{NC}")
+            return False # Fail build script if ANY build fails
         else:
+            # If build succeeded (exit code 0), check for critical output file for 'shared'
+            if service_name == "shared":
+                expected_output = os.path.join(service_dir, "dist", "build", "index.js") # Based on tsconfig outDir
+                if not os.path.exists(expected_output):
+                    print(f"{RED}❌ Build for 'shared' succeeded (Exit Code 0), but output file missing: {expected_output}{NC}")
+                    print(f"{YELLOW}   Check tsconfig.json 'outDir' and build log '{log_file}'.{NC}")
+                    return False
             print(f"{GREEN}✅ {service_name} built successfully{NC}")
             return True
     except FileNotFoundError:
-         print(f"{RED}❌ Build command failed for {service_name}. Is 'npm' or 'npx' installed and in your PATH?{NC}")
-         return False
+        print(f"{RED}❌ Build command failed for {service_name}. Is '{cmd[0]}' installed and in your PATH?{NC}")
+        return False
     except Exception as e:
         print(f"{RED}❌ Exception building {service_name}: {e}{NC}")
         return False
 
-
-def start_service(service_name: str, port: int) -> bool:
-    """Starts a frontend service using npm run dev."""
+# --- MODIFIED FUNCTION SIGNATURE ---
+def start_service(service_name: str, port: int, is_shell: bool) -> bool:
+    """Starts a frontend service using npm run dev (shell) or preview (MFEs)."""
     if port == 0: # Services like 'shared' don't need to be started
         return True
 
@@ -275,9 +264,8 @@ def start_service(service_name: str, port: int) -> bool:
 
     log_file = os.path.join(ROOT_DIR, f"{service_name}_log.txt")
 
-    # --- MODIFICATION: Always use 'dev' command ---
-    npm_command = "dev"
-    # --- End Modification ---
+    # Determine command based on whether it's the shell
+    npm_command = "dev" if is_shell else "preview" # Use 'preview' for MFEs
 
     # Construct the command to start the service
     cmd = [
@@ -291,34 +279,40 @@ def start_service(service_name: str, port: int) -> bool:
         process = subprocess.Popen(
             cmd,
             stdout=open(log_file, 'w'),
-            stderr=subprocess.STDOUT, # Redirect stderr to stdout, then to log file
+            stderr=subprocess.STDOUT,
             cwd=service_dir,
-            # Use process group separation on Unix-like systems for easier cleanup
             preexec_fn=os.setsid if sys.platform != "win32" else None,
-            shell=(sys.platform == "win32"), # Use shell=True on Windows if necessary
-            env=os.environ # Pass current environment variables
+            shell=(sys.platform == "win32"),
+            env=os.environ
         )
         running_processes[service_name] = process
-        time.sleep(3) # Give the process a moment to start or fail
+        # Give preview mode a bit more time maybe
+        time.sleep(4 if not is_shell else 3)
 
-        # Check if the process terminated quickly (indicating a startup error)
         if process.poll() is not None:
             print(f"{RED}❌ Failed to start {service_name}. Process exited immediately. Check {log_file}{NC}")
+            # Try to provide hints for common preview issues
+            if not is_shell:
+                dist_path = os.path.join(service_dir, 'dist')
+                if not os.path.exists(dist_path):
+                    print(f"{YELLOW}   Hint: 'dist' directory not found in {service_dir}. Did the build step run successfully?{NC}")
+                else:
+                    # Construct expected asset filename based on convention
+                    asset_file = os.path.join(dist_path, 'assets', f'{service_name}.js') # Adjust if filename convention differs
+                    if not os.path.exists(asset_file):
+                            print(f"{YELLOW}   Hint: Built asset ({asset_file}) not found. Check build output/config.{NC}")
             return False
         else:
             print(f"{GREEN}✅ {service_name} started (PID {process.pid}) on port {port}{NC}")
             return True
     except FileNotFoundError:
-         # This error means 'npm' command was not found
-         print(f"{RED}❌ Start command failed for {service_name}. Is 'npm' installed and in your PATH?{NC}")
-         return False
+            print(f"{RED}❌ Start command failed for {service_name}. Is 'npm' installed and in your PATH?{NC}")
+            return False
     except Exception as e:
         print(f"{RED}❌ Exception starting {service_name}: {e}{NC}")
-        # Check if the error is related to the script itself not existing
         if "Missing script" in str(e) or (hasattr(e, 'stderr') and e.stderr and "Missing script" in e.stderr):
-             print(f"{YELLOW}   Hint: Ensure '{service_name}' has a '{npm_command}' script defined in its package.json.{NC}")
+                print(f"{YELLOW}   Hint: Ensure '{service_name}' has a '{npm_command}' script defined in its package.json.{NC}")
         return False
-
 
 def cleanup(signum=None, frame=None):
     global is_shutting_down
@@ -327,22 +321,17 @@ def cleanup(signum=None, frame=None):
     is_shutting_down = True
 
     print_header("SHUTTING DOWN SERVICES")
-    # Copy the dictionary items to avoid issues while iterating and modifying
     processes_to_stop = list(running_processes.items())
-    running_processes.clear() # Clear the global dict
+    running_processes.clear()
 
     for name, process in processes_to_stop:
         print(f"Stopping {name} (PID {process.pid})...")
-        if process.poll() is None: # Check if process is still running
+        if process.poll() is None:
             try:
                 if sys.platform != "win32":
-                    # Kill the entire process group on Unix-like systems
                     os.killpg(os.getpgid(process.pid), signal.SIGTERM)
                 else:
-                    # Terminate the process on Windows
                     process.terminate()
-
-                # Wait for the process to terminate
                 process.wait(timeout=5)
                 print(f"{GREEN}✅ {name} stopped gracefully.{NC}")
             except subprocess.TimeoutExpired:
@@ -351,7 +340,6 @@ def cleanup(signum=None, frame=None):
                     if sys.platform != "win32":
                          os.killpg(os.getpgid(process.pid), signal.SIGKILL)
                     else:
-                        # Force kill on Windows
                         subprocess.run(f"taskkill /PID {process.pid} /T /F", shell=True, check=False, capture_output=True)
                     print(f"{GREEN}✅ {name} force killed.{NC}")
                 except Exception as e:
@@ -360,7 +348,6 @@ def cleanup(signum=None, frame=None):
                 print(f"{RED}❌ Error stopping {name}: {e}{NC}")
         else:
              print(f"{YELLOW}✅ {name} was already stopped.{NC}")
-
 
     print(f"{GREEN}✅ Shutdown complete.{NC}")
     sys.exit(0)
@@ -373,58 +360,48 @@ if __name__ == "__main__":
     parser.add_argument("--no-build", action="store_true", help="Skip the build step for all packages")
     args = parser.parse_args()
 
-    # Setup signal handlers for graceful shutdown
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
 
     print_header("STARTING C4H EDITOR WITH ESM MICROFRONTEND ARCHITECTURE")
 
-    # Load environment configuration from environments.json
     if not load_environment_config(args.env):
-        sys.exit(1) # Exit if config loading fails
+        sys.exit(1)
 
-    # --- Determine final service list and resolve ports ---
     final_services_config = []
     target_service_names = args.services if args.services else [cfg[0] for cfg in SERVICES_CONFIG]
 
     for service_name, default_port, needs_build in SERVICES_CONFIG:
         if service_name not in target_service_names:
-            continue # Skip services not requested by the user
+            continue
 
         resolved_port = default_port
         service_url = None
 
-        # Find the URL in the environment config
-        # Try direct match first (e.g., "shell", "yaml-editor")
+        # Find URL in environment_config, handling potential variations like 'config-selector-*'
+        # Prioritize direct key match
         if service_name in environment_config:
             service_url = environment_config[service_name].get('url')
-        else:
-            # Handle cases like "config-selector" potentially matching multiple keys
-            # Example: find "config-selector-workorder" if service_name is "config-selector"
-            # We take the first match found. This assumes all variants run on the same port.
+        # Fallback to checking prefixes only if direct match fails
+        elif service_name == 'config-selector':
+            # Look for any key starting with 'config-selector-'
             for key, value in environment_config.items():
-                if key.startswith(service_name) and isinstance(value, dict) and 'url' in value:
+                if key.startswith('config-selector-') and isinstance(value, dict) and 'url' in value:
                     service_url = value.get('url')
-                    print(f"{YELLOW}Note: Using URL from '{key}' for service '{service_name}'. Ensure this is correct.{NC}")
+                    print(f"{YELLOW}Note: Using URL from '{key}' for service '{service_name}'. Assumes all run on same port.{NC}")
                     break
+        # Add similar logic for other potential prefix groups if needed
 
-        # Try to parse the port from the URL
         if service_url:
             parsed_port = get_port_from_url(service_url)
             if parsed_port is not None:
                 resolved_port = parsed_port
-                # print(f"   Service '{service_name}' using port {resolved_port} from URL: {service_url}") # Debug
-            else:
+            elif service_name != "shared": # Don't warn for shared
                  print(f"{YELLOW}⚠️ Could not parse port from URL '{service_url}' for {service_name}. Using default: {default_port}.{NC}")
-                 resolved_port = default_port
-        elif service_name != "shared": # Don't warn for 'shared' which has no URL/port
+        elif service_name != "shared": # Don't warn for shared
             print(f"{YELLOW}⚠️ No URL found for {service_name} in {args.env} config. Using default port: {default_port}.{NC}")
-            resolved_port = default_port
-
 
         final_services_config.append((service_name, resolved_port, needs_build))
-        # --- End Port Resolution ---
-
 
     if not final_services_config:
         print(f"{RED}❌ No valid services selected or found in config.{NC}")
@@ -432,84 +409,81 @@ if __name__ == "__main__":
 
     print(f"Services to handle: {', '.join([f'{name}({port})' if port != 0 else name for name, port, _ in final_services_config])}")
 
-    # --- Check Ports ---
     print_header("CHECKING PORTS")
     ports_ok = True
+    final_ports = {} # Store the final resolved port for each service
     for service_name, port, _ in final_services_config:
-        # Pass the *resolved* port to check_port
         if not check_port(port, service_name):
             ports_ok = False
-            break # Exit loop early if a port check fails
+            break
+        final_ports[service_name] = port # Store the checked port
 
     if not ports_ok:
         print(f"{RED}❌ Port checks failed. Aborting.{NC}")
-        sys.exit(1) # Exit if any required port is unavailable
+        sys.exit(1)
 
-    # --- Build Packages ---
     if not args.no_build:
         print_header("BUILDING PACKAGES")
         build_success = True
+        # Corrected build logic iteration
         for service_name, _, needs_build in final_services_config:
-            if needs_build:
-                if not build_package(service_name):
-                    # Allow 'shared' to have build issues but fail for others
-                    if service_name != "shared":
-                        build_success = False
-                        print(f"{RED}❌ Build failed for {service_name}. Aborting.{NC}")
-                        break # Stop build process on critical failure
+             should_build_now = needs_build and service_name != 'shell'
+             if should_build_now:
+                 if not build_package(service_name):
+                     if service_name != "shared": # Allow shared build issues but fail for others
+                         build_success = False
+                         print(f"{RED}❌ Build failed for MFE {service_name}. Aborting.{NC}")
+                         break
         if not build_success:
              sys.exit(1)
+        # Build shared if any MFE was built (and shared itself wasn't the one that failed)
+        elif "shared" not in [s for s, _, _ in final_services_config if not build_success] and any(s != 'shell' for s, _, _ in final_services_config):
+             print(f"{YELLOW}Building 'shared' package as other MFEs depend on it...{NC}")
+             build_package("shared")
 
-    # --- Start Services ---
+
+    # --- Start Services (FIXED) ---
     print_header("STARTING SERVICES")
     start_success = True
-    for service_name, port, _ in final_services_config:
-        # Pass the *resolved* port to start_service
-        if port > 0: # Only start services that have a port defined
-            if not start_service(service_name, port):
+    for service_name, _, _ in final_services_config: # Iterate through the final list
+        port = final_ports.get(service_name) # Get the final port for this service
+        if port is not None and port > 0: # Only start services that have a valid port
+            is_shell_service = (service_name == "shell")
+            # --- CORRECTED CALL ---
+            if not start_service(service_name, port, is_shell_service):
+            # --- END CORRECTION ---
                 print(f"{RED}❌ Critical failure starting {service_name}. Initiating cleanup...{NC}")
                 start_success = False
                 break # Stop starting more services if one critically fails
 
     if not start_success:
-         cleanup() # Clean up any services that might have started before the failure
+         cleanup()
          sys.exit(1)
 
-    # --- Monitor Running Services ---
     if running_processes:
         print_header("SERVICES RUNNING")
         for service_name, process in running_processes.items():
-             # Find the correct port from the final config for display
-             port = next((p for s, p, _ in final_services_config if s == service_name), "N/A")
+             port = final_ports.get(service_name, "N/A") # Get resolved port for display
              print(f"  - {BLUE}{service_name}:{NC} http://localhost:{port} (PID: {process.pid})")
 
         print(f"\n{YELLOW}Press Ctrl+C to stop all services{NC}")
 
-        # Keep the main script alive while services are running
         try:
             while True:
-                # Check if any background process has terminated
                 for name, process in list(running_processes.items()):
-                    if process.poll() is not None: # If poll() returns anything other than None, process has ended
+                    if process.poll() is not None:
                         print(f"{RED}❌ Service '{name}' (PID {process.pid}) terminated unexpectedly.{NC}")
-                        # Optionally check return code: process.returncode
-                        # Remove from dictionary to stop monitoring
                         del running_processes[name]
 
-                # If all monitored processes have ended, exit the script
                 if not running_processes:
                     print(f"{YELLOW}All monitored services have stopped. Exiting.{NC}")
                     break
-
-                time.sleep(2) # Check every 2 seconds
+                time.sleep(2)
         except KeyboardInterrupt:
-            # This is caught by the signal handler, but good practice to have it
             cleanup()
         finally:
-             # Ensure cleanup runs even if the loop exits unexpectedly
              if not is_shutting_down:
                   cleanup()
-
     else:
         print(f"{YELLOW}⚠️ No services were started or remained running.{NC}")
-        sys.exit(1) # Exit if nothing was successfully started
+        sys.exit(1)

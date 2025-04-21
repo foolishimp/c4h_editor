@@ -1,12 +1,16 @@
 /**
  * /packages/yaml-editor/vite.config.ts
  * Vite configuration for yaml-editor microfrontend
- * --- UPDATED: Added missing externals ---
- * --- UPDATED: Removed server/preview port config ---
+ * --- UPDATED: Standardized externals, explicit filename, ports removed ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [
@@ -16,27 +20,33 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist',
     lib: {
-      entry: './src/main.tsx', // Entry point for yaml-editor
+      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
+      name: 'YamlEditor', // Optional UMD name
       formats: ['es'],
-      fileName: () => 'yaml-editor.js' // Output filename
+      // fileName removed here
     },
     rollupOptions: {
       external: [
         'react',
         'react-dom',
-        'react/jsx-runtime', // Added
+        'react/jsx-runtime',
         '@mui/material',
         '@mui/icons-material',
-        '@emotion/react',   // Added
-        '@emotion/styled',  // Added
-        'shared'
-        // Add 'js-yaml', '@monaco-editor/react', 'monaco-editor' if they should ALSO be externalized
-        // and provided by the shell's import map (if shared)
+        '@emotion/react',
+        '@emotion/styled',
+        'shared',
+         // Consider externalizing these if provided by shell import map
+        '@monaco-editor/react',
+        'monaco-editor',
+        'js-yaml'
       ],
       output: {
         format: 'esm',
-        entryFileNames: 'assets/yaml-editor.js', // Use specific name
+        // Force the output filename
+        entryFileNames: 'assets/yaml-editor.js',
+        // Keep chunk/asset names standard
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -48,6 +58,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/src')
     }
-    // Removed dedupe array
   }
 });

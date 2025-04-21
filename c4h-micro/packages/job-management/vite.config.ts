@@ -1,42 +1,49 @@
 /**
  * /packages/job-management/vite.config.ts
  * Vite configuration for job-management microfrontend
- * --- UPDATED: Added missing externals ---
- * --- UPDATED: Removed server/preview port config ---
+ * --- UPDATED: Standardized externals, explicit filename, ports removed ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [
     react(),
   ],
   build: {
-    // Changed target to esnext for consistency
-    target: 'esnext', // Was es2020
+    target: 'esnext', // Standardized target
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist',
     lib: {
-      entry: './src/main.tsx', // Entry point for job-management
+      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
+      name: 'JobManagement', // Optional UMD name
       formats: ['es'],
-      fileName: () => 'job-management.js' // Output filename
+      // fileName removed here
     },
     rollupOptions: {
       external: [
         'react',
         'react-dom',
-        'react/jsx-runtime', // Added
+        'react/jsx-runtime',
         '@mui/material',
         '@mui/icons-material',
-        '@emotion/react',   // Added
-        '@emotion/styled',  // Added
+        '@emotion/react',
+        '@emotion/styled',
         'shared'
-        // Add 'axios', 'date-fns', 'react-router-dom' if they should be external/shared
+        // Consider externalizing: 'axios', 'date-fns', 'react-router-dom'
       ],
       output: {
         format: 'esm',
-        entryFileNames: 'assets/job-management.js', // Use specific name
+        // Force the output filename
+        entryFileNames: 'assets/job-management.js',
+        // Keep chunk/asset names standard
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -48,6 +55,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/src')
     }
-    // Removed dedupe array
   }
 });

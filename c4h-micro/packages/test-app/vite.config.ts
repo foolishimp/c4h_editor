@@ -1,12 +1,16 @@
 /**
  * /packages/test-app/vite.config.ts
  * Vite configuration for test-app microfrontend
- * --- UPDATED: Standardized externals ---
- * --- UPDATED: Removed server/preview port config ---
+ * --- UPDATED: Standardized externals, explicit filename, ports removed ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [react()],
@@ -14,13 +18,15 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist',
     lib: {
-      entry: './src/main.tsx', // Entry point for test-app
+      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
+      name: 'TestApp', // Optional UMD name
       formats: ['es'],
-      fileName: () => 'test-app.js' // Output filename
+      // fileName removed here
     },
     rollupOptions: {
-      // Consistent list of externals (even if not all used by this specific MFE)
+      // Consistent list of potential externals
       external: [
         'react',
         'react-dom',
@@ -33,7 +39,9 @@ export default defineConfig({
       ],
       output: {
         format: 'esm',
-        entryFileNames: 'assets/test-app.js', // Use specific name
+        // Force the output filename
+        entryFileNames: 'assets/test-app.js',
+        // Keep chunk/asset names standard
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -45,6 +53,5 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/src')
     }
-    // Removed dedupe array
   }
 });
