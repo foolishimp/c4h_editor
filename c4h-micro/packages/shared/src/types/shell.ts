@@ -1,7 +1,7 @@
 /**
+ * /packages/shared/src/types/shell.ts
  * Type definitions mirroring the Preferences Shell Service API models.
  */
-import { JobConfigReference } from './job'; // Assuming this is needed if AppDefinition relates
 
 // MFE types enum for standardization
 export type MFEType = 'ESM' | 'WebComponent' | 'Iframe';

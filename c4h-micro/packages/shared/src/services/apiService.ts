@@ -1,14 +1,19 @@
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { configTypes, ConfigTypeMetadata } from '../config/configTypes';
-import { Job, JobStatus, JobListResponse, JobConfigReference, JobSubmissionRequest } from '../types/job'; // Added JobSubmissionRequest
-import { Config, ConfigHistoryResponse } from '../types/config'; // Added ConfigHistoryResponse type hint
-import { ShellPreferencesRequest } from '../types/shell'; // Added ShellPreferencesRequest
+/**
+ * /packages/shared/src/services/apiService.ts
+ * Centralized API service for making requests to backend services
+ */
+import axios, { AxiosRequestConfig } from 'axios';
+import { configTypes } from '../config/configTypes';
+import { Job, JobConfigReference } from '../types/job';
+import { Config } from '../types/config';
+import { ShellPreferencesRequest } from '../types/shell';
 
 // --- Base URL Handling ---
-// Initial base URL can be from env var or a default fallback
-const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL
-  ? process.env.VITE_API_BASE_URL
-  : 'http://localhost:8000'; // Default Job/Config Service URL if not configured
+// Initial base URL from environment or default fallback
+const API_BASE_URL = 
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) 
+  ? import.meta.env.VITE_API_BASE_URL 
+  : 'http://localhost:8000';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -30,7 +35,6 @@ export const configureApiService = (baseUrl: string | undefined) => {
 };
 
 // --- Interceptor ---
-
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -40,7 +44,6 @@ axiosInstance.interceptors.response.use(
 );
 
 // --- ApiService Class ---
-
 class ApiService {
   private async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await axiosInstance.get<T>(url, config);
@@ -63,7 +66,6 @@ class ApiService {
   }
 
   // --- Public Methods ---
-
   async getConfigs(configType: string) {
     const endpoint = configTypes[configType]?.apiEndpoints.list;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -72,11 +74,11 @@ class ApiService {
     console.log(`API: Received ${response.length} configs from server`);
     return response;
   }
-  // Specify Config return type
+
   async getConfig(configType: string, id: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.get(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
-    if (id === 'new' || id === '') { // Handle 'new' or empty string for creation
+    if (id === 'new' || id === '') {
       console.log(`API: Creating new empty config of type ${configType}`);
       return this.createEmptyConfig(configType, '');
     }
@@ -100,90 +102,76 @@ class ApiService {
       id: id,
       content: defaultContent,
       metadata: {
-        description: "", // Explicitly initialize description
-        // Ensure all ConfigMetadata fields are present
+        description: "",
         author: "Current User",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         tags: [],
         version: "1.0.0",
-        archived: false // Ensure archived exists
+        archived: false
       },
-      config_type: configType, // Ensure config_type is set
-      lineage: [] // Ensure lineage exists
+      config_type: configType,
+      lineage: []
     };
   }
   
-  // Fix: Accept commitMessage and author as separate optional args
   async createConfig(configType: string, data: Config, commitMessage?: string, author?: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.create;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Creating config of type ${configType} with ID ${data.id} at ${endpoint}`);
 
-    // Construct request body including content, metadata, and API-specific fields
     const requestData = {
-      id: data.id, // Ensure ID is in the request body for creation if needed by backend
+      id: data.id,
       content: data.content,
       metadata: data.metadata,
-      // Add commit message and author to the request payload for the backend API
       commit_message: commitMessage || `Create new ${configType} ${data.id}`,
       author: author || data.metadata?.author || "Current User"
     };
 
-    console.debug(`API: Submitting config create request:`, { // Use debug
+    console.debug(`API: Submitting config create request:`, {
       id: data.id, endpoint, description: data.metadata?.description
     });
     try {
-      // Send the combined data
       return await this.post<Config>(endpoint, requestData);
     } catch (error: any) {
       if (error.response?.status === 409) {
         console.log(`Config with ID ${data.id} already exists, updating instead`);
-        // Update requires content, metadata, commit_message, author
         return this.updateConfig(configType, data.id, data, requestData.commit_message, requestData.author);
       }
       throw error;
     }
   }
 
-  // Fix: Accept commitMessage and author as separate optional args
   async updateConfig(configType: string, id: string, data: Config, commitMessage?: string, author?: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Updating config ${id} of type ${configType} at ${endpoint}`);
 
-    // Construct request body including content, metadata, and API-specific fields
     const requestData = {
       content: data.content,
       metadata: data.metadata,
-      // Add commit message and author to the request payload for the backend API
       commit_message: commitMessage || `Update ${configType} ${id}`,
       author: author || data.metadata?.author || "Current User"
     };
 
-    console.debug(`API: Submitting config update request:`, { // Use debug
+    console.debug(`API: Submitting config update request:`, {
       id, endpoint, description: data.metadata?.description
     });
     try {
-       // Send the combined data
       return await this.put<Config>(endpoint, requestData);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        console.log(`Config ${id} not found, cannot update (implementation doesn't auto-create on PUT 404).`);
-         // Decide how to handle this - maybe throw specific error or return null
-         // For now, re-throwing seems appropriate as createConfig wasn't intended.
+        console.log(`Config ${id} not found, cannot update.`);
         throw new Error(`Configuration with ID ${id} not found for update.`);
       }
       throw error;
     }
   }
-  
 
   async deleteConfig(configType: string, id: string, commitMessage: string = "Deleted via UI", author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Deleting config ${id} of type ${configType} at ${endpoint}`);
-    // Pass parameters as body data for DELETE if required by backend, else use query params
     return this.delete<{ message: string }>(endpoint, { 
       params: { 
         commit_message: commitMessage,
@@ -196,7 +184,6 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.archive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Archiving config ${id} of type ${configType} at ${endpoint}`);
-    // Pass author as a query parameter
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
    
@@ -204,7 +191,6 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.unarchive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Unarchiving config ${id} of type ${configType} at ${endpoint}`);
-    // Pass author as a query parameter
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
   
@@ -212,22 +198,21 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.clone(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Cloning config ${id} of type ${configType} to ${newId} at ${endpoint}`);
-    // Pass new_id as a query parameter
     return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
   }
   
-  async getConfigHistory(configType: string, id: string): Promise<ConfigHistoryResponse> {
+  async getConfigHistory(configType: string, id: string): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.history(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Fetching history for config ${id} of type ${configType} at ${endpoint}`);
-    return this.get<ConfigHistoryResponse>(endpoint);
+    return this.get<any>(endpoint);
   }
 
   // Job API methods
   async getJobs() {
     console.log('API: Fetching all jobs from /api/v1/jobs');
     try {
-      const response = await this.get<JobListResponse>('/api/v1/jobs');
+      const response = await this.get<any>('/api/v1/jobs');
       console.log(`API: Received ${response.items?.length || 0} jobs`);
       return response;
     } catch (error) {
@@ -248,7 +233,6 @@ class ApiService {
     }
   }
 
-  // This specific method might become less relevant if job submission always uses submitJobConfigs
   async submitJob(params: {
     workorder: string,
     teamconfig: string,
@@ -257,8 +241,6 @@ class ApiService {
     jobConfiguration?: Record<string, any>
   }): Promise<Job> {
     console.log('API: Submitting job with configs:', params);
-    // Format the request according to the API expectations
-    // This assumes a specific backend endpoint structure, may need adjustment
     const requestData = {
       workorder: { id: params.workorder, version: "latest", config_type: "workorder" },
       team: { id: params.teamconfig, version: "latest", config_type: "teamconfig" },
@@ -270,33 +252,30 @@ class ApiService {
     return this.post<any>('/api/v1/jobs', requestData);
   }
 
-  // Use this as the primary job submission method
   async submitJobConfigs(
     configs: JobConfigReference[],
     userId?: string,
     jobConfiguration?: Record<string, any>
-  ): Promise<Job> { // Assuming the backend returns the created Job
+  ): Promise<Job> {
     console.log('API: Submitting job with configurations list:', configs);
     if (!configs || configs.length === 0) {
       throw new Error('At least one configuration must be provided');
     }
 
-    // Fill in default version if not provided
     const configurations = configs.map(config => ({
       ...config,
       version: config.version || 'latest'
     }));
 
-    // Create request data with configurations list
     const requestData = {
       configurations,
       user_id: userId || 'current-user',
       job_configuration: jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
     };
-    return this.post<any>('/api/v1/jobs/multi-config', requestData); // Use the new endpoint
+    return this.post<any>('/api/v1/jobs/multi-config', requestData);
   }
   
-  async cancelJob(id: string): Promise<Job> { // Assuming backend returns updated job
+  async cancelJob(id: string): Promise<Job> {
     console.log(`API: Cancelling job ${id}`);
     return this.post<any>(`/api/v1/jobs/${id}/cancel`, {}); 
   }
@@ -306,11 +285,8 @@ class ApiService {
     return this.get<any>(`/api/v1/jobs/${id}/history`);
   }
 
-  // --- Shell Preferences API ---
+  // Shell Preferences API
   async saveShellPreferences(preferences: ShellPreferencesRequest): Promise<{ message: string }> {
-    // Assuming the endpoint is fixed relative to the preferences service base URL
-    // Note: This uses the MAIN apiService instance, assuming Prefs service might be behind same gateway?
-    // If Prefs service has a *different* base URL always, this needs adjustment or a separate service helper.
     return this.put<{ message: string }>('/api/v1/shell/preferences', preferences);
   }
 }

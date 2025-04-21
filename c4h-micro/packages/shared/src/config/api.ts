@@ -1,11 +1,11 @@
-// File: packages/shared/src/config/api.ts
+/**
+ * /packages/shared/src/config/api.ts
+ * API endpoints and axios instance configuration
+ */
 import axios from 'axios';
 
-// Use process.env for Node.js environment compatibility
-// TypeScript doesn't recognize import.meta.env by default
-const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL 
-  ? process.env.VITE_API_BASE_URL 
-  : 'http://localhost:8000';
+// Use a simple default URL - will be properly configured by the shell
+const API_BASE_URL = 'http://localhost:8000';
 
 // Create an axios instance with the base URL
 export const api = axios.create({

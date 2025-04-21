@@ -1,4 +1,7 @@
-// /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/vite.config.ts
+/**
+ * /packages/shell/vite.config.ts
+ * Vite configuration for the shell application
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -18,7 +21,7 @@ export default defineConfig({
   },
   build: {
     target: 'esnext',
-    minify: false,
+    minify: false, // Disable minification for better debugging
     cssCodeSplit: false,
     rollupOptions: {
       output: {
@@ -38,7 +41,13 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
-    cors: true
+    cors: true,
+    headers: {
+      // Add headers to allow proper CORS for loading microfrontends
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
+    }
   },
   preview: {
     port: 3000,

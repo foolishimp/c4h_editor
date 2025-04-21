@@ -1,103 +1,72 @@
-// /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shared/src/utils/eventBus.ts
 /**
+ * /packages/shared/src/utils/eventBus.ts
  * EventBus for cross-microfrontend communication
- * Provides a type-safe pub/sub mechanism based on EventTarget
+ * Provides a centralized pub/sub mechanism using the browser's native EventTarget
  */
 
-export interface EventDetail<T = any> {
-  source: string; // Identifier of the sender (e.g., 'shell', 'config-editor')
-  payload: T;    // Data specific to the event type
-}
+import { EventDetail } from '../types/events';
 
-// Define two callback types to handle both internal and EventTarget use cases
-type DetailCallback<T = any> = (detail: EventDetail<T>) => void;
-type EventTargetCallback = (event: Event) => void;
-
-// Track wrapper functions so we can properly unsubscribe
-interface CallbackPair<T = any> {
-  detailCallback: DetailCallback<T>;
-  eventCallback: EventTargetCallback;
-}
-
+/**
+ * EventBus class that extends the browser's built-in EventTarget
+ * for standardized event handling across microfrontends
+ */
 class EventBus extends EventTarget {
-  private callbacks: Map<string, CallbackPair[]> = new Map();
-
-  constructor() {
-    super();
+  private static instance: EventBus;
+  
+  /**
+   * Get the singleton instance of EventBus
+   */
+  public static getInstance(): EventBus {
+    if (!EventBus.instance) {
+      EventBus.instance = new EventBus();
+    }
+    return EventBus.instance;
   }
-
+  
+  /**
+   * Private constructor to enforce singleton pattern
+   */
+  private constructor() {
+    super();
+    console.log('EventBus: Created new instance');
+  }
+  
+  /**
+   * Publish an event to all subscribers
+   * @param eventType Event type to publish
+   * @param detail Event details to send
+   */
+  public publish<T = any>(eventType: string, detail: EventDetail<T>): void {
+    console.log(`EventBus: Publishing ${eventType}`, detail);
+    this.dispatchEvent(new CustomEvent(eventType, { detail }));
+  }
+  
   /**
    * Subscribe to an event
-   * @param event Event type to subscribe to
+   * @param eventType Event type to subscribe to
    * @param callback Callback function to execute when event occurs
    * @returns Unsubscribe function
    */
-  subscribe<T = any>(event: string, callback: DetailCallback<T>): () => void {
-    if (!this.callbacks.has(event)) {
-      this.callbacks.set(event, []);
-    }
-
-    // Create wrapper to convert EventTarget events to strongly-typed callback
-    const wrappedCallback = (e: Event) => {
-      if (e instanceof CustomEvent) {
-        const customEvent = e as CustomEvent<EventDetail<T>>;
-        callback(customEvent.detail);
-      } else {
-        console.warn("EventBus received non-CustomEvent:", e);
+  public subscribe<T = any>(eventType: string, callback: (detail: EventDetail<T>) => void): () => void {
+    const wrappedCallback = (event: Event) => {
+      if (event instanceof CustomEvent) {
+        callback(event.detail);
       }
     };
     
-    // Store both callbacks for cleanup
-    const pair: CallbackPair<T> = {
-      detailCallback: callback,
-      eventCallback: wrappedCallback
-    };
-    this.callbacks.get(event)?.push(pair);
+    this.addEventListener(eventType, wrappedCallback);
+    console.log(`EventBus: Subscribed to ${eventType}`);
     
-    // Add event listener to EventTarget
-    this.addEventListener(event, wrappedCallback);
-
-    const subscriberCount = this.callbacks.get(event)?.length || 0;
-    console.log(`EventBus: Subscribed to '${event}', total subscribers: ${subscriberCount}`);
-
-    // Return function to unsubscribe
+    // Return unsubscribe function
     return () => {
-      const callbackArray = this.callbacks.get(event);
-      if (!callbackArray) return;
-
-      const index = callbackArray.findIndex(p => p.detailCallback === callback);
-      if (index >= 0) {
-        const [removed] = callbackArray.splice(index, 1);
-        this.removeEventListener(event, removed.eventCallback);
-      }
-
-      const remainingCount = callbackArray.length;
-      console.log(`EventBus: Unsubscribed from '${event}', remaining subscribers: ${remainingCount}`);
-
-      if (remainingCount === 0) {
-        this.callbacks.delete(event);
-      }
+      this.removeEventListener(eventType, wrappedCallback);
+      console.log(`EventBus: Unsubscribed from ${eventType}`);
     };
-  }
-
-  /**
-   * Publish an event to all subscribers
-   * @param event Event type to publish
-   * @param detail Event details to send
-   */
-  publish<T = any>(event: string, detail: EventDetail<T>): void {
-    console.log(`EventBus: Publishing event '${event}'`, detail);
-    
-    // Create and dispatch a CustomEvent
-    this.dispatchEvent(new CustomEvent(event, { detail }));
   }
 }
 
-// Create singleton instance
-const eventBus = new EventBus();
+// Export singleton instance
+export const eventBus = EventBus.getInstance();
 
-// Export the event bus singleton
-export { eventBus };
-
-// Export as default for backward compatibility 
+// Also export as default for backward compatibility
 export default eventBus;
