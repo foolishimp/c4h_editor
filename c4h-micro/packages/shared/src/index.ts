@@ -1,4 +1,3 @@
-// File: packages/shared/src/index.ts
 /**
  * Main entry point for shared package
  * Exports all shared types, utilities, components and services
@@ -9,9 +8,9 @@
 export type * from './types/workorder';
 export type * from './types/job';
 export type * from './types/config';
-export type * from './types/shell';       // Exports AppDefinition, FrameDefinition, AppAssignment etc.
-export type * from './types/iframe';      // Exports IframeMessage (ensure defined in ./types/iframe.ts)
-export type * from './types/events';      // Exports EventDetail (ensure defined in ./types/events.ts)
+export * from './types/shell';           // Export both types and values directly
+export * from './types/iframe';          // Export IframeMessage directly
+export * from './types/events';          // Export EventDetail directly
 
 // Use regular 'export' for modules that export runtime values (or mixed)
 export * from './config/configTypes';

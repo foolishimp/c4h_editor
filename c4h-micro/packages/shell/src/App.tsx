@@ -1,4 +1,3 @@
-// File: packages/shell/src/App.tsx
 import React, { useEffect, useState, useCallback, useRef, useContext } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
@@ -167,7 +166,7 @@ function AppContent() {
     // Set up iframe message bridge - handles messages FROM iframes TO the eventBus
     useEffect(() => {
         // Check currentApp.type HERE
-        if (!currentApp || currentApp.type !== 'Iframe' || !currentApp.url) {
+        if (!currentApp || (currentApp as any).type !== 'Iframe' || !currentApp.url) {
             return;
         }
 
@@ -197,7 +196,7 @@ function AppContent() {
                 payload: iframeMessage.payload
             };
             // Use dispatchEvent
-            eventBusInstance.dispatchEvent(new CustomEvent(iframeMessage.type, {
+            (eventBusInstance as unknown as EventTarget).dispatchEvent(new CustomEvent(iframeMessage.type, {
                 detail: detailPayload
             }));
         };
@@ -212,7 +211,7 @@ function AppContent() {
     // Set up event bus subscriber to relay messages TO the active iframe
     useEffect(() => {
         // Check currentApp.type HERE
-        if (!currentApp || currentApp.type !== 'Iframe' || !currentApp.url) {
+        if (!currentApp || (currentApp as any).type !== 'Iframe' || !currentApp.url) {
             return;
         }
 
@@ -257,7 +256,7 @@ function AppContent() {
         eventTypesToForward.forEach(eventType => {
             const handler = handleEventToForward as EventListener;
             // Use addEventListener with type assertion (TS2352 workaround)
-            (eventBusInstance as EventTarget).addEventListener(eventType, handler);
+            (eventBusInstance as unknown as EventTarget).addEventListener(eventType, handler);
             listeners.push({ type: eventType, handler });
         });
 
@@ -265,10 +264,10 @@ function AppContent() {
         return () => {
             listeners.forEach(({ type, handler }) => {
                 // Use removeEventListener with type assertion (TS2352 workaround)
-                (eventBusInstance as EventTarget).removeEventListener(type, handler);
+                (eventBusInstance as unknown as EventTarget).removeEventListener(type, handler);
             });
         };
-    }, [currentApp, eventBusInstance]);
+    }, [currentApp, eventBusInstance]); // Add currentApp to dependencies
 
 
     const handleTabChange = (_event: React.SyntheticEvent, newFrameId: string) => {
@@ -298,7 +297,7 @@ function AppContent() {
 
         // --- Render based on type ---
         // Check currentApp.type HERE
-        if (currentApp.type === 'Iframe') {
+        if ((currentApp as any).type === 'Iframe') {
              return (
                  <ErrorBoundary message={`Error loading iframe application: ${currentApp.name}`}>
                      <iframe
@@ -311,7 +310,7 @@ function AppContent() {
                      />
                  </ErrorBoundary>
              );
-         } else if (currentApp.type === 'ESM') {
+         } else if ((currentApp as any).type === 'ESM') {
              // --- ESM Module Loader Component ---
              const EsmModuleLoader = ({ appDefinition, frameId }: { appDefinition: AppDefinition, frameId: string }) => {
                   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -352,11 +351,13 @@ function AppContent() {
                                           root = ReactDOM.createRoot(currentContainer);
                                           root.render(<MfeComponent {...customProps} />);
                                           unmountModule = () => {
-                                               root?.unmount();
-                                               console.log(`Unmounted React MFE: ${appDefinition.id}`);
+                                              if (root) {
+                                                  root.unmount();
+                                                  console.log(`Unmounted MFE: ${appDefinition.id}`);
+                                              }
                                           };
-                                     }
-                                } else { console.error(`Module loaded but doesn't export expected interface:`, module); }
+                                     } 
+                                } else { console.error("Module loaded but doesn't export expected interface:", module); }
                             } catch (err) {
                                  if (!cancelled) {
                                      console.error(`Error loading microfrontend '${appDefinition.id}' from URL '${appDefinition.url}':`, err);
@@ -391,8 +392,8 @@ function AppContent() {
              );
          } else {
              // Handle unknown type
-             // Check currentApp.type HERE
-             return <Typography sx={{ p: 3 }}>Unsupported application type: '{currentApp.type}'</Typography>;
+             // Check (currentApp as any).type HERE
+             return <Typography sx={{ p: 3 }}>Unsupported application type: '{(currentApp as any).type}'</Typography>;
          }
     };
     // --- End Helper Function ---

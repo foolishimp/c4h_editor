@@ -9,12 +9,11 @@ export interface EventDetail {
 
 type EventCallback = (event: CustomEvent<EventDetail>) => void;
 
-class EventBus {
+class EventBus extends EventTarget {
   private events: Record<string, EventCallback[]> = {};
-  private target: EventTarget;
 
   constructor() {
-    this.target = new EventTarget();
+    super();
   }
 
   subscribe(event: string, callback: EventCallback): () => void {
@@ -29,13 +28,13 @@ class EventBus {
     
     // Store both the original and wrapped callback for cleanup
     this.events[event].push(callback);
-    this.target.addEventListener(event, wrappedCallback);
-    
+    this.addEventListener(event, wrappedCallback);
+
     console.log(`EventBus: Subscribed to '${event}', total subscribers: ${this.events[event].length}`);
 
     // Return unsubscribe function
     return () => {
-      this.target.removeEventListener(event, wrappedCallback);
+      this.removeEventListener(event, wrappedCallback);
       this.events[event] = this.events[event].filter(cb => cb !== callback); 
       console.log(`EventBus: Unsubscribed from '${event}', remaining subscribers: ${this.events[event].length}`);
     };
@@ -45,8 +44,7 @@ class EventBus {
     console.log(`EventBus: Publishing event '${event}'`, detail);
     
     // Create and dispatch a CustomEvent
-    const customEvent = new CustomEvent(event, { detail });
-    this.target.dispatchEvent(customEvent);
+    this.dispatchEvent(new CustomEvent(event, { detail }));
   }
 }
 

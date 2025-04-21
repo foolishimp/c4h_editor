@@ -17,6 +17,11 @@ export interface Frame {
   assignedApps: AppAssignment[]; // Apps assigned to this Frame.
 }
 
+// Export Frame as FrameDefinition for backward compatibility
+export interface FrameDefinition extends Frame {
+  // Same as Frame but with alias for backward compatibility
+}
+
 // --- Models for Available Apps and Service Endpoints ---
 
 export interface AppDefinition {
@@ -28,6 +33,12 @@ export interface AppDefinition {
   type: 'ESM' | 'Iframe' | 'WebComponent'; // Type of microfrontend
 }
 
+// Preferences represents user-specific shell configuration
+export interface Preferences {
+  frames: Frame[];
+  // Add other user preference fields if needed
+}
+
 export interface ServiceEndpoints {
   jobConfigServiceUrl?: string; // Base URL for the Job/Config Service API.
   // Add other service endpoints here as needed
@@ -36,7 +47,9 @@ export interface ServiceEndpoints {
 // --- API Response/Request Models ---
 
 export interface ShellConfigurationResponse {
-  frames: Frame[];
+  preferences: Preferences;
+  frames: Frame[]; 
+  mainBackendUrl?: string;
   availableApps: AppDefinition[];
   serviceEndpoints: ServiceEndpoints;
 }

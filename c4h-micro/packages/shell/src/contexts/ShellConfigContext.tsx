@@ -1,7 +1,7 @@
 // File: packages/shell/src/contexts/ShellConfigContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
-import { AppDefinition, FrameDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Assuming Preferences is defined in shared/types/shell or similar
+import { AppDefinition, FrameDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Using correct imports
 import { configureApiService } from 'shared'; // Import configuration function
 
 // Define the shape of the context state
@@ -48,13 +48,13 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
 
             console.log("Shell configuration received:", data);
 
-            // Set state based on fetched data
-            setConfig(data.preferences);
+            // Set state based on fetched data (fall back to frames if preferences missing)
+            setConfig(data.preferences || { frames: data.frames || [] });
             setAvailableApps(data.availableApps); // Store available apps
 
             // Configure the shared apiService with the main backend URL
-            if (data.mainBackendUrl) {
-                configureApiService(data.mainBackendUrl);
+            if (data.mainBackendUrl || data.serviceEndpoints?.jobConfigServiceUrl) {
+                configureApiService(data.mainBackendUrl || data.serviceEndpoints?.jobConfigServiceUrl);
                 console.log(`Shared apiService configured with base URL: ${data.mainBackendUrl}`);
             } else {
                 console.warn("Main backend URL not provided in shell configuration.");
