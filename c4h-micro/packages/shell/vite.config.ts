@@ -1,5 +1,3 @@
-/// <reference path="../shared/src/types/federation.d.ts" />
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -33,8 +31,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // Point to shared package's built output directory
-      'shared': path.resolve(__dirname, '../shared/dist')
+      'shared': path.resolve(__dirname, '../shared/src')
     }
   },
   server: {

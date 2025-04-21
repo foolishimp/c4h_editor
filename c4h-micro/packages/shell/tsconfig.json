@@ -23,16 +23,12 @@
     "noFallthroughCasesInSwitch": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    }
+    "baseUrl": "."
   },
   "include": [
     "src",
-    "../../global.d.ts"
+    "../../global.d.ts",
+    "../shared/src/types/*.d.ts"
   ],
   "references": [
     {

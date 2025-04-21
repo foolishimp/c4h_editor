@@ -19,10 +19,7 @@ export default defineConfig({
       external: [
         'react',
         'react-dom',
-        'react-dom/client',
-        'single-spa',
-        'single-spa-react',
-        '@mui/material',
+        '@mui/material', 
         '@mui/icons-material',
         'shared'
       ],
@@ -46,8 +43,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      shared: path.resolve(__dirname, '../shared/dist')
+      '@': path.resolve(__dirname, './src'), 
+      shared: path.resolve(__dirname, '../shared/dist/build')
     }
   }
 });

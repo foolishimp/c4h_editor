@@ -10,7 +10,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "declaration": true,
-    "outDir": "./dist",
+    "outDir": "./dist/build",
     "jsx": "react-jsx",
     "strict": true,
     "noImplicitAny": true,

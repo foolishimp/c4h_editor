@@ -3,6 +3,9 @@
  */
 import { JobConfigReference } from './job'; // Assuming this is needed if AppDefinition relates
 
+// MFE types enum for standardization
+export type MFEType = 'ESM' | 'WebComponent' | 'Iframe';
+
 // --- Models for UI Configuration ---
 
 export interface AppAssignment {
@@ -25,12 +28,13 @@ export interface FrameDefinition extends Frame {
 // --- Models for Available Apps and Service Endpoints ---
 
 export interface AppDefinition {
-  id: string; // Unique identifier for the App (e.g., 'config-selector').
-  name: string; // Display name of the App (e.g., 'Configuration Manager').
-  scope: string; // Module Federation scope (e.g., 'configSelector').
-  module: string; // Module Federation module name (e.g., './ConfigManager').
-  url?: string; // Optional URL for the remoteEntry.js if not standard.
-  type: 'ESM' | 'Iframe' | 'WebComponent'; // Type of microfrontend
+  id: string;       // Unique identifier for the App (e.g., 'config-selector').
+  name: string;     // Display name of the App (e.g., 'Configuration Manager').
+  type: MFEType;    // Type of microfrontend
+  url: string;      // URL to load the microfrontend from
+  // Legacy fields - kept for backward compatibility but optional
+  scope?: string;   // Module Federation scope (legacy)
+  module?: string;  // Module Federation module name (legacy)
 }
 
 // Preferences represents user-specific shell configuration

@@ -1,5 +1,3 @@
-// Removed federation reference path
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -18,7 +16,7 @@ export default defineConfig({
       fileName: (format) => 'job-management.js'
     },
     rollupOptions: {
-      external: ['react', 'react-dom', 'single-spa', 'single-spa-react', '@mui/material', '@mui/icons-material', 'shared'],
+      external: ['react', 'react-dom', '@mui/material', '@mui/icons-material', 'shared'],
       output: {
         format: 'esm',
         entryFileNames: 'assets/[name].js',
@@ -40,7 +38,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      'shared': path.resolve(__dirname, '../shared/dist/build')
     }
   }
 });

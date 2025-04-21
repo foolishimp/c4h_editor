@@ -1,4 +1,4 @@
-import { ShellConfigurationResponse } from 'shared';
+import { ShellConfigurationResponse } from '../types/shell';
 
 export const defaultShellConfiguration: ShellConfigurationResponse = {
   preferences: {
@@ -24,10 +24,8 @@ export const defaultShellConfiguration: ShellConfigurationResponse = {
     {
       id: 'test-app',
       name: 'Test App', 
-      scope: 'testApp',
-      module: './TestApp',
-      url: 'http://localhost:3005/assets/test-app.js',
-      type: 'ESM'
+      type: 'ESM',
+      url: 'http://localhost:3005/assets/test-app.js'
     }
   ],
   serviceEndpoints: {

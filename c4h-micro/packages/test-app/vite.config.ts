@@ -17,10 +17,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         'react',
-        'react-dom',
-        'react-dom/client',
-        'single-spa',
-        'single-spa-react',
+        'react-dom', 
         'shared'
       ],
       output: {

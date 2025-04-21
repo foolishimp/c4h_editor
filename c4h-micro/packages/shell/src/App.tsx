@@ -1,3 +1,4 @@
+// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/App.tsx
 import React, { useEffect, useState, useCallback, useRef, useContext } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
@@ -15,19 +16,17 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import SettingsIcon from '@mui/icons-material/Settings';
 import {
     eventBus,
-    // Use 'import type' for type-only imports
     type AppDefinition,
-    type FrameDefinition, // Assuming FrameDefinition is defined and exported from shared/types/shell
-    type IframeMessage,
-    type EventDetail
+    type FrameDefinition,
+    type IframeMessage, 
+    type EventDetail,
+    type MFEType
 } from 'shared';
-// Import the exported state type
 import { useShellConfig, ShellConfigProvider, type ShellConfigContextState } from './contexts/ShellConfigContext';
 import TabBar from './components/layout/TabBar';
 import PreferencesDialog from './components/preferences/PreferencesDialog';
 
-
-// --- Theme definition ---
+// Theme definition
 const theme = createTheme({
     palette: {
         primary: { main: '#1976d2' },
@@ -42,7 +41,18 @@ const theme = createTheme({
     },
 });
 
-// --- Error Boundary ---
+// Helper function to load a module via ESM dynamic import
+const loadModule = async (url: string): Promise<any> => {
+  try {
+    const module = await import(/* @vite-ignore */ url);
+    return module.default || module;
+  } catch (err) {
+    console.error(`Error loading module from ${url}:`, err);
+    throw err;
+  }
+};
+
+// Error Boundary
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, message?: string }, { hasError: boolean, error: Error | null }> {
    constructor(props: { children: React.ReactNode, message?: string }) {
      super(props);
@@ -76,7 +86,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode, message
 interface EventBusContextValue {
     eventBus: typeof eventBus;
 }
-// Set default value matching the interface or undefined
 const EventBusContext = React.createContext<EventBusContextValue | undefined>(undefined);
 
 // Hook to access the event bus
@@ -88,19 +97,14 @@ export const useEventBus = () => {
     return context.eventBus;
 };
 
-// --- AppContent Component ---
+// AppContent Component
 function AppContent() {
-    // Destructure availableApps from config
-    const { config, loading, error }: ShellConfigContextState = useShellConfig();
-    const availableApps = config?.availableApps; // Get availableApps from config object
-
+    const { config, loading, error, availableApps } = useShellConfig();
     const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
-    // Explicitly type the state here
     const [currentApp, setCurrentApp] = useState<AppDefinition | null>(null);
     const [isPrefsDialogOpen, setIsPrefsDialogOpen] = useState<boolean>(false);
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const eventBusInstance = useEventBus();
-
     const loadedModulesRef = useRef<Record<string, any>>({});
 
     const handleOpenPrefsDialog = useCallback(() => {
@@ -112,30 +116,25 @@ function AppContent() {
     }, []);
 
     // Effect to determine the current application based on activeFrameId
-     useEffect(() => {
-         // Use availableApps derived from config
-         if (activeFrameId && config?.frames && availableApps) {
-             // Add explicit type ': FrameDefinition' to 'f' parameter
-             const activeFrame = config.frames.find((f: FrameDefinition) => f.id === activeFrameId);
-             if (activeFrame?.assignedApps?.length) {
-                 const assignment = activeFrame.assignedApps[0];
-                 // Add explicit type ': AppDefinition' to 'app' parameter
-                 const appDef = availableApps.find((app: AppDefinition) => app.id === assignment.appId);
-                 setCurrentApp(appDef || null);
-             } else {
-                 setCurrentApp(null);
-             }
-         } else {
-             setCurrentApp(null);
-         }
-     }, [activeFrameId, config, availableApps]); // Add availableApps dependency
+    useEffect(() => {
+        if (activeFrameId && config?.frames && availableApps) {
+            const activeFrame = config.frames.find((f: FrameDefinition) => f.id === activeFrameId);
+            if (activeFrame?.assignedApps?.length) {
+                const assignment = activeFrame.assignedApps[0];
+                const appDef = availableApps.find((app: AppDefinition) => app.id === assignment.appId);
+                setCurrentApp(appDef || null);
+            } else {
+                setCurrentApp(null);
+            }
+        } else {
+            setCurrentApp(null);
+        }
+    }, [activeFrameId, config, availableApps]);
 
-
-    // useEffect Hook for activeFrameId initialization and validation
+    // Initialize activeFrameId
     useEffect(() => {
         if (!loading && !error && config?.frames) {
             const sortedFrames = [...config.frames].sort((a, b) => a.order - b.order);
-            // Add explicit type ': FrameDefinition' to 'f' parameter
             const currentFrameExists = activeFrameId ? sortedFrames.some((f: FrameDefinition) => f.id === activeFrameId) : false;
 
             if (sortedFrames.length === 0) {
@@ -145,28 +144,25 @@ function AppContent() {
                 setActiveFrameId(sortedFrames[0].id);
             }
         } else if (!loading && !error && (!config?.frames || config.frames.length === 0)) {
-             if (activeFrameId !== null) setActiveFrameId(null);
+            if (activeFrameId !== null) setActiveFrameId(null);
         }
     }, [config, loading, error, activeFrameId]);
-
 
     // Clean up ESM modules effect
     useEffect(() => {
         return () => {
-             const previousModule = activeFrameId ? loadedModulesRef.current[activeFrameId] : null;
-             if (previousModule && typeof previousModule.cleanup === 'function') {
-                 console.log(`Calling cleanup for module in frame: ${activeFrameId}`);
-                 previousModule.cleanup();
-                 if(activeFrameId) delete loadedModulesRef.current[activeFrameId];
-             }
+            const previousModule = activeFrameId ? loadedModulesRef.current[activeFrameId] : null;
+            if (previousModule && typeof previousModule.cleanup === 'function') {
+                console.log(`Calling cleanup for module in frame: ${activeFrameId}`);
+                previousModule.cleanup();
+                if(activeFrameId) delete loadedModulesRef.current[activeFrameId];
+            }
         };
     }, [activeFrameId]);
 
-
     // Set up iframe message bridge - handles messages FROM iframes TO the eventBus
     useEffect(() => {
-        // Check currentApp.type HERE
-        if (!currentApp || (currentApp as any).type !== 'Iframe' || !currentApp.url) {
+        if (!currentApp || currentApp.type !== 'Iframe' || !currentApp.url) {
             return;
         }
 
@@ -192,11 +188,11 @@ function AppContent() {
             console.log(`Shell: Bridge received message from iframe (${iframeMessage.source}):`, iframeMessage.type);
 
             const detailPayload: EventDetail = {
-                source: `iframe:${iframeMessage.source}`,
+                source: `iframe:${iframeMessage.source}`, 
                 payload: iframeMessage.payload
             };
-            // Use dispatchEvent
-            (eventBusInstance as unknown as EventTarget).dispatchEvent(new CustomEvent(iframeMessage.type, {
+            
+            eventBusInstance.dispatchEvent(new CustomEvent(iframeMessage.type, {
                 detail: detailPayload
             }));
         };
@@ -207,28 +203,26 @@ function AppContent() {
         };
     }, [currentApp, eventBusInstance]);
 
-
     // Set up event bus subscriber to relay messages TO the active iframe
     useEffect(() => {
-        // Check currentApp.type HERE
-        if (!currentApp || (currentApp as any).type !== 'Iframe' || !currentApp.url) {
+        if (!currentApp || currentApp.type !== 'Iframe' || !currentApp.url) {
             return;
         }
 
         let targetOrigin: string;
-         try {
+        try {
             targetOrigin = new URL(currentApp.url).origin;
-         } catch (e) {
-             console.error(`Invalid URL for iframe target origin derivation: ${currentApp.url}`);
-             return;
-         }
+        } catch (e) {
+            console.error(`Invalid URL for iframe target origin derivation: ${currentApp.url}`);
+            return;
+        }
 
         const handleEventToForward = (event: Event) => {
-             if (!(event instanceof CustomEvent) || !event.detail || typeof event.detail.source !== 'string' || !Object.prototype.hasOwnProperty.call(event.detail, 'payload')) {
-                 console.warn("Shell: Received internal event with invalid detail structure, cannot forward:", event);
-                 return;
-             }
-             const detail: EventDetail = event.detail;
+            if (!(event instanceof CustomEvent) || !event.detail || typeof event.detail.source !== 'string' || !Object.prototype.hasOwnProperty.call(event.detail, 'payload')) {
+                console.warn("Shell: Received internal event with invalid detail structure, cannot forward:", event);
+                return;
+            }
+            const detail: EventDetail = event.detail;
 
             const iframe = iframeRef.current;
             if (!iframe || !iframe.contentWindow) {
@@ -249,128 +243,129 @@ function AppContent() {
             }
         };
 
-        // --- Subscription Logic ---
-        const eventTypesToForward = ['chat:sendMessage', 'chat:provideContext']; // Example types
+        const eventTypesToForward = ['chat:sendMessage', 'chat:provideContext']; 
         const listeners: { type: string; handler: EventListener }[] = [];
 
-        eventTypesToForward.forEach(eventType => {
+        eventTypesToForward.forEach((eventType) => {
             const handler = handleEventToForward as EventListener;
-            // Use addEventListener with type assertion (TS2352 workaround)
-            (eventBusInstance as unknown as EventTarget).addEventListener(eventType, handler);
+            eventBusInstance.addEventListener(eventType, handler);
             listeners.push({ type: eventType, handler });
         });
 
-        // Cleanup all subscriptions
         return () => {
             listeners.forEach(({ type, handler }) => {
-                // Use removeEventListener with type assertion (TS2352 workaround)
-                (eventBusInstance as unknown as EventTarget).removeEventListener(type, handler);
+                eventBusInstance.removeEventListener(type, handler);
             });
         };
-    }, [currentApp, eventBusInstance]); // Add currentApp to dependencies
-
+    }, [currentApp, eventBusInstance]);
 
     const handleTabChange = (_event: React.SyntheticEvent, newFrameId: string) => {
         setActiveFrameId(newFrameId);
     };
 
-    // --- Helper function to render the content for the active frame ---
+    // Helper function to render the content for the active frame
     const renderActiveFrameContent = () => {
         if (loading) {
-             return <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
+            return <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
         }
+        
         if (error) {
-              return <Box sx={{ flexGrow: 1, p: 3 }}><Typography color="error">Error loading config: {error}</Typography></Box>;
+            return <Box sx={{ flexGrow: 1, p: 3 }}><Typography color="error">Error loading config: {error}</Typography></Box>;
         }
+        
         if (!config || !config.frames || config.frames.length === 0) {
             return <Typography sx={{ p: 3, fontStyle: 'italic' }}>No frames configured.</Typography>;
         }
+        
         if (!activeFrameId) {
             return <Typography sx={{ p: 3, fontStyle: 'italic' }}>Select a frame.</Typography>;
         }
+        
         if (!currentApp) {
-             // Add explicit type ': FrameDefinition' to 'f' parameter
-             const activeFrame = config.frames.find((f: FrameDefinition) => f.id === activeFrameId);
-             const reason = !activeFrame ? 'Frame not found' : 'No app assigned or app definition missing';
-             return <Typography sx={{ p: 3 }}>{reason} for this frame.</Typography>;
+            const activeFrame = config.frames.find((f: FrameDefinition) => f.id === activeFrameId);
+            return <Typography sx={{ p: 3 }}>
+                {!activeFrame ? 'Frame not found' : 'No app assigned or app definition missing'} for this frame.
+            </Typography>;
         }
 
-        // --- Render based on type ---
-        // Check currentApp.type HERE
-        if ((currentApp as any).type === 'Iframe') {
-             return (
-                 <ErrorBoundary message={`Error loading iframe application: ${currentApp.name}`}>
-                     <iframe
-                         ref={iframeRef}
-                         id={`iframe-${activeFrameId}-${currentApp.id}`}
-                         src={currentApp.url}
-                         style={{ width: '100%', height: '100%', border: 'none' }}
-                         sandbox="allow-scripts allow-same-origin allow-forms"
-                         title={currentApp.name}
-                     />
-                 </ErrorBoundary>
-             );
-         } else if ((currentApp as any).type === 'ESM') {
-             // --- ESM Module Loader Component ---
-             const EsmModuleLoader = ({ appDefinition, frameId }: { appDefinition: AppDefinition, frameId: string }) => {
-                  const containerRef = useRef<HTMLDivElement | null>(null);
-                  const isMountedRef = useRef(false);
+        // Render based on MFE type
+        switch (currentApp.type) {
+            case 'Iframe':
+                return (
+                    <ErrorBoundary message={`Error loading iframe application: ${currentApp.name}`}>
+                        <iframe
+                            ref={iframeRef}
+                            id={`iframe-${activeFrameId}-${currentApp.id}`}
+                            src={currentApp.url}
+                            style={{ width: '100%', height: '100%', border: 'none' }}
+                            sandbox="allow-scripts allow-same-origin allow-forms"
+                            title={currentApp.name}
+                        />
+                    </ErrorBoundary>
+                );
+                
+            case 'ESM':
+                // ESM Module Loader Component
+                const EsmModuleLoader = ({ appDefinition, frameId }: { appDefinition: AppDefinition, frameId: string }) => {
+                    const containerRef = useRef<HTMLDivElement | null>(null);
+                    const isMountedRef = useRef(false);
 
-                  useEffect(() => {
-                      let root: ReactDOM.Root | null = null;
-                      let unmountModule: (() => void) | null = null;
-                      let cancelled = false;
+                    useEffect(() => {
+                        let root: ReactDOM.Root | null = null;
+                        let unmountModule: (() => void) | null = null;
+                        let cancelled = false;
 
-                      const loadAndMount = async () => {
+                        const loadAndMount = async () => {
                             if (!containerRef.current || isMountedRef.current || !appDefinition.url || cancelled) return;
                             isMountedRef.current = true;
                             const currentContainer = containerRef.current;
                             currentContainer.innerHTML = '';
 
                             try {
-                                console.log(`Dynamically importing module from URL: ${appDefinition.url}`);
-                                const module = await import(/* @vite-ignore */ appDefinition.url);
+                                // Use helper function to load the module
+                                const module = await loadModule(appDefinition.url);
                                 if (cancelled) return;
                                 console.log(`Module successfully loaded:`, module);
                                 loadedModulesRef.current[frameId] = module;
 
                                 let customProps: any = { eventBus: eventBusInstance };
-                                 // Check appDefinition.type HERE before specific logic
-                                 if (appDefinition.id.startsWith('config-selector-')) {
+                                if (appDefinition.id.startsWith('config-selector-')) {
                                     const configType = appDefinition.id.replace('config-selector-', '');
                                     customProps = {
-                                         ...customProps, configType,
-                                         onNavigateBack: () => { if(!cancelled) console.log(`Shell: MFE (${appDefinition.id}) nav back`); },
-                                         onNavigateTo: (id: string) => { if(!cancelled) console.log(`Shell: MFE (${appDefinition.id}) nav to ${id}`); }
+                                        ...customProps, configType,
+                                        onNavigateBack: () => { if(!cancelled) console.log(`Shell: MFE (${appDefinition.id}) nav back`); },
+                                        onNavigateTo: (id: string) => { if(!cancelled) console.log(`Shell: MFE (${appDefinition.id}) nav to ${id}`); }
                                     };
-                                 }
+                                }
 
                                 if (module.default && typeof module.default === 'function') {
-                                     const MfeComponent = module.default;
-                                     if(currentContainer && !cancelled){
-                                          root = ReactDOM.createRoot(currentContainer);
-                                          root.render(<MfeComponent {...customProps} />);
-                                          unmountModule = () => {
-                                              if (root) {
-                                                  root.unmount();
-                                                  console.log(`Unmounted MFE: ${appDefinition.id}`);
-                                              }
-                                          };
-                                     } 
-                                } else { console.error("Module loaded but doesn't export expected interface:", module); }
+                                    const MfeComponent = module.default;
+                                    if(currentContainer && !cancelled){
+                                        root = ReactDOM.createRoot(currentContainer);
+                                        root.render(<MfeComponent {...customProps} />);
+                                        unmountModule = () => {
+                                            if (root) {
+                                                root.unmount();
+                                                console.log(`Unmounted MFE: ${appDefinition.id}`);
+                                            }
+                                        };
+                                    } 
+                                } else { 
+                                    console.error("Module loaded but doesn't export expected interface:", module); 
+                                }
                             } catch (err) {
-                                 if (!cancelled) {
-                                     console.error(`Error loading microfrontend '${appDefinition.id}' from URL '${appDefinition.url}':`, err);
-                                     if (currentContainer) {
-                                         currentContainer.innerHTML = `<p style="color: red;">Failed to load ${appDefinition.name}.</p>`;
-                                     }
-                                 }
-                             }
-                      };
+                                if (!cancelled) {
+                                    console.error(`Error loading microfrontend '${appDefinition.id}' from URL '${appDefinition.url}':`, err);
+                                    if (currentContainer) {
+                                        currentContainer.innerHTML = `<p style="color: red;">Failed to load ${appDefinition.name}.</p>`;
+                                    }
+                                }
+                            }
+                        };
 
-                      loadAndMount();
+                        loadAndMount();
 
-                      return () => {
+                        return () => {
                             cancelled = true;
                             unmountModule?.();
                             const previousModule = loadedModulesRef.current[frameId];
@@ -379,108 +374,110 @@ function AppContent() {
                             }
                             delete loadedModulesRef.current[frameId];
                             isMountedRef.current = false;
-                      };
-                   }, [appDefinition, frameId, eventBusInstance]);
+                        };
+                    }, [appDefinition, frameId, eventBusInstance]);
 
-                  return <div ref={containerRef} id={`esm-module-${frameId}-${appDefinition.id}`} style={{ height: '100%', width: '100%' }} />;
-             };
+                    return <div ref={containerRef} id={`esm-module-${frameId}-${appDefinition.id}`} style={{ height: '100%', width: '100%' }} />;
+                };
 
-             return (
-                 <ErrorBoundary message={`Error loading application: ${currentApp.name}`}>
-                    <EsmModuleLoader appDefinition={currentApp} frameId={activeFrameId} />
-                 </ErrorBoundary>
-             );
-         } else {
-             // Handle unknown type
-             // Check (currentApp as any).type HERE
-             return <Typography sx={{ p: 3 }}>Unsupported application type: '{(currentApp as any).type}'</Typography>;
-         }
+                return (
+                    <ErrorBoundary message={`Error loading application: ${currentApp.name}`}>
+                        <EsmModuleLoader appDefinition={currentApp} frameId={activeFrameId} />
+                    </ErrorBoundary>
+                );
+                
+            case 'WebComponent':
+                return <Typography sx={{ p: 3 }}>Web Component support coming soon.</Typography>;
+                
+            default:
+                return <Typography sx={{ p: 3 }}>Unsupported application type: '{currentApp.type}'</Typography>;
+        }
     };
-    // --- End Helper Function ---
 
     const verticalTabBarWidth = 200;
 
     return (
         <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-            {/* App Bar, Tab Bar, Main Content Area structure remains the same */}
-             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-                 <Toolbar>
-                       <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline' }}>
-                         <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>
-                             Visual Prompt Studio
-                         </Typography>
-                          <Typography variant="subtitle1" noWrap component="div" sx={{ opacity: 0.8 }}>
-                             C4H Editor
-                         </Typography>
-                     </Box>
-                      <IconButton
-                         color="inherit"
-                         aria-label="open preferences"
-                         onClick={handleOpenPrefsDialog}
-                          edge="end"
-                     >
-                         <SettingsIcon />
-                     </IconButton>
-                 </Toolbar>
-              </AppBar>
+            {/* App Bar */}
+            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+                <Toolbar>
+                    <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline' }}>
+                        <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>
+                            Visual Prompt Studio
+                        </Typography>
+                        <Typography variant="subtitle1" noWrap component="div" sx={{ opacity: 0.8 }}>
+                            C4H Editor
+                        </Typography>
+                    </Box>
+                    <IconButton
+                        color="inherit"
+                        aria-label="open preferences"
+                        onClick={handleOpenPrefsDialog}
+                        edge="end"
+                    >
+                        <SettingsIcon />
+                    </IconButton>
+                </Toolbar>
+            </AppBar>
 
-             <Box sx={{
-                 width: verticalTabBarWidth,
-                 flexShrink: 0,
-                 pt: (theme) => `${theme.mixins.toolbar.minHeight || 64}px`,
-                 height: '100vh',
-                 boxSizing: 'border-box',
-                 borderRight: 1,
-                 borderColor: 'divider',
-                 bgcolor: 'background.paper'
-              }}>
-                 {!loading && !error && config?.frames && config.frames.length > 0 ? (
-                      <TabBar
-                          frames={config.frames}
-                          activeFrameId={activeFrameId}
-                          onTabChange={handleTabChange}
-                          width={verticalTabBarWidth}
-                      />
-                 ) : (
-                      <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} >
-                          {loading && <CircularProgress sx={{m: 2}} size={20}/>}
-                          {!loading && !error && <Typography sx={{p:2, color: 'text.secondary'}}>No Tabs</Typography>}
-                      </Box>
-                  )}
-              </Box>
+            {/* Vertical TabBar / Sidebar */}
+            <Box sx={{
+                width: verticalTabBarWidth,
+                flexShrink: 0,
+                pt: `${theme.mixins.toolbar.minHeight || 64}px`,
+                height: '100vh',
+                boxSizing: 'border-box',
+                borderRight: 1,
+                borderColor: 'divider',
+                bgcolor: 'background.paper'
+            }}>
+                {!loading && !error && config?.frames && config.frames.length > 0 ? (
+                    <TabBar
+                        frames={config.frames}
+                        activeFrameId={activeFrameId}
+                        onTabChange={handleTabChange}
+                        width={verticalTabBarWidth}
+                    />
+                ) : (
+                    <Box sx={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }} >
+                        {loading && <CircularProgress sx={{m: 2}} size={20}/>}
+                        {!loading && !error && <Typography sx={{p:2, color: 'text.secondary'}}>No Tabs</Typography>}
+                    </Box>
+                )}
+            </Box>
 
-             <Box component="main" sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                 <Toolbar /> {/* Spacer */}
-                  <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
-                      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                          <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, boxSizing: 'border-box' }}>
-                               {renderActiveFrameContent()}
-                          </Box>
-                      </Box>
-                  </Box>
-             </Box>
-
+            {/* Main content area */}
+            <Box component="main" sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <Toolbar /> {/* AppBar Spacer */}
+                <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
+                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+                        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3, boxSizing: 'border-box' }}>
+                            {renderActiveFrameContent()}
+                        </Box>
+                    </Box>
+                </Box>
+            </Box>
+              
             <PreferencesDialog
                 open={isPrefsDialogOpen}
                 onClose={handleClosePrefsDialog}
-             />
+            />
         </Box>
     );
 }
 
-// --- App Component (Wrapper) ---
+// App Component (Wrapper)
 function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
             <ShellConfigProvider>
-                {/* Provide eventBus via Context */}
-                <EventBusContext.Provider value={{ eventBus: eventBus }}>
+                <EventBusContext.Provider value={{ eventBus }}>
                     <Router>
                         <AppContent />
                     </Router>
                 </EventBusContext.Provider>
-             </ShellConfigProvider>
+            </ShellConfigProvider>
         </ThemeProvider>
     );
 }

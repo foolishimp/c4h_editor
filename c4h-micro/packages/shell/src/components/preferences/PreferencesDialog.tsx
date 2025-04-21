@@ -1,6 +1,3 @@
-// File: packages/shell/src/components/preferences/PreferencesDialog.tsx
-// --- CORRECTED Full File ---
-
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios'; // Need axios for the direct PUT call
 import {
@@ -104,9 +101,9 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
        if (editingFrame) {
            const currentApps = editingFrame.assignedApps;
            const newAssignedApps: AppAssignment[] = Array(numberOfSlots).fill(null).map((_, index) =>
-              currentApps[index] ? { ...currentApps[index] } : { appId: '' }
+              currentApps && currentApps[index] ? { ...currentApps[index] } : { appId: '' }
            );
-           setEditingFrame(prev => prev ? { ...prev, assignedApps: newAssignedApps } : null);
+           setEditingFrame((prev: Frame | null) => prev ? { ...prev, assignedApps: newAssignedApps } : null);
        }
    };
 
@@ -116,7 +113,7 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
             const updatedApps = [...editingFrame.assignedApps];
             if (slotIndex >= 0 && slotIndex < updatedApps.length) {
                 updatedApps[slotIndex] = { appId: appId };
-                setEditingFrame(prev => prev ? { ...prev, assignedApps: updatedApps } : null);
+                setEditingFrame((prev: Frame | null) => prev ? { ...prev, assignedApps: updatedApps } : null);
             }
         }
    };
@@ -213,7 +210,7 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                               <TextField
                                   label="Tab Name"
                                   value={editingFrame.name}
-                                  onChange={(e) => setEditingFrame(prev => prev ? { ...prev, name: e.target.value } : null)}
+                                  onChange={(e) => setEditingFrame((prev: Frame | null) => prev ? { ...prev, name: e.target.value } : null)}
                                   fullWidth margin="normal" required autoFocus
                                   error={!editingFrame?.name?.trim()}
                                   helperText={!editingFrame?.name?.trim() ? "Tab name is required." : ""}

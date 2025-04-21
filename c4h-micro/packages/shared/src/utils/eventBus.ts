@@ -1,46 +1,77 @@
 /**
  * EventBus for cross-microfrontend communication
- * Provides a simple pub/sub mechanism for sharing events
+ * Provides a type-safe pub/sub mechanism based on EventTarget
  */
-export interface EventDetail {
+
+export interface EventDetail<T = any> {
   source: string; // Identifier of the sender (e.g., 'shell', 'config-editor')
-  payload: any;   // Data specific to the event type
+  payload: T;    // Data specific to the event type
 }
 
-type EventCallback = (event: CustomEvent<EventDetail>) => void;
+// Define two callback types to handle both internal and EventTarget use cases
+type DetailCallback<T = any> = (detail: EventDetail<T>) => void;
+type EventTargetCallback = (event: Event) => void;
+
+// Store callbacks in their consumer-friendly form
+type EventCallbackRecord = { callback: DetailCallback; listener: EventTargetCallback };
 
 class EventBus extends EventTarget {
-  private events: Record<string, EventCallback[]> = {};
+  private events: Map<string, Set<EventCallback>> = new Map();
 
   constructor() {
     super();
   }
 
-  subscribe(event: string, callback: EventCallback): () => void {
-    if (!this.events[event]) {
-      this.events[event] = [];
+  /**
+   * Subscribe to an event
+   * @param event Event type to subscribe to
+   * @param callback Callback function to execute when event occurs
+   * @returns Unsubscribe function
+   */
+  subscribe<T = any>(event: string, callback: DetailCallback<T>): () => void {
+    if (!this.events.has(event)) {
+      this.events.set(event, new Set());
     }
 
-    // Create a wrapper that converts EventTarget events to our callback format
+    // Create wrapper to convert EventTarget events to strongly-typed callback
     const wrappedCallback = (e: Event) => {
-      callback(e as CustomEvent<EventDetail>);
+      if (e instanceof CustomEvent) {
+        const customEvent = e as CustomEvent<EventDetail<T>>;
+        callback(customEvent.detail);
+      } else {
+        console.warn("EventBus received non-CustomEvent:", e);
+      }
     };
     
-    // Store both the original and wrapped callback for cleanup
-    this.events[event].push(callback);
+    // Store callback in our registry with safe type handling
+    const record: EventCallbackRecord = { callback, listener: wrappedCallback };
+    this.events.get(event)?.add(record as unknown as EventCallback);
+    
+    // Add event listener to EventTarget
     this.addEventListener(event, wrappedCallback);
 
-    console.log(`EventBus: Subscribed to '${event}', total subscribers: ${this.events[event].length}`);
+    const subscriberCount = this.events.get(event)?.size || 0;
+    console.log(`EventBus: Subscribed to '${event}', total subscribers: ${subscriberCount}`);
 
-    // Return unsubscribe function
+    // Return function to unsubscribe
     return () => {
       this.removeEventListener(event, wrappedCallback);
-      this.events[event] = this.events[event].filter(cb => cb !== callback); 
-      console.log(`EventBus: Unsubscribed from '${event}', remaining subscribers: ${this.events[event].length}`);
+      this.events.get(event)?.delete(callback as EventCallback);
+      const remainingCount = this.events.get(event)?.size || 0;
+      console.log(`EventBus: Unsubscribed from '${event}', remaining subscribers: ${remainingCount}`);
+
+      if (remainingCount === 0) {
+        this.events.delete(event);
+      }
     };
   }
 
-  publish(event: string, detail: EventDetail): void {
+  /**
+   * Publish an event to all subscribers
+   * @param event Event type to publish
+   * @param detail Event details to send
+   */
+  publish<T = any>(event: string, detail: EventDetail<T>): void {
     console.log(`EventBus: Publishing event '${event}'`, detail);
     
     // Create and dispatch a CustomEvent
@@ -56,6 +87,3 @@ export { eventBus };
 
 // Export as default for backward compatibility 
 export default eventBus;
-
-// Note: We no longer attach to window.__C4H_EVENT_BUS__
-// EventBus is now shared via ESM import/export and React Context
