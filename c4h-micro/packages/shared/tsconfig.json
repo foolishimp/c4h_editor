@@ -11,6 +11,7 @@
     "moduleResolution": "bundler",
     "declaration": true,
     "outDir": "./dist/build",
+    "rootDir": "src",
     "jsx": "react-jsx",
     "strict": true,
     "noImplicitAny": true,

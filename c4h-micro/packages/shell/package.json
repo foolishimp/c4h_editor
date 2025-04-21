@@ -22,15 +22,14 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.22.3",
     "systemjs": "^6.14.3",
-    "vite": "^5.4.14",
-    "shared": "workspace:*"
+    "vite": "^5.4.14"
   },
   "devDependencies": {
     "@types/diff": "^5.0.8",
     "@types/react": "^18.2.61",
     "@types/react-dom": "^18.2.19",
-    "@types/systemjs": "^6.13.2", 
+    "@types/systemjs": "^6.13.2",
     "typescript": "^5.3.3",
-    "shared": "*"
+    "shared": "workspace:*"
   }
 }

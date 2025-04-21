@@ -14,6 +14,15 @@ importers:
 
   c4h-micro/packages/config-selector:
     dependencies:
+      '@emotion/react':
+        specifier: ^11.11.4
+        version: 11.14.0(@types/react@18.3.20)(react@18.3.1)
+      '@emotion/styled':
+        specifier: ^11.11.0
+        version: 11.14.0(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react@18.3.1)
+      '@mui/icons-material':
+        specifier: ^5.15.14
+        version: 5.17.1(@mui/material@5.17.1(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@emotion/styled@11.14.0(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@types/react@18.3.20)(react@18.3.1)
       '@mui/material':
         specifier: ^5.15.14
         version: 5.17.1(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@emotion/styled@11.14.0(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -34,26 +43,32 @@ importers:
         version: 18.3.1(react@18.3.1)
       shared:
         specifier: workspace:*
-        version: 'link:'
+        version: link:../shared
       yaml-editor:
         specifier: file:../yaml-editor
         version: file:c4h-micro/packages/yaml-editor(@types/react@18.3.20)
     devDependencies:
-      '@types/diff':
-        specifier: ^5.0.8
-        version: 5.2.3
-      '@types/node':
-        specifier: ^22.14.1
-        version: 22.14.1
+      '@originjs/vite-plugin-federation':
+        specifier: ^1.3.5
+        version: 1.4.1
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       '@types/react':
         specifier: ^18.2.61
         version: 18.3.20
       '@types/react-dom':
         specifier: ^18.2.19
         version: 18.3.6(@types/react@18.3.20)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.4.1(vite@5.4.18(@types/node@22.14.1))
       typescript:
         specifier: ^5.3.3
         version: 5.8.3
+      vite:
+        specifier: ^5.4.14
+        version: 5.4.18(@types/node@22.14.1)
 
   c4h-micro/packages/job-management:
     dependencies:
@@ -86,7 +101,7 @@ importers:
         version: 6.30.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       shared:
         specifier: workspace:*
-        version: link:../config-selector
+        version: link:../shared
       single-spa-react:
         specifier: ^6.0.2
         version: 6.0.2(@types/react-dom@18.3.6(@types/react@18.3.20))(@types/react@18.3.20)(react@18.3.1)
@@ -185,9 +200,6 @@ importers:
       react-router-dom:
         specifier: ^6.22.3
         version: 6.30.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      shared:
-        specifier: workspace:*
-        version: link:../config-selector
       systemjs:
         specifier: ^6.14.3
         version: 6.15.1
@@ -207,6 +219,9 @@ importers:
       '@types/systemjs':
         specifier: ^6.13.2
         version: 6.15.3
+      shared:
+        specifier: workspace:*
+        version: link:../shared
       typescript:
         specifier: ^5.3.3
         version: 5.8.3
@@ -221,7 +236,7 @@ importers:
         version: 18.3.1(react@18.3.1)
       shared:
         specifier: workspace:*
-        version: link:../config-selector
+        version: link:../shared
       single-spa:
         specifier: ^6.0.3
         version: 6.0.3
@@ -270,7 +285,7 @@ importers:
         version: 18.3.1(react@18.3.1)
       shared:
         specifier: workspace:*
-        version: link:../config-selector
+        version: link:../shared
     devDependencies:
       '@originjs/vite-plugin-federation':
         specifier: ^1.3.5
@@ -2659,7 +2674,7 @@ snapshots:
       monaco-editor: 0.47.0
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      shared: link:c4h-micro/packages/config-selector
+      shared: link:c4h-micro/packages/shared
     transitivePeerDependencies:
       - '@types/react'
       - supports-color
