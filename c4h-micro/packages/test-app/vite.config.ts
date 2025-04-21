@@ -1,6 +1,8 @@
 /**
  * /packages/test-app/vite.config.ts
  * Vite configuration for test-app microfrontend
+ * --- UPDATED: Standardized externals ---
+ * --- UPDATED: Removed server/preview port config ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -10,50 +12,39 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: 'esnext',
-    outDir: 'dist',
-    emptyOutDir: true,
-    minify: false, // Disable minification for better debugging
+    minify: false,
     cssCodeSplit: false,
     lib: {
-      entry: './src/main.tsx',
-      formats: ['es'], // ESM format only
-      fileName: () => 'test-app.js'
+      entry: './src/main.tsx', // Entry point for test-app
+      formats: ['es'],
+      fileName: () => 'test-app.js' // Output filename
     },
     rollupOptions: {
-      // External packages that shouldn't be bundled
+      // Consistent list of externals (even if not all used by this specific MFE)
       external: [
         'react',
-        'react-dom', 
+        'react-dom',
         'react/jsx-runtime',
-        'shared',
         '@mui/material',
         '@mui/icons-material',
         '@emotion/react',
-        '@emotion/styled'
+        '@emotion/styled',
+        'shared'
       ],
       output: {
-        // Preserve the ESM format
         format: 'esm',
-        entryFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/test-app.js', // Use specific name
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
+  // Removed server/preview sections
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/src')
     }
-  },
-  server: {
-    port: 3005,
-    strictPort: true,
-    cors: true
-  },
-  preview: {
-    port: 3005,
-    strictPort: true,
-    cors: true
+    // Removed dedupe array
   }
 });

@@ -1,15 +1,19 @@
 /**
  * /packages/shell/vite.config.ts
  * Vite configuration for the shell application
+ * --- UPDATED: Removed server/preview port config ---
+ * --- UPDATED: Removed resolve.dedupe ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+// import shellPlugin from './shell-vite.plugin'; // Uncomment if you use this plugin
 
 export default defineConfig({
   plugins: [
-    react()
-  ], 
+    react(),
+    // shellPlugin() // Uncomment if you use this plugin
+  ],
   optimizeDeps: {
     esbuildOptions: {
       target: 'es2022'
@@ -20,38 +24,34 @@ export default defineConfig({
     target: 'es2022'
   },
   build: {
+    // Shell builds an application, not a library
     target: 'esnext',
-    minify: false, // Disable minification for better debugging
-    cssCodeSplit: false,
+    minify: false,
+    cssCodeSplit: false, // Keep CSS bundled for simplicity
     rollupOptions: {
       output: {
-        format: 'esm',
-        entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
-        assetFileNames: 'assets/[name].[ext]'
+        format: 'esm', // Standard format
+        // Standard output naming for shell app assets
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // Ensure alias points to the source directory of the shared package
       'shared': path.resolve(__dirname, '../shared/src')
     }
+    // Removed dedupe array
   },
+  // Removed server and preview sections defining port/strictPort
+  // CORS can be kept if direct access during dev is needed, otherwise remove
   server: {
-    port: 3000,
-    strictPort: true,
-    cors: true,
-    headers: {
-      // Add headers to allow proper CORS for loading microfrontends
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-      "Access-Control-Allow-Headers": "X-Requested-With, content-type, Authorization"
-    }
+    cors: true
   },
   preview: {
-    port: 3000,
-    strictPort: true,
     cors: true
   }
 });

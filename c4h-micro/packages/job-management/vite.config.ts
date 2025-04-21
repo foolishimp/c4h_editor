@@ -1,3 +1,9 @@
+/**
+ * /packages/job-management/vite.config.ts
+ * Vite configuration for job-management microfrontend
+ * --- UPDATED: Added missing externals ---
+ * --- UPDATED: Removed server/preview port config ---
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -7,38 +13,41 @@ export default defineConfig({
     react(),
   ],
   build: {
-    target: 'es2020',
+    // Changed target to esnext for consistency
+    target: 'esnext', // Was es2020
     minify: false,
     cssCodeSplit: false,
     lib: {
-      entry: './src/main.tsx',
+      entry: './src/main.tsx', // Entry point for job-management
       formats: ['es'],
-      fileName: (format) => 'job-management.js'
+      fileName: () => 'job-management.js' // Output filename
     },
     rollupOptions: {
-      external: ['react', 'react-dom', '@mui/material', '@mui/icons-material', 'shared'],
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime', // Added
+        '@mui/material',
+        '@mui/icons-material',
+        '@emotion/react',   // Added
+        '@emotion/styled',  // Added
+        'shared'
+        // Add 'axios', 'date-fns', 'react-router-dom' if they should be external/shared
+      ],
       output: {
         format: 'esm',
-        entryFileNames: 'assets/[name].js',
+        entryFileNames: 'assets/job-management.js', // Use specific name
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
-  server: {
-    port: 3004,
-    strictPort: true,
-    cors: true
-  },
-  preview: {
-    port: 3004,
-    strictPort: true,
-    cors: true
-  },
+  // Removed server/preview sections
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
       'shared': path.resolve(__dirname, '../shared/src')
     }
+    // Removed dedupe array
   }
 });
