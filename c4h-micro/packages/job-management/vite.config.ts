@@ -1,7 +1,7 @@
 /**
  * /packages/job-management/vite.config.ts
  * Vite configuration for job-management microfrontend
- * --- UPDATED: Standardized externals, explicit filename, ports removed ---
+ * --- UPDATED: Removed 'shared' from externals ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -17,17 +17,18 @@ export default defineConfig({
     react(),
   ],
   build: {
-    target: 'esnext', // Standardized target
+    target: 'esnext',
     minify: false,
     cssCodeSplit: false,
     outDir: 'dist',
     lib: {
-      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
-      name: 'JobManagement', // Optional UMD name
+      entry: path.resolve(__dirname, 'src/main.tsx'),
+      name: 'JobManagement',
       formats: ['es'],
       // fileName removed here
     },
     rollupOptions: {
+      // Shared removed from externals
       external: [
         'react',
         'react-dom',
@@ -35,15 +36,13 @@ export default defineConfig({
         '@mui/material',
         '@mui/icons-material',
         '@emotion/react',
-        '@emotion/styled',
-        'shared'
-        // Consider externalizing: 'axios', 'date-fns', 'react-router-dom'
+        '@emotion/styled'
+        // 'shared' // <-- REMOVED
+        // Consider externalizing: 'axios', 'date-fns', 'react-router-dom' if needed
       ],
       output: {
         format: 'esm',
-        // Force the output filename
-        entryFileNames: 'assets/job-management.js',
-        // Keep chunk/asset names standard
+        entryFileNames: 'assets/job-management.js', // Keep explicit filename
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -53,7 +52,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/src')
+      'shared': path.resolve(__dirname, '../shared/src') // Keep alias for build
     }
   }
 });

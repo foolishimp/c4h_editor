@@ -1,7 +1,7 @@
 /**
  * /packages/config-selector/vite.config.ts
  * Vite configuration for config-selector microfrontend
- * --- UPDATED: Correct externals, explicit filename, ports removed ---
+ * --- UPDATED: Removed 'shared' from externals ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -19,30 +19,28 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
-    outDir: 'dist', // Standard output directory
+    outDir: 'dist',
     lib: {
-      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
+      entry: path.resolve(__dirname, 'src/main.tsx'),
       name: 'ConfigSelector',
       formats: ['es'],
-      // fileName removed here, handled in rollupOptions.output
+      // fileName removed here
     },
     rollupOptions: {
-      external: [ // Ensure this list is correct
+      // Shared removed from externals
+      external: [
         'react',
         'react-dom',
         'react/jsx-runtime',
         '@mui/material',
         '@mui/icons-material',
         '@emotion/react',
-        '@emotion/styled',
-        'shared'
-        // Add 'js-yaml', 'date-fns', 'yaml-editor' if needed & provided by shell/import map
+        '@emotion/styled'
+        // 'shared' // <-- REMOVED
       ],
       output: {
         format: 'esm',
-        // Force the output filename
-        entryFileNames: 'assets/config-selector.js',
-        // Keep chunk/asset names standard
+        entryFileNames: 'assets/config-selector.js', // Keep explicit filename
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -52,7 +50,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/src')
+      'shared': path.resolve(__dirname, '../shared/src') // Keep alias for build
     }
   }
 });

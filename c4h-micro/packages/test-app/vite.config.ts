@@ -1,7 +1,7 @@
 /**
  * /packages/test-app/vite.config.ts
  * Vite configuration for test-app microfrontend
- * --- UPDATED: Standardized externals, explicit filename, ports removed ---
+ * --- UPDATED: Removed 'shared' from externals ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -20,13 +20,13 @@ export default defineConfig({
     cssCodeSplit: false,
     outDir: 'dist',
     lib: {
-      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
-      name: 'TestApp', // Optional UMD name
+      entry: path.resolve(__dirname, 'src/main.tsx'),
+      name: 'TestApp',
       formats: ['es'],
       // fileName removed here
     },
     rollupOptions: {
-      // Consistent list of potential externals
+      // Shared removed from externals
       external: [
         'react',
         'react-dom',
@@ -34,14 +34,12 @@ export default defineConfig({
         '@mui/material',
         '@mui/icons-material',
         '@emotion/react',
-        '@emotion/styled',
-        'shared'
+        '@emotion/styled'
+        // 'shared' // <-- REMOVED
       ],
       output: {
         format: 'esm',
-        // Force the output filename
-        entryFileNames: 'assets/test-app.js',
-        // Keep chunk/asset names standard
+        entryFileNames: 'assets/test-app.js', // Keep explicit filename
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -51,7 +49,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/src')
+      // This alias allows `import 'shared'` within test-app's source
+      // to be resolved correctly by its dev server or build process
+      'shared': path.resolve(__dirname, '../shared/src') 
     }
   }
 });

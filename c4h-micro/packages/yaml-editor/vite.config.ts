@@ -1,7 +1,7 @@
 /**
  * /packages/yaml-editor/vite.config.ts
  * Vite configuration for yaml-editor microfrontend
- * --- UPDATED: Standardized externals, explicit filename, ports removed ---
+ * --- UPDATED: Removed 'shared' from externals ---
  */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -22,12 +22,13 @@ export default defineConfig({
     cssCodeSplit: false,
     outDir: 'dist',
     lib: {
-      entry: path.resolve(__dirname, 'src/main.tsx'), // Use absolute path
-      name: 'YamlEditor', // Optional UMD name
+      entry: path.resolve(__dirname, 'src/main.tsx'),
+      name: 'YamlEditor',
       formats: ['es'],
       // fileName removed here
     },
     rollupOptions: {
+       // Shared removed from externals
       external: [
         'react',
         'react-dom',
@@ -36,17 +37,15 @@ export default defineConfig({
         '@mui/icons-material',
         '@emotion/react',
         '@emotion/styled',
-        'shared',
-         // Consider externalizing these if provided by shell import map
+        // 'shared', // <-- REMOVED
+        // Keep other specific externals if needed and provided by shell import map
         '@monaco-editor/react',
         'monaco-editor',
         'js-yaml'
       ],
       output: {
         format: 'esm',
-        // Force the output filename
-        entryFileNames: 'assets/yaml-editor.js',
-        // Keep chunk/asset names standard
+        entryFileNames: 'assets/yaml-editor.js', // Keep explicit filename
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[ext]'
       }
@@ -56,7 +55,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/src')
+      'shared': path.resolve(__dirname, '../shared/src') // Keep alias for build
     }
   }
 });
