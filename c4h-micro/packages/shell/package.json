@@ -4,10 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "../../node_modules/.bin/vite --port 3000 --strictPort",
-    "build": "../../node_modules/.bin/tsc && ../../node_modules/.bin/vite build",
-    "preview": "../../node_modules/.bin/vite preview --port 3000 --strictPort",
-    "serve": "node server.cjs"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview --strictPort"
   },
   "dependencies": {
     "@emotion/react": "^11.11.4",

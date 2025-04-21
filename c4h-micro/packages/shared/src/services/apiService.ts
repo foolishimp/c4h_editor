@@ -9,11 +9,8 @@ import { Config } from '../types/config';
 import { ShellPreferencesRequest } from '../types/shell';
 
 // --- Base URL Handling ---
-// Initial base URL from environment or default fallback
-const API_BASE_URL = 
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) 
-  ? import.meta.env.VITE_API_BASE_URL 
-  : 'http://localhost:8000';
+// Start with a default URL - will be configured by the shell
+const API_BASE_URL = 'http://localhost:8000';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,

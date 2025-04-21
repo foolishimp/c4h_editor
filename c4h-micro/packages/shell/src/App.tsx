@@ -1,9 +1,10 @@
 /**
  * /packages/shell/src/App.tsx
  * Main application component that handles microfrontend loading and frame management
+ * --- CORRECTED useEffect for activeFrameId ---
  */
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import * as ReactDOM from 'react-dom/client';
+import * as ReactDOM from 'react-dom/client'; // Keep if using ReactDOM.createRoot elsewhere, otherwise can be just 'react-dom/client'
 import {
     ThemeProvider,
     CssBaseline,
@@ -16,10 +17,11 @@ import {
 } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { BrowserRouter as Router } from 'react-router-dom';
-import SettingsIcon from '@mui/icons-material/Settings'; 
+import SettingsIcon from '@mui/icons-material/Settings';
 import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
 import TabBar from './components/layout/TabBar';
-import { AppAssignment, eventBus } from 'shared';
+// Import eventBus and necessary types from shared package
+import { AppAssignment, AppDefinition, eventBus } from 'shared';
 import PreferencesDialog from './components/preferences/PreferencesDialog';
 
 // --- Theme definition ---
@@ -38,23 +40,24 @@ const theme = createTheme({
 });
 
 // --- Error Boundary ---
+// (Keep the ErrorBoundary class definition as it was)
 class ErrorBoundary extends React.Component<
-  { children: React.ReactNode, message?: string }, 
+  { children: React.ReactNode, message?: string },
   { hasError: boolean, error: any }
 > {
    constructor(props: { children: React.ReactNode, message?: string }) {
      super(props);
      this.state = { hasError: false, error: null };
    }
-   
-   static getDerivedStateFromError(error: any) { 
-     return { hasError: true, error }; 
+
+   static getDerivedStateFromError(error: any) {
+     return { hasError: true, error };
    }
-   
+
    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
      console.error("ErrorBoundary caught:", error, errorInfo);
    }
-   
+
    render() {
      if (this.state.hasError) {
        return (
@@ -75,12 +78,15 @@ class ErrorBoundary extends React.Component<
    }
 }
 
+
 // --- AppContent Component ---
 function AppContent() {
-    const { config, loading, error } = useShellConfig();
+    // Get state from context - MAKE SURE availableApps is destructured if needed elsewhere
+    const { config, loading, error, availableApps } = useShellConfig();
     const [activeFrameId, setActiveFrameId] = useState<string | null>(null);
     const [isPrefsDialogOpen, setIsPrefsDialogOpen] = useState<boolean>(false);
-    const mountedModulesRef = useRef<Record<string, any>>({});
+    // Use useRef to keep track of mounted modules/components and their unmount functions
+    const mountedModulesRef = useRef<Record<string, { unmount: () => void }>>({});
 
     const handleOpenPrefsDialog = useCallback(() => {
         setIsPrefsDialogOpen(true);
@@ -90,58 +96,91 @@ function AppContent() {
         setIsPrefsDialogOpen(false);
     }, []);
 
-    // useEffect Hook for activeFrameId management
+    // --- CORRECTED useEffect Hook for activeFrameId management ---
     useEffect(() => {
+        console.log("App.tsx: useEffect for activeFrameId triggered. loading:", loading, "error:", !!error);
+        // Only proceed if config is loaded without errors
         if (!loading && !error && config?.frames) {
+            // Sort frames by order to ensure consistent default selection
             const sortedFrames = [...config.frames].sort((a, b) => a.order - b.order);
-            const currentFrameExists = activeFrameId ? sortedFrames.some(f => f.id === activeFrameId) : false;
+            console.log("App.tsx: Sorted frames:", sortedFrames.map(f => f.id));
+            console.log("App.tsx: Current activeFrameId state:", activeFrameId);
 
-            if (sortedFrames.length === 0) {
+            // Check if the current activeFrameId exists in the *current* list of frames
+            const currentFrameIsValid = activeFrameId ? sortedFrames.some(f => f.id === activeFrameId) : false;
+            console.log("App.tsx: Is current activeFrameId valid?", currentFrameIsValid);
+
+            if (sortedFrames.length > 0) {
+                // If current frame is not valid (or no frame is active yet), set to the first available frame
+                if (!currentFrameIsValid) {
+                    const newActiveId = sortedFrames[0].id;
+                    console.log(`App.tsx: Setting active frame. Reason: ${!activeFrameId ? 'Initial load' : 'Current ID invalid/missing'}. New ID: ${newActiveId}`);
+                    setActiveFrameId(newActiveId);
+                } else {
+                    console.log(`App.tsx: Current activeFrameId '${activeFrameId}' is still valid. No change.`);
+                }
+            } else {
+                // No frames available, set activeFrameId to null
                 if (activeFrameId !== null) {
-                    console.log("No frames available, setting activeFrameId to null.");
+                    console.log("App.tsx: No frames available, setting activeFrameId to null.");
                     setActiveFrameId(null);
                 }
             }
-            else if (!currentFrameExists || !activeFrameId) {
-                const newActiveId = sortedFrames[0].id;
-                console.log(`Setting active frame. Reason: ${!currentFrameExists ? 'Current frame missing' : 'Initial load'}. New ID: ${newActiveId}`);
-                setActiveFrameId(newActiveId);
-            }
         } else if (!loading && !error && !config?.frames) {
-            if (activeFrameId !== null) {
-                console.log("Config loaded but frames array is missing, setting activeFrameId to null.");
+            // Config loaded, but no frames array - ensure activeId is null
+             if (activeFrameId !== null) {
+                console.log("App.tsx: Config loaded but frames array is missing/empty, setting activeFrameId to null.");
                 setActiveFrameId(null);
             }
         }
-    }, [config, loading, error, activeFrameId]);
+        // Dependency array: Trigger when loading/error state changes, or when config.frames potentially changes
+    }, [config?.frames, loading, error, activeFrameId]); // Keep activeFrameId here if needed for the 'currentFrameIsValid' check consistency
+    // --- End CORRECTED useEffect ---
 
-    // Clean up modules when activeFrameId changes or component unmounts
+
+    // Clean up modules when component unmounts or activeFrameId changes significantly
     useEffect(() => {
-        const previousActiveFrameId = activeFrameId;
+        // Store the current value of activeFrameId when the effect is set up
+        const frameIdToCleanUp = activeFrameId;
+
+        // Return the cleanup function
         return () => {
-            const moduleToUnmount = mountedModulesRef.current[previousActiveFrameId!]; 
-            if (moduleToUnmount && typeof moduleToUnmount.unmount === 'function') {
-                console.log(`Unmounting module for previous frame: ${previousActiveFrameId}`);
-                try {
-                    moduleToUnmount.unmount();
-                } catch (err) {
-                    console.error(`Error unmounting module for frame ${previousActiveFrameId}:`, err);
+            // Use the captured frameIdToCleanUp in the cleanup logic
+            if (frameIdToCleanUp) {
+                const moduleToUnmount = mountedModulesRef.current[frameIdToCleanUp];
+                if (moduleToUnmount && typeof moduleToUnmount.unmount === 'function') {
+                    console.log(`App.tsx: Cleanup - Unmounting module for previous frame: ${frameIdToCleanUp}`);
+                    try {
+                        moduleToUnmount.unmount();
+                    } catch (err) {
+                        console.error(`App.tsx: Cleanup - Error unmounting module for frame ${frameIdToCleanUp}:`, err);
+                    }
+                    // Remove the reference after unmounting
+                    delete mountedModulesRef.current[frameIdToCleanUp];
                 }
-                delete mountedModulesRef.current[previousActiveFrameId!];
             }
         };
+        // This effect should run when activeFrameId changes, ensuring the *previous* frame's module gets unmounted.
     }, [activeFrameId]);
 
+
     const handleTabChange = useCallback((_event: React.SyntheticEvent, newFrameId: string) => {
-        setActiveFrameId(newFrameId);
-    }, []);
+        console.log(`App.tsx: handleTabChange called. New frame ID: ${newFrameId}`);
+        if (newFrameId !== activeFrameId) {
+             setActiveFrameId(newFrameId);
+        }
+    }, [activeFrameId]); // Add activeFrameId dependency
 
     // --- Helper function to render the content for the active frame ---
     const renderActiveFrameContent = () => {
+        console.log("App.tsx: renderActiveFrameContent called. activeFrameId:", activeFrameId);
+        // Check loading/error states from useShellConfig() first
         if (loading) {
+             console.log("renderActiveFrameContent: Showing loading spinner.");
              return <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}><CircularProgress /></Box>;
         }
         if (error) {
+              console.log("renderActiveFrameContent: Showing error message:", error);
               return (
                  <Box sx={{ flexGrow: 1, p: 3 }}>
                      <Typography color="error">Error loading shell configuration:</Typography>
@@ -149,143 +188,208 @@ function AppContent() {
                  </Box>
              );
         }
-        if (!config || !config.frames || config.frames.length === 0) {
-            return <Typography sx={{ p: 3, fontStyle: 'italic' }}>No frames configured. Open Preferences (gear icon) to add tabs.</Typography>;
+
+        // --- Simplified CHECK: Ensure config essentials are loaded ---
+        // Check if config and necessary data arrays are loaded before proceeding
+        // We rely on the useEffect above to set a *valid* activeFrameId if possible
+        if (!config || !config.frames || !availableApps) {
+            console.log("renderActiveFrameContent: Waiting for config, frames, and availableApps to load...");
+            return <Typography sx={{ p: 3, fontStyle: 'italic' }}>Loading configuration...</Typography>;
+        }
+        // --- End Simplified CHECK ---
+
+
+        // Handle cases where no frames exist or no frame is selected
+        if (config.frames.length === 0) {
+             console.log("renderActiveFrameContent: No frames configured.");
+             return <Typography sx={{ p: 3, fontStyle: 'italic' }}>No frames configured. Open Preferences (gear icon) to add tabs.</Typography>;
         }
         if (!activeFrameId) {
-            return <Typography sx={{ p: 3, fontStyle: 'italic' }}>Select a frame to view its content.</Typography>;
+             console.log("renderActiveFrameContent: No active frame selected.");
+             // This case should ideally be handled by the useEffect setting a default
+             return <Typography sx={{ p: 3, fontStyle: 'italic' }}>Select a frame to view its content.</Typography>;
         }
 
+        // Find the active frame definition using the current (and hopefully valid) activeFrameId
         const activeFrame = config.frames.find(f => f.id === activeFrameId);
+
+        // Handle case where activeFrameId is somehow invalid despite useEffect (should be rare)
         if (!activeFrame) {
-            console.warn(`No frame found for activeFrameId: ${activeFrameId}`);
-            return <Typography sx={{ p: 3 }}>Frame not found or selected frame was removed.</Typography>;
+            console.warn(`renderActiveFrameContent: Could not find frame definition for activeFrameId: ${activeFrameId}. This might be a timing issue or invalid ID.`);
+            // Optionally try setting a default again here, or show error
+            // setActiveFrameId(config.frames[0].id); // Example: Force reset (might cause loop if not careful)
+            return <Typography sx={{ p: 3 }}>Selected frame ('{activeFrameId}') not found in current configuration.</Typography>;
         }
+
+        // Check if apps are assigned to the active frame
         if (!activeFrame.assignedApps || activeFrame.assignedApps.length === 0) {
+            console.log(`renderActiveFrameContent: No application assigned to frame '${activeFrame.name}'.`);
             return <Typography sx={{ p: 3 }}>No application assigned to the '{activeFrame.name}' frame.</Typography>;
         }
 
+        // Get the first assigned app
         const assignment: AppAssignment = activeFrame.assignedApps[0];
-        const appDef = config.availableApps?.find(app => app.id === assignment.appId);
 
+        // --- Lookup the app definition using the availableApps from context ---
+        // availableApps should be valid here because of the check at the start of the function
+        console.log(`renderActiveFrameContent: Looking for app ID '${assignment.appId}' in availableApps:`, availableApps);
+        const appDef = availableApps.find(app => app.id === assignment.appId);
+
+        // Handle missing app definition
         if (!appDef) {
-             console.error(`App definition missing for app ID: ${assignment.appId}`);
-             return <Typography color="error" sx={{ p: 3 }}>Error: Application definition not found for '{assignment.appId}'. Check configuration.</Typography>;
+             console.error(`renderActiveFrameContent: App definition missing in availableApps for assigned app ID: ${assignment.appId}`);
+             return <Typography color="error" sx={{ p: 3 }}>Error: Application definition for '{assignment.appId}' not found in the list of available applications.</Typography>;
         }
-        
+
+        // Handle missing app URL
         if (!appDef.url) {
-             console.error(`URL missing for app ID: ${assignment.appId}`);
+             console.error(`renderActiveFrameContent: URL missing for app ID: ${assignment.appId}`);
              return <Typography color="error" sx={{ p: 3 }}>Error: Application URL is missing for '{appDef.name}'. Cannot load microfrontend.</Typography>;
         }
 
-        console.log(`Preparing to load ESM module for app: ${appDef.id} from URL: ${appDef.url}`);
+        // --- Dynamic Module Loading Logic ---
+        console.log(`renderActiveFrameContent: Preparing to load ESM module for app: ${appDef.id} from URL: ${appDef.url}`);
 
         // Mount function to be passed to the ref
         const mountModule = (el: HTMLDivElement | null) => {
-            if (!el || !activeFrameId) {
-                console.error('Cannot mount module: DOM element or activeFrameId not available', { el, activeFrameId });
+            if (!el || !activeFrameId) { // Check element and ensure activeFrameId hasn't changed unexpectedly
+                console.error('mountModule: Cannot mount - DOM element or activeFrameId missing.', { el, activeFrameId });
                 return;
             }
+            // Capture frameId at the time of mount setup to prevent closure issues if activeFrameId changes rapidly
+            const currentFrameId = activeFrameId;
 
-            // Unmount existing module if any
-            const existingModule = mountedModulesRef.current[activeFrameId];
+            console.log(`mountModule: Attempting mount for frame ${currentFrameId}, app ${appDef.id}`);
+
+            // --- Unmount existing module for this frame ---
+            // Check specifically for the currentFrameId we intend to mount into
+            const existingModule = mountedModulesRef.current[currentFrameId];
             if (existingModule) {
-                console.log(`Unmounting existing module in frame ${activeFrameId}`);
+                console.log(`mountModule: Unmounting existing module in frame ${currentFrameId}`);
                 if (typeof existingModule.unmount === 'function') {
                     try {
                         existingModule.unmount();
                     } catch (err) {
-                        console.error(`Error unmounting previous module for frame ${activeFrameId}:`, err);
+                        console.error(`mountModule: Error unmounting previous module for frame ${currentFrameId}:`, err);
                     }
                 }
-                delete mountedModulesRef.current[activeFrameId];
+                // Clear the reference immediately after attempting unmount
+                delete mountedModulesRef.current[currentFrameId];
             }
+            // --- End Unmount ---
 
-            // Load and mount the module using dynamic import
-            console.log(`Loading module from URL: ${appDef.url}`);
+
+            // Load and mount the new module using dynamic import
+            console.log(`mountModule: Loading module from URL: ${appDef.url}`);
             import(/* @vite-ignore */ appDef.url).then(module => {
-                console.log(`Module loaded successfully from ${appDef.url}`, module);
-                
-                // Create props for the microfrontend including event bus
-                const props = {
-                    domElement: el,
-                    name: appDef.name,
-                    eventBus: eventBus // Pass event bus to all MFEs
+                // --- Check if component is still mounted and frame is still active ---
+                // Ensure the element is still in the DOM and the frame hasn't changed *while* loading
+                 if (!el.isConnected) {
+                    console.warn(`mountModule: Element for frame ${currentFrameId} disconnected before module could mount.`);
+                    return;
+                 }
+                 if (activeFrameId !== currentFrameId) {
+                     console.warn(`mountModule: Frame changed from ${currentFrameId} to ${activeFrameId} while module ${appDef.id} was loading. Aborting mount.`);
+                     return;
+                 }
+                 // --- End Check ---
+
+
+                console.log(`mountModule: Module loaded successfully from ${appDef.url}`, module);
+
+                // Create props for the microfrontend
+                const props: Record<string, any> = {
+                     domElement: el,
+                     name: appDef.name,
+                     eventBus: eventBus
+                     // Add other standard props
                 };
-                
-                // Add additional props for specific app types
+
+                // Add props for specific app types
                 if (appDef.id.startsWith('config-selector-')) {
                     const configType = appDef.id.replace('config-selector-', '');
                     Object.assign(props, {
                         configType,
-                        onNavigateBack: () => {
-                            console.log(`Shell: MFE (${appDef.id}) requested navigation back.`);
-                            // Dispatch navigation event if needed
-                            eventBus.publish('navigation:request', {
-                                source: 'shell',
-                                payload: { action: 'back', from: appDef.id }
-                            });
-                        },
-                        onNavigateTo: (configId: string) => {
-                            console.log(`Shell: MFE (${appDef.id}) requested navigation to config: ${configId}`);
-                            // Dispatch navigation event if needed
-                            eventBus.publish('navigation:request', {
-                                source: 'shell',
-                                payload: { action: 'navigateTo', target: configId, from: appDef.id }
-                            });
-                        }
+                        onNavigateBack: () => { /* ... event bus logic ... */ },
+                        onNavigateTo: (configId: string) => { /* ... event bus logic ... */ }
                     });
                 }
-                
+                // Add props for other app types...
+
+                // Mount the module
                 try {
-                    // Handle different module export patterns
+                    let mountResult: any = null;
                     if (module.mount && typeof module.mount === 'function') {
-                        // Handle single-spa compatible modules
-                        const mountedModule = module.mount(props);
-                        mountedModulesRef.current[activeFrameId] = mountedModule;
+                         console.log(`mountModule: Mounting module ${appDef.id} using mount()...`);
+                         mountResult = module.mount(props);
+                         // Store the unmount function if the module provides one directly or via result
+                         const unmountFn = mountResult?.unmount || module.unmount;
+                         if (typeof unmountFn === 'function') {
+                              mountedModulesRef.current[currentFrameId] = { unmount: unmountFn };
+                         } else {
+                              console.warn(`mountModule: Module ${appDef.id} provided 'mount' but no 'unmount' function.`);
+                              // Store a no-op unmount if necessary, or handle differently
+                              mountedModulesRef.current[currentFrameId] = { unmount: () => {} };
+                         }
+
                     } else if (module.default && typeof module.default === 'function') {
-                        // Handle React component default exports
+                        console.log(`mountModule: Rendering module ${appDef.id} as React component...`);
                         const ReactComponent = module.default;
                         const reactRoot = ReactDOM.createRoot(el);
                         reactRoot.render(
-                            <ReactComponent {...props} />
+                            <React.StrictMode> {/* Or other providers */}
+                                <ReactComponent {...props} />
+                            </React.StrictMode>
                         );
-                        
-                        // Store unmount function
-                        mountedModulesRef.current[activeFrameId] = {
+                        // Store React-specific unmount function
+                        mountedModulesRef.current[currentFrameId] = {
                             unmount: () => {
-                                reactRoot.unmount();
+                                console.log(`mountModule/unmount: Unmounting React component for ${appDef.id} in frame ${currentFrameId}`);
+                                try {
+                                     reactRoot.unmount();
+                                } catch (unmountErr) {
+                                     console.error(`mountModule/unmount: Error during reactRoot.unmount for ${appDef.id}:`, unmountErr);
+                                }
                             }
                         };
                     } else {
-                        console.error(`Module from ${appDef.url} doesn't export expected interface`);
+                        console.error(`mountModule: Module from ${appDef.url} is not a valid MFE (no mount or default export).`);
+                        el.innerHTML = `<div style="color: red; padding: 1em;">Failed to load: Invalid module structure.</div>`;
                     }
-                } catch (err) {
-                    console.error(`Error mounting module from ${appDef.url}:`, err);
+                } catch (mountErr) {
+                    console.error(`mountModule: Error mounting/rendering module from ${appDef.url}:`, mountErr);
+                    el.innerHTML = `<div style="color: red; padding: 1em;">Failed to load: Error during mount/render.</div>`;
+                     // Clean up ref if mount fails catastrophically
+                     delete mountedModulesRef.current[currentFrameId];
                 }
-            }).catch(err => {
-                console.error(`Error dynamically importing module from ${appDef.url}:`, err);
-            });
-        };
 
-        // Container div where the module will be mounted
+            }).catch(importErr => {
+                console.error(`mountModule: Error dynamically importing module from ${appDef.url}:`, importErr);
+                 el.innerHTML = `<div style="color: red; padding: 1em;">Failed to load application module. Check console.</div>`;
+                 // Clean up ref if import fails
+                 delete mountedModulesRef.current[currentFrameId];
+            });
+        }; // End of mountModule function
+
+        // Container div where the dynamically loaded module will be mounted
         return (
           <ErrorBoundary message={`Error loading application: ${appDef.name}`}>
-              <div ref={mountModule} id={`esm-module-${activeFrame.id}-${appDef.id}`} style={{height: '100%', width: '100%'}} />
+              {/* Key ensures component remounts if appDef or activeFrame changes */}
+              <div ref={mountModule} key={`${activeFrame.id}-${appDef.id}`} id={`mfe-container-${activeFrame.id}-${appDef.id}`} style={{height: '100%', width: '100%', overflow: 'auto'}} />
           </ErrorBoundary>
         );
-    };
-    // --- End Helper Function ---
+    }; // End of renderActiveFrameContent function
 
+
+    // --- Main AppContent Render ---
     const verticalTabBarWidth = 200;
-
     return (
         <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
             {/* Main AppBar */}
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar>
                       <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'baseline' }}>
-                        <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>
+                         <Typography variant="h5" noWrap component="div" sx={{ mr: 2 }}>
                             Visual Prompt Studio
                         </Typography>
                          <Typography variant="subtitle1" noWrap component="div" sx={{ opacity: 0.8 }}>
@@ -296,7 +400,7 @@ function AppContent() {
                         color="inherit"
                         aria-label="open preferences"
                         onClick={handleOpenPrefsDialog}
-                         edge="end"
+                        edge="end"
                     >
                         <SettingsIcon />
                     </IconButton>
@@ -307,17 +411,18 @@ function AppContent() {
              <Box sx={{
                 width: verticalTabBarWidth,
                 flexShrink: 0,
-                pt: (theme) => theme?.mixins?.toolbar?.minHeight ? `${theme.mixins.toolbar.minHeight}px` : '64px',
-                height: '100vh',
+                pt: (theme) => `${theme?.mixins?.toolbar?.minHeight || 64}px`, // Use theme spacing
+                height: '100vh', // Ensure full height
                 boxSizing: 'border-box',
                 borderRight: 1,
                 borderColor: 'divider',
                 bgcolor: 'background.paper'
              }}>
                 {/* Render TabBar */}
-                {!loading && !error && config?.frames && config.frames.length > 0 ? (
+                {/* Ensure TabBar receives the potentially updated config.frames */}
+                {!loading && config?.frames && config.frames.length > 0 ? (
                      <TabBar
-                         frames={config.frames}
+                         frames={config.frames} // Pass current frames
                          activeFrameId={activeFrameId}
                          onTabChange={handleTabChange}
                          width={verticalTabBarWidth}
@@ -332,15 +437,13 @@ function AppContent() {
 
             {/* Main content area */}
             <Box component="main" sx={{ flexGrow: 1, height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <Toolbar /> {/* AppBar Spacer */}
-
+                {/* AppBar Spacer */}
+                <Toolbar />
                 {/* Content Display Area */}
-                 <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'row', overflow: 'hidden' }}>
-                     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-                         <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 3 }}>
-                              {renderActiveFrameContent()}
-                         </Box>
-                     </Box>
+                {/* Ensure this Box takes remaining height and allows scrolling if needed */}
+                 <Box sx={{ flexGrow: 1, display: 'flex', overflow: 'hidden' /* Prevent double scrollbars */ }}>
+                    {/* Render the active frame's content */}
+                    {renderActiveFrameContent()}
                  </Box>
             </Box>
 
@@ -351,18 +454,20 @@ function AppContent() {
              />
         </Box>
     );
-}
+} // --- End AppContent Component ---
+
 
 // --- App Component (Wrapper) ---
 function App() {
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
+            {/* Ensure Provider wraps the component using the context */}
             <ShellConfigProvider>
                 <Router>
                     <AppContent />
                 </Router>
-             </ShellConfigProvider>
+            </ShellConfigProvider>
         </ThemeProvider>
     );
 }

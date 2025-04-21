@@ -10,6 +10,6 @@
     "config-selector-runtime":{ "url": "http://localhost:3103/assets/config-selector.js" },
     "job-management":         { "url": "http://localhost:3104/assets/job-management.js" },
 
-    "test-app":               { "url": "http://localhost:3005/assets/test-app.js" }
+    "test-app":               { "url": "http://localhost:3106/assets/test-app.js" }
   }
 }

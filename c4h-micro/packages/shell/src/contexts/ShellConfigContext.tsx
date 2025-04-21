@@ -97,7 +97,7 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
         prefsServiceUrl, // Provide prefsServiceUrl
         fetchConfig
     }), [config, loading, error, availableApps, prefsServiceUrl]);
-
+    console.log("ShellConfigProvider: Value being provided by Context:", contextValue);
     return (
         <ShellConfigContext.Provider value={contextValue}>
             {children}

@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite",
     "build": "tsc && vite build",
-    "dev": "vite --port 3005 --strictPort",
-    "preview": "vite preview --port 3005 --strictPort"
+    "preview": "vite preview --strictPort"
   },
   "dependencies": {
     "react": "^18.3.1",
