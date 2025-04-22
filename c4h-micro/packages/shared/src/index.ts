@@ -18,6 +18,9 @@ export * from './types/events';
 // Use regular 'export' for modules that export runtime values (or mixed)
 export * from './config/configTypes';
 
+// Export mount helper utility
+export * from './utils/mountHelper';
+
 // Export runtime utilities/values
 export { eventBus } from './utils/eventBus';
 

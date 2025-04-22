@@ -97,93 +97,77 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   // Show error if loading failed
   if (contextError && !currentConfig) {
     return <Alert severity="error" sx={{ m: 3 }}>Error loading configuration: {contextError}</Alert>;
-  }
+}
 
-  // For new configs, show ID input form
-  if (isNew && !newIdInput) {
-    return (
-      <Box sx={{ p: 0 }}>
-        <Typography variant="h5" gutterBottom>
-          Create New {configTypes[configType]?.name || configType}
-        </Typography>
-        
-        <TextField
-          label="Configuration ID"
-          value={newIdInput}
-          onChange={(e) => setNewIdInput(e.target.value.trim())}
-          fullWidth
-          required
-          margin="normal"
-          sx={{ mb: 2 }}
-          disabled={loading}
-          helperText="Enter a unique ID for the new configuration."
-        />
-        
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-          <Button variant="outlined" onClick={onBack} disabled={loading}>
-            Back to List
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => setNewIdInput(newIdInput || `new-${Date.now()}`)}
-            disabled={loading || !!newIdInput}
-          >
-            Continue to Editor
-          </Button>
-        </Box>
-      </Box>
-    );
-  }
+ // Main editor view with YamlEditor directly embedded
+ return (
+   <Box sx={{ p: 0 }}>
+      <Button variant="outlined" onClick={onBack} disabled={loading} sx={{ mb: 2 }}>
+        Back to List
+      </Button>
 
-  // Main editor view with YamlEditor directly embedded
-  return (
-    <Box sx={{ p: 0 }}>
-      <Typography variant="h5" gutterBottom>
-        {isNew ? `Create New ${configTypes[configType]?.name || configType}` : `Edit ${configTypes[configType]?.name || configType}: ${currentConfig?.id || configId}`}
-      </Typography>
+     <Typography variant="h5" gutterBottom>
+       {isNew ? `Create New ${configTypes[configType]?.name || configType}` : `Edit ${configTypes[configType]?.name || configType}: ${currentConfig?.id || configId}`}
+     </Typography>
 
-      {/* YamlEditor component */}
-      {yaml !== undefined ? (
-        <YamlEditor
-          yaml={yaml}
-          onChange={updateYaml}
-          onSave={handleSave}
-          readOnly={loading}
-          title={`${configTypes[configType]?.name || configType} Configuration`}
-          description="Edit the configuration in YAML format. Changes will be applied when you save."
-        />
-      ) : (
-        <Paper sx={{ p: 3, textAlign: 'center', mb: 2 }}>
-          <CircularProgress size={24} sx={{ mb: 2 }} />
-          <Typography>Loading YAML content...</Typography>
-        </Paper>
-      )}
+     { /* YamlEditor component */ }
+     {yaml !== undefined ? (
+       <>
+          {/* Conditionally render ID input field only for new configs */}
+          {isNew && (
+            <TextField
+              label="Configuration ID"
+              value={newIdInput}
+              onChange={(e) => setNewIdInput(e.target.value.trim())}
+              fullWidth
+              required
+              error={!newIdInput} // Show error if empty
+              helperText={!newIdInput ? "Configuration ID is required." : "Enter a unique ID for the new configuration."}
+              margin="normal"
+              sx={{ mb: 2 }}
+              disabled={loading}
+            />
+          )}
+         <YamlEditor
+           yaml={yaml}
+           onChange={updateYaml}
+           onSave={handleSave}
+           readOnly={loading}
+           title={`${configTypes[configType]?.name || configType} Configuration`}
+           description="Edit the configuration in YAML format. Changes will be applied when you save."
+         />
+       </>
+     ) : (
+       <Paper sx={{ p: 3, textAlign: 'center', mb: 2 }}>
+         <CircularProgress size={24} sx={{ mb: 2 }} />
+         <Typography>Loading YAML content...</Typography>
+       </Paper>
+     )}
 
-      {/* Commit Message Input */}
-      <TextField
-        label="Commit Message (Optional)"
-        value={commitMessage}
-        onChange={(e) => setCommitMessage(e.target.value)}
-        fullWidth
-        margin="normal"
-        sx={{ mb: 2 }}
-        disabled={loading}
-        helperText="Describe the changes you made."
-      />
+     {/* Commit Message Input */}
+     <TextField
+       label="Commit Message (Optional)"
+       value={commitMessage}
+       onChange={(e) => setCommitMessage(e.target.value)}
+       fullWidth
+       margin="normal"
+       sx={{ mb: 2 }}
+       disabled={loading}
+       helperText="Describe the changes you made."
+     />
 
-      {/* Action Buttons */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-        <Button variant="outlined" onClick={onBack} disabled={loading}>
-          Back to List
-        </Button>
-        <Button
-          variant="contained" 
-          onClick={handleSave}
-          disabled={loading || saved || yaml === undefined}
-        >
-          {loading ? <CircularProgress size={24} /> : 'Save Configuration'}
-        </Button>
-      </Box>
+     { /* Action Buttons */ }
+     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+        {/* Back button moved to top */}
+        <span></span> {/* Placeholder for spacing */}
+       <Button
+         variant="contained" 
+         onClick={handleSave}
+         disabled={loading || saved || yaml === undefined || (isNew && !newIdInput)} // Disable save if new and no ID
+       >
+         {loading ? <CircularProgress size={24} /> : 'Save Configuration'}
+       </Button>
+     </Box>
 
       {/* Snackbar for feedback */}
       <Snackbar
