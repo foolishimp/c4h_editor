@@ -12,22 +12,22 @@ import { configTypes } from 'shared';
 // Define mapping between app IDs and config types
 const appIdToConfigType: Record<string, string> = {
   'config-selector-workorders': 'workorder',
-  'config-selector-teamconfigs': 'teamconfig',
-  'config-selector-runtimeconfigs': 'runtimeconfig'
+  'config-selector-teams': 'teamconfig',
+  'config-selector-runtime': 'runtimeconfig'
 };
 
 // Create mount function with configType detection
 export function mount(props: any) {
-  const { domElement, name = '' } = props;
+  const { domElement, appId = '', customProps = {} } = props; // Use appId from props
+// Determine config type from app ID
+  let configType = 'workorder';
+// Default
   
-  // Determine config type from app ID
-  let configType = 'workorder'; // Default
-  
-  if (name && appIdToConfigType[name]) {
-    configType = appIdToConfigType[name];
+  if (appId && appIdToConfigType[appId]) { // Check map using appId
+    configType = appIdToConfigType[appId];
   } else {
     // Try extracting from pattern
-    const matches = name.match(/config-selector-(\w+)/i);
+    const matches = appId.match(/config-selector-(\w+)/i); // Match against appId
     if (matches && matches[1]) {
       const extracted = matches[1].toLowerCase();
       
@@ -40,15 +40,14 @@ export function mount(props: any) {
     }
   }
   
-  console.log(`Mounting ConfigManager with configType: ${configType} (from app ID: ${name})`);
-  
-  // Create root and render
+  console.log(`Mounting ConfigManager with configType: ${configType} (from app ID: ${appId})`);
+// Create root and render
   const root = createRoot(domElement);
   root.render(
     <StyledEngineProvider injectFirst>
       <ThemeProvider theme={createTheme()}>
         <CssBaseline />
-        <ConfigProvider configType={configType}>
+        <ConfigProvider configType={configType} initialConfigId={customProps.configId}> {/* Pass initialConfigId if provided */}
           <ConfigManager configType={configType} {...props.customProps} />
         </ConfigProvider>
       </ThemeProvider>

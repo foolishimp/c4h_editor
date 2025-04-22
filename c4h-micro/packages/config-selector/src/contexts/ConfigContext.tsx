@@ -1,5 +1,5 @@
 // ** IMPORTS **
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'; // Ensure useContext is imported
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'; // Ensure useContext is imported
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import { configTypes, apiService, Config, eventBus } from 'shared'; // Import Config type and eventBus from shared
 
@@ -51,9 +51,10 @@ const ConfigContext = createContext<ConfigContextState>(defaultContextState);
 interface ConfigProviderProps {
   children: ReactNode;
   configType: string;
+  initialConfigId?: string | null; // Add optional prop for initial ID
 }
 
-export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, configType }) => {
+export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, configType, initialConfigId }) => {
   const [configs, setConfigs] = useState<any[]>([]);
   const [currentConfig, setCurrentConfig] = useState<any | null>(null);
   const [yaml, setYaml] = useState<string>('');
@@ -98,7 +99,9 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       const response = await apiService.getConfigs(configType);
       setConfigs(response || []);
     } catch (err: any) {
-      setError(err.message || 'Failed to load configurations');
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load configurations';
+      setError(errorMsg);
+      console.error(`ConfigContext: Error loading configs for type '${configType}'. API Response:`, err.response?.data); // Log the full response data
       console.error('Error loading configurations:', err);
       setConfigs([]);
     } finally {
@@ -128,7 +131,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
 
   // Function to load a specific config
   const loadConfig = useCallback(async (id: string) => {
-    if (id === 'new') {
+    if (id === 'new' || !id) { // Handle empty ID as well
       createNewConfig();
       return;
     }
@@ -339,11 +342,19 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       // For now, just log success
        console.log(`ConfigContext: Cloned ${id} to ${newId}`, clonedConfig);
     } catch (err: any) {
+      setError( any) {
       setError(err.message || `Failed to clone configuration: ${id}`); console.error('Error cloning configuration:', err);
     } finally {
       setLoading(false);
     }
   }, [configType, loadConfigs /* loadConfig if loading clone */]);
+
+  // Effect to load initial config if provided via prop
+  useEffect(() => {
+    if (initialConfigId) {
+      loadConfig(initialConfigId);
+    }
+  }, [initialConfigId, loadConfig]); // Depend on initialConfigId and loadConfig
 
   // Context value provided to consumers
   const contextValue: ConfigContextState = {
@@ -370,3 +381,4 @@ export const useConfigContext = (): ConfigContextState => {
   }
   return context;
 };
+}

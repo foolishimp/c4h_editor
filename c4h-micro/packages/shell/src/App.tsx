@@ -247,7 +247,7 @@ function AppContent() {
             // Base props common to all modules
             const baseProps = { 
                 domElement: containerElement,
-                name: appDef.name
+                appId: appDef.id // Pass app ID for type detection
             };
             
             // Custom props with proper navigation handlers
