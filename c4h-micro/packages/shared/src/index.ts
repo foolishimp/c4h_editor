@@ -24,7 +24,6 @@ export { eventBus } from './utils/eventBus';
 // Export shared components (runtime values)
 export { default as TimeAgo } from './components/TimeAgo';
 export { default as DiffViewer } from './components/DiffViewer';
-export { default as RemoteComponent } from './components/RemoteComponent';
 
 // Export API service (runtime values) AND configuration function
 export { apiService, api, configureApiService } from './services/apiService';
