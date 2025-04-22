@@ -38,12 +38,16 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
   const [newIdInput, setNewIdInput] = useState<string>("");
   const [commitMessage, setCommitMessage] = useState("");
 
+  // Local state specifically for the description field
+  const [descriptionInput, setDescriptionInput] = useState<string>("");
+
   // Determine if we are creating a new config
   const isNew = configId === 'new';
 
   // Load config when component mounts or configId changes
   useEffect(() => {
     console.log(`ConfigEditor: Loading config ${configId}`);
+    // loadConfig now implicitly handles the 'new' case by calling createNewConfig in context
     loadConfig(configId);
   }, [configId, loadConfig]);
 
@@ -53,6 +57,19 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
       setNewIdInput(currentConfig.id || "");
     } else if (isNew) {
       setNewIdInput("");
+    }
+  }, [currentConfig, isNew]);
+
+  // Update local state if currentConfig changes (including description)
+  useEffect(() => {
+    if (currentConfig) {
+      if (!isNew) {
+        setNewIdInput(currentConfig.id || "");
+      } else if (isNew) {
+        setNewIdInput(""); // Clear ID field for new
+      }
+      // Set initial description for new or existing
+      setDescriptionInput(currentConfig.metadata?.description || "");
     }
   }, [currentConfig, isNew]);
 
@@ -67,8 +84,15 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
     }
 
     console.log(`ConfigEditor: Saving ${configType} config ${idToSave}`);
-    const result = await saveConfig(idToSave, commitMessage);
-    
+    // Pass descriptionInput to saveConfig
+    const result = await saveConfig(
+        idToSave,
+        commitMessage,
+        { // Pass metadata overrides
+            description: descriptionInput
+        }
+    );
+
     if (result) {
       setSnackbarMessage("Configuration saved successfully!");
       setSnackbarSeverity("success");
@@ -114,6 +138,7 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
      {yaml !== undefined ? (
        <>
           {/* Conditionally render ID input field only for new configs */}
+          {/* Always show ID field when creating new */}
           {isNew && (
             <TextField
               label="Configuration ID"
@@ -128,6 +153,19 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
               disabled={loading}
             />
           )}
+
+          {/* Add Description Field */}
+           <TextField
+              label={`${configTypes[configType]?.name || configType} Description`}
+              value={descriptionInput}
+              onChange={(e) => setDescriptionInput(e.target.value)}
+              fullWidth
+              multiline
+              rows={2} // Adjust rows as needed
+              margin="normal"
+              sx={{ mb: 2 }}
+              disabled={loading}
+           />
          <YamlEditor
            yaml={yaml}
            onChange={updateYaml}

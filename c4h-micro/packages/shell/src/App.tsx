@@ -387,7 +387,7 @@ function AppContent() {
             console.log(`App.tsx: Mount Effect - Cleanup executing for effect instance tied to frame ${currentFrameIdForMount}, app ${appDef?.id}`);
             isEffectActive = false;
         };
-    }, [activeFrameId, activeConfigId, availableApps, config, error, loading]); // Dependencies remain the same
+    }, [activeFrameId, availableApps, config, error, loading]);// Dependencies remain the same
 
 
     // Event bus listener for navigation requests
@@ -483,7 +483,10 @@ function AppContent() {
             <ErrorBoundary message={`Error loading application for frame ${activeFrameId}`}>
                 <div
                     ref={mfeContainerRef}
-                    key={`${activeFrameId}-${activeConfigId || 'list'}`}
+                    // *** THIS IS THE LINE TO CHANGE ***
+                    // Only key by frame ID to prevent remount on internal navigation
+                    key={activeFrameId}
+                    // *** END OF CHANGE ***
                     id={`mfe-container-${activeFrameId}`}
                     style={{height: '100%', width: '100%', overflow: 'auto'}}
                 />

@@ -1,6 +1,6 @@
 // File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/contexts/ConfigContext.tsx
 // ** IMPORTS **
-import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import { configTypes, apiService, Config, eventBus, EventTypes } from 'shared'; // Import eventBus and EventTypes [cite: 414, 415, 466]
 
@@ -17,9 +17,11 @@ interface ConfigContextState {
   // Functions
   loadConfigs: () => Promise<void>;
   loadConfig: (id: string) => Promise<void>;
-  createNewConfig: () => void;
+  // Allow createNewConfig to accept initial data (like description)
+  createNewConfig: (initialData?: Partial<Config>) => Config; // Return the created config object
   updateYaml: (yaml: string) => void;
-  saveConfig: (idToSave?: string, commitMessage?: string) => Promise<Config | null>; // Return saved config or null
+  // Update saveConfig signature to accept metadata overrides
+  saveConfig: (idToSave?: string, commitMessage?: string, metadataOverrides?: Partial<Config['metadata']>) => Promise<Config | null>; // Return saved config or null
   deleteConfig: (id: string, commitMessage?: string) => Promise<void>;
   archiveConfig: (id: string, archive: boolean, author?: string) => Promise<void>;
   cloneConfig: (id: string, newId: string, author?: string) => Promise<void>; // Added author optional param
@@ -37,7 +39,7 @@ const defaultContextState: ConfigContextState = {
   // Default stub functions
   loadConfigs: async () => {},
   loadConfig: async () => {},
-  createNewConfig: () => {},
+  createNewConfig: () => ({} as Config),
   updateYaml: () => {},
   saveConfig: async () => null,
   deleteConfig: async () => {},
@@ -62,7 +64,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<boolean>(false);
-  const [isShellReady, setIsShellReady] = useState(false); // <-- Add state to track shell readiness [cite: 750]
+  // Use ref for shell readiness to avoid triggering effects unnecessarily on its change
+  const isShellReadyRef = useRef(false);
 
   // Emit config-related events to the event bus for cross-MFE communication
   const emitConfigChange = useCallback((action: 'loaded' | 'saved' | 'deleted', config: Config | null) => {
@@ -103,9 +106,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   // Effect to listen for shell readiness
   useEffect(() => {
       console.log("ConfigContext: Setting up listener for shell:config:ready");
-      const handleShellReady = () => {
+      // Define the handler function
+      const handleShellReady = (detail: any) => { // Add detail param if needed
           console.log("ConfigContext: Received shell:config:ready event. Setting isShellReady=true.");
-          setIsShellReady(true);
+          isShellReadyRef.current = true; // Set the ref
+          console.log("ConfigContext: isShellReadyRef.current is now:", isShellReadyRef.current); // <-- ADD THIS LOG
       };
       const unsubscribe = eventBus.subscribe(EventTypes.SHELL_CONFIG_READY, handleShellReady); // [cite: 415, 471]
 
@@ -126,7 +131,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setLoading(true);
     setError(null);
     // --- ADD CHECK ---
-    if (!isShellReady) {
+    if (!isShellReadyRef.current) { // Check the ref
         console.log("ConfigContext: Waiting for shell:config:ready before loading configs...");
         // Optionally set a specific loading message or just return
         // setError("Waiting for shell configuration..."); // Or handle differently
@@ -149,10 +154,11 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [configType, isShellReady]); // Added isShellReady dependency [cite: 758]
+  }, [configType]); // isShellReadyRef change doesn't need to trigger reload
+  // Added isShellReady dependency [cite: 758]
 
   // Function to create a new blank config state
-  const createNewConfig = useCallback(() => {
+  const createNewConfig = useCallback((initialData?: Partial<Config>): Config => {
     const defaultContent = configTypes[configType]?.defaultContent || {};
     // Ensure the structure matches the Config interface
     const emptyConfig: Config = {
@@ -162,9 +168,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       metadata: { // Initialize metadata structure
           author: 'Current User',
           archived: false,
+          // Use initialData if provided, otherwise default
+          description: initialData?.metadata?.description || '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          description: '',
           tags: [],
           version: '1.0.0'
       },
@@ -172,6 +179,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
       lineage: []
     };
     // No need to call ensureMetadata here as we initialize it fully
+    // Merge any other initial data provided
+    Object.assign(emptyConfig, initialData);
     setCurrentConfig(emptyConfig);
     try {
       const initialYaml = yamlDump(defaultContent, { lineWidth: -1 });
@@ -183,16 +192,18 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     setError(null);
     setLoading(false);
     setSaved(false); // New config isn't saved yet
-  }, [configType, ensureMetadata]); // ensureMetadata might not be needed if initialized fully here
+    return emptyConfig; // Return the created object
+  }, [configType]); // Removed ensureMetadata dependency as it's initialized here
+  // ensureMetadata might not be needed if initialized fully here
 
   // Function to load a specific config
   const loadConfig = useCallback(async (id: string) => {
     if (id === 'new' || !id) { // Handle empty ID case as 'new'
-      createNewConfig();
+      createNewConfig(); // Call function to set state
       return;
     }
     // --- ADD CHECK ---
-    if (!isShellReady) {
+    if (!isShellReadyRef.current) { // Check ref
         console.log(`ConfigContext: Waiting for shell:config:ready before loading config ${id}...`);
         setError("Waiting for shell configuration..."); // Set error to indicate waiting
         return; // Don't proceed if shell isn't ready
@@ -231,7 +242,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [configType, createNewConfig, ensureMetadata, emitConfigChange, isShellReady]); // Added isShellReady dependency [cite: 769]
+  }, [configType, createNewConfig, ensureMetadata, emitConfigChange]); // isShellReadyRef change doesn't trigger reload
 
   // Function to update YAML state from editor changes
   const updateYaml = useCallback((newYaml: string) => {
@@ -240,7 +251,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   }, []);
 
   // Function to save the current configuration
-  const saveConfig = useCallback(async (idFromEditor?: string, commitMessageFromInput?: string): Promise<Config | null> => {
+  // Updated signature to accept metadataOverrides
+  const saveConfig = useCallback(async (idFromEditor?: string, commitMessageFromInput?: string, metadataOverrides?: Partial<Config['metadata']> ): Promise<Config | null> => {
     setLoading(true); setError(null);
 
     if (!currentConfig) {
@@ -248,6 +260,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     }
 
     const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === '';
+
+    // --- ADD CHECK ---
+    if (!isShellReadyRef.current) {
+        console.error("ConfigContext: Cannot save config, shell is not ready (API service potentially not configured).");
+        setError("Cannot save: Shell configuration not ready. Please wait or refresh.");
+        setLoading(false);
+        return null;
+    }
+    // --- END CHECK ---
     const effectiveId = isNew ? idFromEditor?.trim() : currentConfig.id;
 
     if (!effectiveId || effectiveId.trim() === '') {
@@ -262,6 +283,10 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
 
     // Ensure metadata exists and update timestamps/author
     ensureMetadata(configToSave);
+    // Apply metadata overrides (like description) before updating timestamp
+    if (metadataOverrides) {
+        Object.assign(configToSave.metadata, metadataOverrides);
+    }
     configToSave.metadata.updated_at = new Date().toISOString();
     configToSave.metadata.author = configToSave.metadata.author || "Current User"; // Ensure author exists
     if (isNew) {
@@ -323,7 +348,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     } finally {
       setLoading(false);
     }
-  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata, emitConfigChange]); // Dependencies for saveConfig
+  }, [currentConfig, yaml, configType, loadConfigs, ensureMetadata, emitConfigChange]); // isShellReadyRef change doesn't need to affect callback definition
 
   // Function to delete a configuration
   const deleteConfig = useCallback(async (id: string, commitMessage?: string) => {
@@ -387,13 +412,14 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
 
   // Effect to load initial config if provided via prop
   useEffect(() => {
-    if (initialConfigId && isShellReady) { // <-- Add isShellReady check
+    if (initialConfigId && isShellReadyRef.current) { // Check ref
       console.log(`ConfigContext: InitialConfigId prop detected: ${initialConfigId}. Loading...`);
       loadConfig(initialConfigId);
-    } else if (initialConfigId && !isShellReady) {
+    } else if (initialConfigId && !isShellReadyRef.current) {
         console.log(`ConfigContext: InitialConfigId prop detected: ${initialConfigId}, but waiting for shell:config:ready.`);
     }
-  }, [initialConfigId, loadConfig, isShellReady]); // Added isShellReady dependency [cite: 801]
+  }, [initialConfigId, loadConfig]); // isShellReadyRef change doesn't trigger effect
+  // Added isShellReady dependency [cite: 801]
 
   // Context value provided to consumers
   const contextValue: ConfigContextState = {

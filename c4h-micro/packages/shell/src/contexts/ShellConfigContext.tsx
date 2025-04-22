@@ -1,4 +1,3 @@
-// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios'; // Keep axios import for isAxiosError check
 import { AppDefinition, Preferences, ShellConfigurationResponse, eventBus, EventTypes } from 'shared'; // Added eventBus, EventTypes [cite: 414, 415, 466]
@@ -66,8 +65,8 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
                  // without exporting it, but we log that we *attempted* the configuration.
                 // --- ADD THIS ---
                 // Publish event AFTER configuration is done
-                console.log("ShellConfigContext: Publishing shell:config:ready event.");
-                eventBus.publish(EventTypes.SHELL_CONFIG_READY, { // [cite: 415, 470]
+                console.log("ShellConfigContext: Publishing shell:config:ready event."); // <-- ADD THIS LOG
+                eventBus.publish(EventTypes.SHELL_CONFIG_READY, { //
                     source: 'ShellConfigContext',
                     payload: { backendUrl: backendUrl }
                 });
