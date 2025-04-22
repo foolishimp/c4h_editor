@@ -12,7 +12,7 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
-import { configTypes, api, JobConfigReference, eventBus, EventDetail } from 'shared';
+import { configTypes, api, JobConfigReference, eventBus, EventDetail, checkApiServiceReady } from 'shared'; // Import checkApiServiceReady
 import { useJobContext } from '../contexts/JobContext';
 
 interface ConfigOption {
@@ -39,6 +39,16 @@ const JobCreator: React.FC = () => {
     console.log("JobCreator: Loading config options...");
     setLoadingOptions(true);
     setOptionsError(null);
+
+    // --- ADD Readiness Check ---
+    if (!checkApiServiceReady()) {
+        console.log("JobCreator: Waiting for API service to be ready before loading config options...");
+        setOptionsError("API service not ready. Please wait or refresh.");
+        setLoadingOptions(false);
+        return; // Don't proceed if not ready
+    }
+    // --- END Readiness Check ---
+
     const options: Record<string, ConfigOption[]> = {};
     REQUIRED_CONFIG_TYPES.forEach(type => { options[type] = []; });
 

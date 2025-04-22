@@ -29,5 +29,5 @@ export { default as TimeAgo } from './components/TimeAgo';
 export { default as DiffViewer } from './components/DiffViewer';
 
 // Export API service (runtime values) AND configuration function
-export { apiService, api, configureApiService } from './services/apiService';
+export { apiService, api, configureApiService, checkApiServiceReady } from './services/apiService';
 export { API_ENDPOINTS } from './config/api';

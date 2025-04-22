@@ -1,6 +1,7 @@
 /**
  * /packages/shared/src/services/apiService.ts
  * Centralized API service for making requests to backend services
+ * --- MODIFIED: Added checkApiServiceReady function ---
  */
 import axios, { AxiosRequestConfig } from 'axios';
 import { configTypes } from '../config/configTypes';
@@ -10,7 +11,10 @@ import { ShellPreferencesRequest } from '../types/shell';
 
 // --- Base URL Handling ---
 // Start with a default URL - will be configured by the shell
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8000'; // Default base URL
+
+// Internal state to track if the service has been configured
+let isApiConfigured = false;
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -22,16 +26,35 @@ const axiosInstance = axios.create({
 
 // --- Dynamic Configuration Function ---
 export const configureApiService = (baseUrl: string | undefined) => {
-  const finalBaseUrl = baseUrl || API_BASE_URL;   
+  const finalBaseUrl = baseUrl || API_BASE_URL;
   console.log(`apiService: configureApiService CALLED with: ${baseUrl}. Setting base URL to: ${finalBaseUrl}`);
 
   if (axiosInstance.defaults.baseURL !== finalBaseUrl) {
-    console.log(`Configuring apiService baseURL to: ${finalBaseUrl}`);
+    console.log(`apiService: Configuring baseURL to: ${finalBaseUrl}`);
     axiosInstance.defaults.baseURL = finalBaseUrl;
+    isApiConfigured = true; // Mark as configured
   } else {
-    console.log(`apiService baseURL already set to: ${finalBaseUrl}`);
+    console.log(`apiService: baseURL already set to: ${finalBaseUrl}`);
+    // If it's already set to the final URL (even if it's the default), consider it configured.
+    isApiConfigured = true;
   }
 };
+
+// --- NEW: Function to check readiness ---
+/**
+ * Checks if the apiService has been configured with a base URL.
+ * This is typically done by the shell application after fetching initial configuration.
+ * @returns {boolean} True if the API service is considered ready, false otherwise.
+ */
+export const checkApiServiceReady = (): boolean => {
+  // Simple check: has configureApiService been successfully called?
+  // You could add more sophisticated checks if needed (e.g., pinging an endpoint).
+  const ready = isApiConfigured;
+  console.log(`apiService: checkApiServiceReady() called. Returning: ${ready}`);
+  return ready;
+};
+// --- END NEW FUNCTION ---
+
 
 // --- Interceptor ---
 axiosInstance.interceptors.response.use(
@@ -82,7 +105,6 @@ class ApiService {
       return this.createEmptyConfig(configType, '');
     }
     console.log(`API: Fetching config ${id} of type ${configType} from ${endpoint}`);
-    
     try {
       return this.get<any>(endpoint);
     } catch (error: any) {
@@ -93,7 +115,7 @@ class ApiService {
       throw error;
     }
   }
-  
+
   private createEmptyConfig(configType: string, id: string): Config {
     const defaultContent = configTypes[configType]?.defaultContent || {};
     console.log(`API: Creating empty config of type ${configType} with ID ${id || 'empty'}`);
@@ -113,12 +135,11 @@ class ApiService {
       lineage: []
     };
   }
-  
+
   async createConfig(configType: string, data: Config, commitMessage?: string, author?: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.create;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Creating config of type ${configType} with ID ${data.id} at ${endpoint}`);
-
     const requestData = {
       id: data.id,
       content: data.content,
@@ -126,7 +147,6 @@ class ApiService {
       commit_message: commitMessage || `Create new ${configType} ${data.id}`,
       author: author || data.metadata?.author || "Current User"
     };
-
     console.debug(`API: Submitting config create request:`, {
       id: data.id, endpoint, description: data.metadata?.description
     });
@@ -145,14 +165,12 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Updating config ${id} of type ${configType} at ${endpoint}`);
-
     const requestData = {
       content: data.content,
       metadata: data.metadata,
       commit_message: commitMessage || `Update ${configType} ${id}`,
       author: author || data.metadata?.author || "Current User"
     };
-
     console.debug(`API: Submitting config update request:`, {
       id, endpoint, description: data.metadata?.description
     });
@@ -171,35 +189,35 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Deleting config ${id} of type ${configType} at ${endpoint}`);
-    return this.delete<{ message: string }>(endpoint, { 
-      params: { 
+    return this.delete<{ message: string }>(endpoint, {
+      params: {
         commit_message: commitMessage,
-        author 
+        author
       }
     });
   }
-  
+
   async archiveConfig(configType: string, id: string, author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.archive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Archiving config ${id} of type ${configType} at ${endpoint}`);
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
-   
+
   async unarchiveConfig(configType: string, id: string, author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.unarchive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Unarchiving config ${id} of type ${configType} at ${endpoint}`);
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
-  
+
   async cloneConfig(configType: string, id: string, newId: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.clone(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Cloning config ${id} of type ${configType} to ${newId} at ${endpoint}`);
     return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
   }
-  
+
   async getConfigHistory(configType: string, id: string): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.history(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -219,7 +237,7 @@ class ApiService {
       throw error;
     }
   }
-  
+
   async getJob(id: string): Promise<Job> {
     console.log(`API: Fetching job ${id} from /api/v1/jobs/${id}`);
     try {
@@ -247,7 +265,6 @@ class ApiService {
       user_id: params.userId || 'current-user',
       job_configuration: params.jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
     };
-    
     return this.post<any>('/api/v1/jobs', requestData);
   }
 
@@ -265,7 +282,6 @@ class ApiService {
       ...config,
       version: config.version || 'latest'
     }));
-
     const requestData = {
       configurations,
       user_id: userId || 'current-user',
@@ -273,10 +289,10 @@ class ApiService {
     };
     return this.post<any>('/api/v1/jobs/multi-config', requestData);
   }
-  
+
   async cancelJob(id: string): Promise<Job> {
     console.log(`API: Cancelling job ${id}`);
-    return this.post<any>(`/api/v1/jobs/${id}/cancel`, {}); 
+    return this.post<any>(`/api/v1/jobs/${id}/cancel`, {});
   }
 
   async getJobHistory(id: string) {
@@ -286,13 +302,14 @@ class ApiService {
 
   // Shell Preferences API
   async saveShellPreferences(preferences: ShellPreferencesRequest): Promise<{ message: string }> {
+    // Use the preferences service URL directly here if needed, or assume baseURL is set correctly
+    // For now, assuming the baseURL is correctly set by the shell context
     return this.put<{ message: string }>('/api/v1/shell/preferences', preferences);
   }
 }
 
 // Create and export a singleton instance
 export const apiService = new ApiService();
-
 // Export the axios instance as well
 export const api = axiosInstance;
 
