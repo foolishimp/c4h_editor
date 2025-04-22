@@ -1,25 +1,22 @@
-// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/config-selector/src/ConfigManager.tsx
-// Removed unused CssBaseline, Container imports
+/**
+ * /packages/config-selector/src/ConfigManager.tsx
+ */
+import { useState } from 'react';
 import { Box, Typography } from '@mui/material';
-// Removed unused useParams, useNavigate imports
 import { ConfigProvider } from './contexts/ConfigContext';
 import ConfigList from './components/ConfigList';
 import ConfigEditor from './components/ConfigEditor';
 import { configTypes } from 'shared';
 
 export interface ConfigManagerProps {
-  configType: string; // Now required
+  configType: string;
   configId?: string;
-  onNavigateBack?: () => void; // Callback prop
-  onNavigateTo?: (configId: string) => void; // Callback prop
-  domElement?: HTMLElement; // Standard single-spa prop
+  onNavigateBack?: () => void;
+  onNavigateTo?: (configId: string) => void;
+  domElement?: HTMLElement;
 }
 
-/**
- * A microfrontend component for managing various configuration types
- */
 function ConfigManager(props: ConfigManagerProps) {
-  // Read configType/Id ONLY from props now
   const {
     configType: propConfigType,
     configId: propConfigId,
@@ -27,25 +24,31 @@ function ConfigManager(props: ConfigManagerProps) {
     onNavigateTo
   } = props;
 
+  // Local state to track if viewing a config or list
+  const [viewingConfigId, setViewingConfigId] = useState<string | null>(propConfigId || null);
+
   // Navigation handlers that use callbacks
   const handleEditConfig = (id: string) => {
     console.log(`ConfigManager: Requesting navigation to edit ${id}`);
+    setViewingConfigId(id);
     if (onNavigateTo) {
-      onNavigateTo(id); // Signal to parent/shell
+      onNavigateTo(id);
     }
   };
 
   const handleCreateNew = () => {
     console.log('ConfigManager: Requesting navigation to create new');
+    setViewingConfigId('new');
     if (onNavigateTo) {
-      onNavigateTo('new'); // Signal to parent/shell
+      onNavigateTo('new');
     }
   };
 
   const handleBackToList = () => {
     console.log('ConfigManager: Requesting navigation back to list');
+    setViewingConfigId(null);
     if (onNavigateBack) {
-      onNavigateBack(); // Signal to parent/shell
+      onNavigateBack();
     }
   };
 
@@ -81,15 +84,15 @@ function ConfigManager(props: ConfigManagerProps) {
           {configTypes[propConfigType].name} Management
         </Typography>
 
-        {propConfigId ? (
+        {viewingConfigId ? (
           <ConfigEditor
-            configId={propConfigId} // Pass prop directly
-            onBack={handleBackToList} // Pass internal back handler
+            configId={viewingConfigId}
+            onBack={handleBackToList}
           />
         ) : (
           <ConfigList
-            onEdit={handleEditConfig} // Pass internal edit handler
-            onCreateNew={handleCreateNew} // Pass internal create handler
+            onEdit={handleEditConfig}
+            onCreateNew={handleCreateNew}
           />
         )}
       </Box>

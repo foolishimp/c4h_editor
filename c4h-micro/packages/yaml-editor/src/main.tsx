@@ -1,6 +1,6 @@
 /**
  * /packages/yaml-editor/src/main.tsx
- * Properly exports YamlEditor with MUI providers to fix context errors
+ * Properly exports YamlEditor with required providers
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -8,30 +8,23 @@ import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/
 import CssBaseline from '@mui/material/CssBaseline';
 import YamlEditor from './YamlEditor';
 
-// Create a theme matching the shell
-const theme = createTheme({
-  palette: {
-    primary: { main: '#1976d2' },
-    secondary: { main: '#dc004e' },
-  },
-});
-
-// Export default component
+// Export the component
 export default YamlEditor;
 
 /**
- * Mount function for dynamic loading by shell
+ * Mount function for dynamic loading
+ * Includes all required providers following MFE Guidelines
  */
 export function mount(props: any) {
   const { domElement, customProps = {} } = props;
   
-  console.log('Mounting YamlEditor with props:', customProps);
+  console.log('YamlEditor: Mounting with props:', customProps);
   
   const root = createRoot(domElement);
   
   root.render(
     <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={createTheme()}>
         <CssBaseline />
         <YamlEditor {...customProps} />
       </ThemeProvider>
@@ -40,6 +33,7 @@ export function mount(props: any) {
   
   return {
     unmount() {
+      console.log('YamlEditor: Unmounting');
       root.unmount();
     }
   };

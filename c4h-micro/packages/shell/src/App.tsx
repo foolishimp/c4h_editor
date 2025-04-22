@@ -94,6 +94,27 @@ function AppContent() {
     const handleOpenPrefsDialog = useCallback(() => setIsPrefsDialogOpen(true), []);
     const handleClosePrefsDialog = useCallback(() => setIsPrefsDialogOpen(false), []);
 
+    // Helper function to load a specific app into a frame
+    const loadFrame = useCallback((frameId: string, appId: string) => {
+        console.log(`Shell: loadFrame helper called for frame ${frameId}, app ${appId}`);
+        
+        // Find the app definition
+        const appDef = availableApps?.find(app => app.id === appId);
+        if (!appDef) {
+            console.error(`Shell: App ${appId} not found in availableApps`);
+            return;
+        }
+        
+        // Set the active frame if needed
+        if (activeFrameId !== frameId) {
+            setActiveFrameId(frameId);
+        }
+        
+        // The actual loading will be handled by the main mount effect
+        // which watches for changes to activeFrameId
+        
+    }, [availableApps, activeFrameId, setActiveFrameId]);
+
     // Effect to manage activeFrameId based on loaded config
     useEffect(() => {
         if (!loading && !error && config?.frames) {
@@ -337,6 +358,123 @@ function AppContent() {
         const unsubscribe = eventBus.subscribe('navigation:request', handleNavigationRequest);
         return () => unsubscribe();
     }, []);
+
+    // Event bus listener for in-place YAML editor requests
+    useEffect(() => {
+        const handleYamlEditorRequest = (detail: any) => {
+            if (detail?.payload?.inPlace && detail.payload.configType && detail.payload.configId) {
+                console.log(`Shell received request to load YAML Editor in-place for ${detail.payload.configType}:${detail.payload.configId}`);
+                
+                // Find the yaml-editor app definition
+                const yamlEditorApp = availableApps?.find(app => app.id === 'yaml-editor');
+                if (!yamlEditorApp) {
+                    console.error("Shell: Cannot find yaml-editor in availableApps");
+                    return;
+                }
+                
+                // Get the current frame ID from the event or use activeFrameId
+                const frameId = detail.payload.frameId || activeFrameId;
+                if (!frameId) {
+                    console.error("Shell: No valid frame ID for yaml-editor mounting");
+                    return;
+                }
+                
+                // Store the current app info to restore later if needed
+                const currentFrame = config?.frames?.find(f => f.id === frameId);
+                const currentAppId = currentFrame?.assignedApps?.[0]?.appId;
+                
+                // We'll unmount the current app in this frame
+                const currentModule = mountedModulesRef.current[frameId];
+                if (currentModule?.unmount) {
+                    try {
+                        console.log(`Shell: Unmounting current app in frame ${frameId} to load yaml-editor`);
+                        currentModule.unmount();
+                    } catch (e) {
+                        console.error("Error unmounting current app:", e);
+                    }
+                }
+                
+                // Get the container element to mount the YAML Editor
+                const containerElement = document.getElementById(`mfe-container-${frameId}`);
+                if (!containerElement) {
+                    console.error(`Shell: Cannot find container element for frame ${frameId}`);
+                    return;
+                }
+                
+                // Clear the container
+                containerElement.innerHTML = '';
+                
+                // Load and mount the YAML Editor
+                console.log(`Shell: Loading yaml-editor from ${yamlEditorApp.url}`);
+                import(/* @vite-ignore */ yamlEditorApp.url)
+                    .then(module => {
+                        if (!module.mount && !module.default) {
+                            throw new Error("YAML Editor module doesn't export mount or default");
+                        }
+                        
+                        const mountFn = module.mount || ((props: any) => {
+                            const root = ReactDOM.createRoot(containerElement);
+                            const Component = module.default;
+                            root.render(<Component {...props} />);
+                            return {
+                                unmount: () => root.unmount()
+                            };
+                        });
+                        
+                        // Prepare props for YAML Editor
+                        const yamlEditorProps = {
+                            domElement: containerElement,
+                            customProps: {
+                                configType: detail.payload.configType,
+                                configId: detail.payload.configId,
+                                readOnly: detail.payload.readOnly || false,
+                                onBack: () => {
+                                    // When user clicks back in YAML Editor, restore original app
+                                    console.log(`Shell: YAML Editor requested back navigation, restoring original app`);
+                                    if (currentAppId) {
+                                        // This will trigger the mount effect with the original app
+                                        loadFrame(frameId, currentAppId);
+                                    }
+                                }
+                            }
+                        };
+                        
+                        // Mount the YAML Editor
+                        try {
+                            console.log(`Shell: Mounting yaml-editor with props:`, yamlEditorProps);
+                            const mountedYamlEditor = mountFn(yamlEditorProps);
+                            
+                            // Store the mounted instance so we can unmount it later
+                            mountedModulesRef.current[frameId] = {
+                                unmount: () => {
+                                    try {
+                                        mountedYamlEditor.unmount();
+                                    } catch (e) {
+                                        console.error("Error unmounting yaml-editor:", e);
+                                    }
+                                }
+                            };
+                        } catch (e) {
+                            console.error("Error mounting yaml-editor:", e);
+                            const errorMessage = e instanceof Error ? e.message : String(e);
+                            containerElement.innerHTML = `<div style="color: red; padding: 1em;">Error loading YAML Editor: ${errorMessage}</div>`;
+                        }
+                    })
+                    .catch(err => {
+                        console.error(`Shell: Error loading yaml-editor module:`, err);
+                        containerElement.innerHTML = `<div style="color: red; padding: 1em;">Failed to load YAML Editor. Check console for details.</div>`;
+                    });
+            }
+        };
+        
+        console.log("Shell: Subscribing to config:edit:yaml event");
+        const unsubscribe = eventBus.subscribe('config:edit:yaml', handleYamlEditorRequest);
+        
+        return () => {
+            console.log("Shell: Unsubscribing from config:edit:yaml event");
+            unsubscribe();
+        };
+    }, [availableApps, config?.frames, activeFrameId, loadFrame]);
 
     // Helper function to render content
     const renderActiveFrameContent = () => {

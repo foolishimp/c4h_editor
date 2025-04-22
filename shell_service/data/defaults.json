@@ -5,35 +5,35 @@
       "name": "Workorder Config Manager",
       "scope": "configSelector",
       "module": "./ConfigManager",
-      "url": "http://localhost:3101/assets/config-selector.js"
+      "url": ""
     },
     {
       "id": "config-selector-teams",
       "name": "Team Config Manager",
       "scope": "configSelector",
       "module": "./ConfigManager",
-      "url": "http://localhost:3102/assets/config-selector.js"
+      "url":  ""
     },
     {
       "id": "config-selector-runtime",
       "name": "Runtime Config Manager",
       "scope": "configSelector",
       "module": "./ConfigManager",
-      "url": "http://localhost:3103/assets/config-selector.js"
+      "url": ""
     },
     {
       "id": "job-management",
       "name": "Job Manager",
       "scope": "jobManagement",
       "module": "./JobManager",
-      "url": "http://localhost:3104/assets/job-management.js"
+      "url": ""
     },
     {
       "id": "test-app",
       "name": "Test App",
       "scope": "testApp",
       "module": "./TestApp",
-      "url": "http://localhost:3005/assets/test-app.js"
+      "url":  ""
     }
   ],
   "defaultEndpoints": {
