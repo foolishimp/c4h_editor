@@ -48,9 +48,6 @@ importers:
         specifier: file:../yaml-editor
         version: file:c4h-micro/packages/yaml-editor(@types/react@18.3.20)
     devDependencies:
-      '@originjs/vite-plugin-federation':
-        specifier: ^1.3.5
-        version: 1.4.1
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -102,9 +99,6 @@ importers:
       shared:
         specifier: workspace:*
         version: link:../shared
-      single-spa-react:
-        specifier: ^6.0.2
-        version: 6.0.2(@types/react-dom@18.3.6(@types/react@18.3.20))(@types/react@18.3.20)(react@18.3.1)
     devDependencies:
       '@types/react':
         specifier: ^18.2.61
@@ -176,9 +170,6 @@ importers:
       '@mui/material':
         specifier: ^5.15.14
         version: 5.17.1(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@emotion/styled@11.14.0(@emotion/react@11.14.0(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react@18.3.1))(@types/react@18.3.20)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@originjs/vite-plugin-federation':
-        specifier: ^1.3.5
-        version: 1.4.1
       axios:
         specifier: ^1.6.7
         version: 1.8.4
@@ -237,12 +228,6 @@ importers:
       shared:
         specifier: workspace:*
         version: link:../shared
-      single-spa:
-        specifier: ^6.0.3
-        version: 6.0.3
-      single-spa-react:
-        specifier: ^6.0.2
-        version: 6.0.2(@types/react-dom@18.3.6(@types/react@18.3.20))(@types/react@18.3.20)(react@18.3.1)
     devDependencies:
       '@vitejs/plugin-react':
         specifier: ^4.3.4
@@ -287,9 +272,6 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
-      '@originjs/vite-plugin-federation':
-        specifier: ^1.3.5
-        version: 1.4.1
       '@types/js-yaml':
         specifier: ^4.0.9
         version: 4.0.9
@@ -706,10 +688,6 @@ packages:
       '@types/react':
         optional: true
 
-  '@originjs/vite-plugin-federation@1.4.1':
-    resolution: {integrity: sha512-Uo08jW5pj1t58OUKuZNkmzcfTN2pqeVuAWCCiKf/75/oll4Efq4cHOqSE1FXMlvwZNGDziNdDyBbQ5IANem3CQ==}
-    engines: {node: '>=14.0.0', pnpm: '>=7.0.1'}
-
   '@popperjs/core@2.11.8':
     resolution: {integrity: sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A==}
 
@@ -893,9 +871,6 @@ packages:
     resolution: {integrity: sha512-7rAxByjUMqQ3/bHJy7D6OGXvx/MMc4IqBn/X0fcM1QUcAItpZrBEYhWGem+tzXH90c+G01ypMcYJBO9Y30203g==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
 
-  browserslist-config-single-spa@1.0.1:
-    resolution: {integrity: sha512-nqOxTbatv6FcdgBvUTuH4MuojMZwvskspz5Y4dmpVcKd0uaQY8KEl3iALWus16+AwPVe3BIerBNEgELyaHZcQg==}
-
   browserslist@4.24.4:
     resolution: {integrity: sha512-KDi1Ny1gSePi1vm0q4oxSF8b4DR44GF4BbmS2YdhPLOEqd8pDviZOGH/GsmRwoWJ2+5Lr085X7naowMwKHDG1A==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
@@ -1048,9 +1023,6 @@ packages:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
 
-  estree-walker@3.0.3:
-    resolution: {integrity: sha512-7RUKfXgSMMkzt6ZuXmqapOurLGPPfgj6l9uRZ7lRGolvk0y2yocc35LdcxKC5PQZdn2DMqioAQ2NoWcrTKmm6g==}
-
   etag@1.8.1:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
@@ -1185,10 +1157,6 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  magic-string@0.27.0:
-    resolution: {integrity: sha512-8UnnX2PeRAPZuN12svgR9j7M1uWMovg/CEnIwIG0LFkXSJJe4PdfUGiTGl8V9bsBHFUtfVINcSyYxd7q+kx9fA==}
-    engines: {node: '>=12'}
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -1396,21 +1364,6 @@ packages:
   side-channel@1.1.0:
     resolution: {integrity: sha512-ZX99e6tRweoUXqR+VBrslhda51Nh5MTQwou5tnUDgbtyM0dBgmhEDtWGP/xbKn6hqfPRHujUNwz5fy/wbbhnpw==}
     engines: {node: '>= 0.4'}
-
-  single-spa-react@6.0.2:
-    resolution: {integrity: sha512-nRz5Izf57iYZXMXdTh+RmHnxxQojFL8NCIVUyA7PpXRib1ykmbat6JgT3yFPgXRs129BCC4+j+O5TLQOmLzF4Q==}
-    peerDependencies:
-      '@types/react': '*'
-      '@types/react-dom': '*'
-      react: '*'
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-      '@types/react-dom':
-        optional: true
-
-  single-spa@6.0.3:
-    resolution: {integrity: sha512-pXlwHXHhs3hx/MnGQHBLdFCVAN2rlm9TLBKazbDMyZ25QRxoen2vlUZ47MyXKa9K8Gd5UZs/gkuQad4TGbViwg==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -1896,11 +1849,6 @@ snapshots:
     optionalDependencies:
       '@types/react': 18.3.20
 
-  '@originjs/vite-plugin-federation@1.4.1':
-    dependencies:
-      estree-walker: 3.0.3
-      magic-string: 0.27.0
-
   '@popperjs/core@2.11.8': {}
 
   '@remix-run/router@1.23.0': {}
@@ -2068,8 +2016,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  browserslist-config-single-spa@1.0.1: {}
-
   browserslist@4.24.4:
     dependencies:
       caniuse-lite: 1.0.30001715
@@ -2210,10 +2156,6 @@ snapshots:
   escape-html@1.0.3: {}
 
   escape-string-regexp@4.0.0: {}
-
-  estree-walker@3.0.3:
-    dependencies:
-      '@types/estree': 1.0.7
 
   etag@1.8.1: {}
 
@@ -2371,10 +2313,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  magic-string@0.27.0:
-    dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.0
 
   math-intrinsics@1.1.0: {}
 
@@ -2604,16 +2542,6 @@ snapshots:
       side-channel-list: 1.0.0
       side-channel-map: 1.0.1
       side-channel-weakmap: 1.0.2
-
-  single-spa-react@6.0.2(@types/react-dom@18.3.6(@types/react@18.3.20))(@types/react@18.3.20)(react@18.3.1):
-    dependencies:
-      browserslist-config-single-spa: 1.0.1
-      react: 18.3.1
-    optionalDependencies:
-      '@types/react': 18.3.20
-      '@types/react-dom': 18.3.6(@types/react@18.3.20)
-
-  single-spa@6.0.3: {}
 
   source-map-js@1.2.1: {}
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # File: start_frontends.py (ESM Microfrontend Architecture)
-# --- UPDATED: Use 'pnpm run dev' for ALL services, REMOVED build step ---
+# --- MODIFIED: Added build step for 'shared' package ---
 import argparse
 import json
 import os
@@ -19,7 +19,6 @@ ENV_FILE = os.path.join(ROOT_DIR, "environments.json")
 MFE_ROOT = os.path.join(ROOT_DIR, "c4h-micro/packages") # Assuming script runs from project root
 
 # Service definitions: (package_name, default_port)
-# Removed needs_build flag
 SERVICES_CONFIG: List[Tuple[str, int]] = [
     ("shared", 0), # Port 0 means it doesn't need to be started as a server
     ("yaml-editor", 3005), # Using default ports, will be overridden by env
@@ -120,7 +119,8 @@ def load_environment_config(app_env: str) -> bool:
     if not os.path.exists(ENV_FILE):
         print(f"{YELLOW}⚠️ {ENV_FILE} not found. Using default configurations.{NC}")
         environment_config = {}
-        os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8001" # Default prefs service (use correct port)
+        # Set default prefs service URL directly
+        os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8011"
         return True
 
     try:
@@ -130,14 +130,15 @@ def load_environment_config(app_env: str) -> bool:
         if app_env not in all_envs:
             print(f"{YELLOW}⚠️ Environment '{app_env}' not found in {ENV_FILE}. Using defaults.{NC}")
             environment_config = {}
-            os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8001" # Default prefs service (use correct port)
+            # Set default prefs service URL directly
+            os.environ['VITE_PREFS_SERVICE_URL'] = "http://localhost:8011"
             return True
 
         print(f"Loading configuration for environment: {BLUE}{app_env}{NC}")
         environment_config = all_envs[app_env]
 
         # Set environment variables needed by the shell
-        os.environ['VITE_PREFS_SERVICE_URL'] = environment_config.get('prefs_service', {}).get('url', 'http://localhost:8001') # Use correct port
+        os.environ['VITE_PREFS_SERVICE_URL'] = environment_config.get('prefs_service', {}).get('url', 'http://localhost:8011')
 
         print(f"{GREEN}✅ Environment configuration loaded{NC}")
         print(f"   - Prefs Service URL: {os.environ['VITE_PREFS_SERVICE_URL']}")
@@ -161,37 +162,33 @@ def start_service(service_name: str, port: int) -> bool:
 
     log_file = os.path.join(ROOT_DIR, f"{service_name}_log.txt")
 
-    # --- MODIFIED COMMAND: Use npx vite directly ---
     cmd = [
-        "npx", "-y", # Added -y to auto-confirm npx usage if needed
-        "vite", # Invoke vite directly
+        "npx", "-y",
+        "vite",
         "--port", str(port),
-        "--strictPort" # Keep strictPort to fail fast if port is taken
+        "--strictPort"
     ]
-    # --- END MODIFICATION ---
 
     print(f"{YELLOW}DEBUG: Running command: {' '.join(cmd)}{NC}")
 
     try:
-        # Use the 'port' variable passed in for logging purposes
         print(f"{YELLOW}🚀 Starting {service_name} directly with 'vite' expecting port {port}... (Log: {log_file}){NC}")
         process = subprocess.Popen(
             cmd,
             stdout=open(log_file, 'w'),
             stderr=subprocess.STDOUT,
-            cwd=service_dir, # CRITICAL: Still run from the package directory
+            cwd=service_dir,
             preexec_fn=os.setsid if sys.platform != "win32" else None,
             shell=(sys.platform == "win32"),
             env=os.environ
         )
         running_processes[service_name] = process
-        time.sleep(4) # Give Vite time to start
+        time.sleep(4)
 
         if process.poll() is not None:
             print(f"{RED}❌ Failed to start {service_name}. Process exited immediately. Check {log_file}{NC}")
             return False
         else:
-            # Check the log file to see which port Vite actually started on
             try:
                  with open(log_file, 'r') as lf:
                       log_content = lf.read()
@@ -201,7 +198,6 @@ def start_service(service_name: str, port: int) -> bool:
                            if actual_port == port:
                                 print(f"{GREEN}✅ {service_name} started (PID {process.pid}) on expected port {port}{NC}")
                            else:
-                                # If strictPort is working, Vite should have exited if port was wrong/taken
                                 print(f"{YELLOW}⚠️ {service_name} started (PID {process.pid}) but on UNEXPECTED port {actual_port} (expected {port}). Check Vite logs/config.{NC}")
                       else:
                            print(f"{YELLOW}⚠️ {service_name} started (PID {process.pid}) but could not confirm listening port from log.{NC}")
@@ -210,12 +206,10 @@ def start_service(service_name: str, port: int) -> bool:
                  print(f"{YELLOW}Note: Could not read port from log file for {service_name}: {e}{NC}")
             return True
     except FileNotFoundError:
-         # This might now indicate 'npx' is not found, or 'vite' isn't installed locally
          print(f"{RED}❌ Start command failed for {service_name}. Is 'npx' in your PATH and 'vite' installed in the workspace?{NC}")
          return False
     except Exception as e:
         print(f"{RED}❌ Exception starting {service_name}: {e}{NC}")
-        # Check if vite itself threw an error visible in stderr (which is redirected to stdout/log)
         return False
 
 
@@ -262,7 +256,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start C4H Editor Microfrontends in Dev Mode")
     parser.add_argument("--env", default="development", help="Environment name (must match a key in environments.json)")
     parser.add_argument("--services", nargs='+', help="Specific services (package names) to start", default=None)
-    # Removed --no-build argument
     args = parser.parse_args()
 
     signal.signal(signal.SIGINT, cleanup)
@@ -277,23 +270,22 @@ if __name__ == "__main__":
     target_service_names = args.services if args.services else [cfg[0] for cfg in SERVICES_CONFIG]
 
     # Resolve ports based on environment config or defaults
-    for service_name, default_port in SERVICES_CONFIG: # Removed needs_build from tuple
+    for service_name, default_port in SERVICES_CONFIG:
         if service_name not in target_service_names:
             continue
 
         resolved_port = default_port
         service_url = None
 
-        # Find URL in environment_config, handling potential variations like 'config-selector-*'
+        # Find URL in environment_config
         if service_name in environment_config:
             service_url = environment_config[service_name].get('url')
-        elif service_name == 'config-selector': # Special handling for config-selector variants
+        elif service_name == 'config-selector':
             for key, value in environment_config.items():
                 if key.startswith('config-selector-') and isinstance(value, dict) and 'url' in value:
                     service_url = value.get('url')
                     print(f"{YELLOW}Note: Using URL from '{key}' for service '{service_name}'. Assumes all run on same port.{NC}")
                     break
-        # Add similar logic for other potential prefix groups if needed
 
         if service_url:
             parsed_port = get_port_from_url(service_url)
@@ -304,7 +296,7 @@ if __name__ == "__main__":
         elif service_name != "shared":
             print(f"{YELLOW}⚠️ No URL found for {service_name} in {args.env} config. Using default port: {default_port}.{NC}")
 
-        final_services_config.append((service_name, resolved_port)) # Store only name and resolved port
+        final_services_config.append((service_name, resolved_port))
 
     if not final_services_config:
         print(f"{RED}❌ No valid services selected or found in config.{NC}")
@@ -314,7 +306,7 @@ if __name__ == "__main__":
 
     print_header("CHECKING PORTS")
     ports_ok = True
-    final_ports = {} # Store the final resolved port for each service
+    final_ports = {}
     for service_name, port in final_services_config:
         if not check_port(port, service_name):
             ports_ok = False
@@ -325,14 +317,35 @@ if __name__ == "__main__":
         print(f"{RED}❌ Port checks failed. Aborting.{NC}")
         sys.exit(1)
 
-    # --- BUILD STEP REMOVED ---
+    # --- Build Shared Package --- # <<< MODIFICATION INSERTED HERE <<<
+    print_header("BUILDING SHARED PACKAGE")
+    shared_dir = os.path.join(MFE_ROOT, "shared")
+    if os.path.isdir(shared_dir):
+        print(f"Running build in {shared_dir}...")
+        # Assuming pnpm based on script comments, adjust if using npm/yarn
+        build_cmd = ["pnpm", "run", "build"]
+        try:
+            # Run build command, capture output
+            result = subprocess.run(build_cmd, cwd=shared_dir, check=True, capture_output=True, text=True)
+            print(f"{GREEN}✅ 'shared' package built successfully.{NC}")
+            # Optionally print stdout/stderr from build if needed for debugging
+            # print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print(f"{RED}❌ Failed to build 'shared' package. Error:{NC}")
+            print(e.stderr) # Print build errors
+            sys.exit(1)
+        except FileNotFoundError:
+             print(f"{RED}❌ Build command ('pnpm run build') failed. Is 'pnpm' installed and in PATH?{NC}")
+             sys.exit(1)
+    else:
+        print(f"{YELLOW}⚠️ Shared package directory not found at {shared_dir}. Skipping build.{NC}")
+    # --- End Build Shared Package --- # <<< END MODIFICATION <<<
 
     print_header("STARTING SERVICES (DEV MODE)")
     start_success = True
-    for service_name, _ in final_services_config: # Iterate through the final list
+    for service_name, _ in final_services_config:
         port = final_ports.get(service_name)
         if port is not None and port > 0:
-            # Call start_service (which now always uses 'dev')
             if not start_service(service_name, port):
                 print(f"{RED}❌ Critical failure starting {service_name}. Initiating cleanup...{NC}")
                 start_success = False

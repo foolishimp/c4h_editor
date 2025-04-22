@@ -28,6 +28,7 @@ export interface EventDetail<T = any> {
     CONFIG_SAVED = 'config:saved',
     CONFIG_DELETED = 'config:deleted',
     CONFIG_LIST_UPDATED = 'config:list-updated',
+    SHELL_CONFIG_READY = 'shell:config:ready', // Signal that shell has configured API service
     
     // Navigation events
     NAVIGATION_REQUEST = 'navigation:request',

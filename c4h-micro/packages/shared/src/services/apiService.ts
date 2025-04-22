@@ -22,7 +22,9 @@ const axiosInstance = axios.create({
 
 // --- Dynamic Configuration Function ---
 export const configureApiService = (baseUrl: string | undefined) => {
-  const finalBaseUrl = baseUrl || API_BASE_URL; // Use provided URL or fallback
+  const finalBaseUrl = baseUrl || API_BASE_URL;   
+  console.log(`apiService: configureApiService CALLED with: ${baseUrl}. Setting base URL to: ${finalBaseUrl}`);
+
   if (axiosInstance.defaults.baseURL !== finalBaseUrl) {
     console.log(`Configuring apiService baseURL to: ${finalBaseUrl}`);
     axiosInstance.defaults.baseURL = finalBaseUrl;

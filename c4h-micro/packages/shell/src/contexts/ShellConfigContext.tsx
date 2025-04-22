@@ -1,17 +1,17 @@
-// File: packages/shell/src/contexts/ShellConfigContext.tsx
+// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
-import { AppDefinition, Preferences, ShellConfigurationResponse } from 'shared'; // Using correct imports
-import { configureApiService } from 'shared'; // Import configuration function
+import axios from 'axios'; // Keep axios import for isAxiosError check
+import { AppDefinition, Preferences, ShellConfigurationResponse, eventBus, EventTypes } from 'shared'; // Added eventBus, EventTypes [cite: 414, 415, 466]
+// Using correct imports
+import { configureApiService } from 'shared'; // Removed apiService import as it's not directly used here
 
 // Define the shape of the context state
-// Add 'export' here to make it available for import in App.tsx
 export interface ShellConfigContextState {
     config: Preferences | null;
     loading: boolean;
     error: string | null;
-    availableApps: AppDefinition[] | null; // Add availableApps here
-    prefsServiceUrl: string | null;       // Add prefsServiceUrl here
+    availableApps: AppDefinition[] | null;
+    prefsServiceUrl: string | null;
     fetchConfig: () => Promise<void>;
 }
 
@@ -32,52 +32,74 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
     const [error, setError] = useState<string | null>(null);
 
     const fetchConfig = async () => {
+        console.log("ShellConfigContext: fetchConfig function CALLED."); 
+
         setLoading(true);
         setError(null);
-        // Default Prefs Service URL - could be overridden by env var
-        const effectivePrefsServiceUrl = import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8001';
+        // Default Prefs Service URL - *should* be overridden by env var VITE_PREFS_SERVICE_URL set by start_frontends.py
+        const effectivePrefsServiceUrl = import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8011'; // Corrected default port for prefs
         setPrefsServiceUrl(effectivePrefsServiceUrl); // Store the URL used
 
-        // Create a dedicated axios instance for fetching config
+        // Create a dedicated axios instance for fetching config (safer than using shared one before it's configured)
         const configFetcher = axios.create({ baseURL: effectivePrefsServiceUrl });
 
         try {
-            console.log(`Fetching shell configuration from: ${effectivePrefsServiceUrl}/api/v1/shell/configuration`);
+            console.log(`ShellConfigContext: Attempting to fetch config from: ${effectivePrefsServiceUrl}/api/v1/shell/configuration`); // Log 1
             const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
             const data = response.data;
 
-            console.log("Shell configuration received:", data);
+            console.log("ShellConfigContext: Raw config response received:", JSON.stringify(data, null, 2)); // Log 2: Raw response
 
-            // Set state based on fetched data (fall back to frames if preferences missing)
-            setConfig(data.preferences || { frames: data.frames || [] });
-            setAvailableApps(data.availableApps); // Store available apps
+            // Set state based on fetched data
+            // Use optional chaining and nullish coalescing for safety
+            setConfig(data?.preferences ?? { frames: data?.frames ?? [] });
+            setAvailableApps(data?.availableApps ?? null);
 
-            // Configure the shared apiService with the main backend URL
-            if (data.mainBackendUrl || data.serviceEndpoints?.jobConfigServiceUrl) {
-                configureApiService(data.mainBackendUrl || data.serviceEndpoints?.jobConfigServiceUrl);
-                console.log(`Shared apiService configured with base URL: ${data.mainBackendUrl}`);
+            // --- Configure shared apiService ---
+            const backendUrl = data?.serviceEndpoints?.jobConfigServiceUrl;
+            console.log(`ShellConfigContext: Extracted jobConfigServiceUrl: ${backendUrl}`); // Log 3: Extracted URL
+
+            if (backendUrl && typeof backendUrl === 'string') {
+                console.log(`ShellConfigContext: Calling configureApiService with URL: ${backendUrl}`); // Log 4
+                configureApiService(backendUrl);
+                 // We can't easily log the *actual* current base URL of the shared instance from here
+                 // without exporting it, but we log that we *attempted* the configuration.
+                // --- ADD THIS ---
+                // Publish event AFTER configuration is done
+                console.log("ShellConfigContext: Publishing shell:config:ready event.");
+                eventBus.publish(EventTypes.SHELL_CONFIG_READY, { // [cite: 415, 470]
+                    source: 'ShellConfigContext',
+                    payload: { backendUrl: backendUrl }
+                });
+                // --- END ADD ---
+                 console.log(`ShellConfigContext: configureApiService called.`);
             } else {
-                console.warn("Main backend URL not provided in shell configuration.");
-                // Optionally configure with a default/fallback URL if needed
-                // configureApiService('http://localhost:8000'); // Example fallback
+                console.warn("ShellConfigContext: jobConfigServiceUrl not found or invalid in response. apiService may use default or previously set URL.");
+                // Log the default URL from apiService's perspective if possible, or just note the issue.
+                 // console.warn(`ShellConfigContext: apiService base URL might remain: ${apiService.getBaseUrl()}`); // If you add a getter to apiService
             }
+            // --- End Configuration ---
 
         } catch (err: any) {
-            console.error("Error fetching shell configuration:", err);
+            console.error("ShellConfigContext: Error fetching shell configuration:", err); // Log 6 (Error Detail)
+
+            // --- FIX: Define errorMessage at the start of the catch block ---
             let errorMessage = "Failed to fetch configuration.";
+
             if (axios.isAxiosError(err)) {
+                console.error("ShellConfigContext: Axios error details:", { status: err.response?.status, data: err.response?.data });
                  errorMessage = err.response?.data?.detail || err.message || errorMessage;
                  // Handle specific status codes if needed
                  if(err.response?.status === 404) {
-                     errorMessage = `Configuration endpoint not found at ${effectivePrefsServiceUrl}/api/v1/shell/configuration. Is the preferences service running?`;
+                     errorMessage = `Configuration endpoint not found at ${effectivePrefsServiceUrl}/api/v1/shell/configuration. Is the preferences service (shell_service on :8011) running?`;
+                 } else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED') {
+                     errorMessage = `Network error connecting to preferences service at ${effectivePrefsServiceUrl}. Is it running and accessible?`;
                  }
             } else if (err instanceof Error) {
                  errorMessage = err.message;
             }
-            setError(errorMessage);
-            // Fallback to default preferences on error? Or show error state?
-            // setConfig(DEFAULT_PREFERENCES); // Consider fallback strategy
-            setConfig(null); // Or set to null to indicate failure
+            setError(errorMessage); // Use the defined variable
+            setConfig(null);
             setAvailableApps(null);
         } finally {
             setLoading(false);
@@ -88,15 +110,16 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
         fetchConfig();
     }, []); // Fetch on initial mount
 
-    // Memoize the context value to prevent unnecessary re-renders
+    // Memoize the context value
     const contextValue = React.useMemo(() => ({
         config,
         loading,
         error,
-        availableApps, // Provide availableApps
-        prefsServiceUrl, // Provide prefsServiceUrl
+        availableApps,
+        prefsServiceUrl,
         fetchConfig
     }), [config, loading, error, availableApps, prefsServiceUrl]);
+
     console.log("ShellConfigProvider: Value being provided by Context:", contextValue);
     return (
         <ShellConfigContext.Provider value={contextValue}>
