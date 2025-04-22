@@ -1,6 +1,5 @@
 /**
  * /packages/config-selector/src/main.tsx
- * Export ConfigManager with proper providers and config type handling
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -8,87 +7,55 @@ import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/
 import CssBaseline from '@mui/material/CssBaseline';
 import ConfigManager from './ConfigManager';
 import { ConfigProvider } from './contexts/ConfigContext';
+import { configTypes } from 'shared';
 
-// Define props interface for mount function
-interface MountProps {
-  domElement: HTMLElement;
-  name?: string; // The app name from shell
-  configType?: string;
-  customProps?: {
-    configType?: string;
-    configId?: string;
-    onNavigateBack?: () => void;
-    onNavigateTo?: (configId: string) => void;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-// Map for plural to singular conversion
-const configTypeMap: Record<string, string> = {
-  'workorders': 'workorder',
-  'teamconfigs': 'teamconfig',
-  'runtimeconfigs': 'runtimeconfig'
+// Define mapping between app IDs and config types
+const appIdToConfigType: Record<string, string> = {
+  'config-selector-workorders': 'workorder',
+  'config-selector-teamconfigs': 'teamconfig',
+  'config-selector-runtimeconfigs': 'runtimeconfig'
 };
 
-// Create a theme matching the shell
-const theme = createTheme({
-  palette: {
-    primary: { main: '#1976d2' },
-    secondary: { main: '#dc004e' },
-  },
-});
-
-// Export the component directly
-export default ConfigManager;
-
-/**
- * Mount function called by the shell
- */
-export function mount(props: MountProps) {
-  const { domElement, name = '', configType, customProps = {} } = props;
+// Create mount function with configType detection
+export function mount(props: any) {
+  const { domElement, name = '' } = props;
   
-  // Determine config type from multiple sources with priority
-  let effectiveConfigType = configType || customProps.configType;
+  // Determine config type from app ID
+  let configType = 'workorder'; // Default
   
-  // If not explicitly provided, try to extract from app name/ID
-  if (!effectiveConfigType && name) {
-    // Parse from app ID pattern like "config-selector-workorders"
-    const matches = name.match(/config-selector-(\w+)/);
+  if (name && appIdToConfigType[name]) {
+    configType = appIdToConfigType[name];
+  } else {
+    // Try extracting from pattern
+    const matches = name.match(/config-selector-(\w+)/i);
     if (matches && matches[1]) {
       const extracted = matches[1].toLowerCase();
-      // Convert plural to singular if needed
-      effectiveConfigType = configTypeMap[extracted] || extracted;
-      console.log(`Extracted config type '${effectiveConfigType}' from app name '${name}'`);
+      
+      // Check if this is a plural that we need to make singular
+      if (extracted.endsWith('s') && configTypes[extracted.slice(0, -1)]) {
+        configType = extracted.slice(0, -1);
+      } else if (configTypes[extracted]) {
+        configType = extracted;
+      }
     }
   }
   
-  // Final fallback
-  effectiveConfigType = effectiveConfigType || 'workorder';
+  console.log(`Mounting ConfigManager with configType: ${configType} (from app ID: ${name})`);
   
-  console.log(`Mounting ConfigManager with configType: ${effectiveConfigType}`);
-  
-  // Create root once
+  // Create root and render
   const root = createRoot(domElement);
-  
-  // Render with all necessary providers
   root.render(
     <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={createTheme()}>
         <CssBaseline />
-        <ConfigProvider configType={effectiveConfigType}>
-          <ConfigManager 
-            configType={effectiveConfigType}
-            {...customProps} 
-          />
+        <ConfigProvider configType={configType}>
+          <ConfigManager configType={configType} {...props.customProps} />
         </ConfigProvider>
       </ThemeProvider>
     </StyledEngineProvider>
   );
   
-  return {
-    unmount() {
-      root.unmount();
-    }
-  };
+  return { unmount: () => root.unmount() };
 }
+
+export default ConfigManager;
