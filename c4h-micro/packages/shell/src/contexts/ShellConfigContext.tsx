@@ -32,81 +32,76 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
     const [isReady, setIsReady] = useState<boolean>(false); // Initialize readiness to false
     const [error, setError] = useState<string | null>(null);
 
-// Inside ShellConfigContext.tsx
-
+    // Inside ShellConfigContext.tsx
     const fetchConfig = async () => {
-        console.log("ShellConfigContext: fetchConfig function CALLED.");
+        console.log("!!! ShellConfigContext: useEffect[] calling fetchConfig !!!"); // Moved log here
+        console.log("!!! ShellConfigContext: fetchConfig START !!!");
         setLoading(true);
-        setIsReady(false);
+        setIsReady(false); // Ensure ready is false at the start
         setError(null);
+        let configurationSuccessful = false; // <<< NEW FLAG
+
         const effectivePrefsServiceUrl = import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8011';
         setPrefsServiceUrl(effectivePrefsServiceUrl);
         const configFetcher = axios.create({ baseURL: effectivePrefsServiceUrl });
 
         try {
-            console.log(`ShellConfigContext: Attempting to fetch config from: ${effectivePrefsServiceUrl}/api/v1/shell/configuration`);
+            console.log(`ShellConfigContext: Preparing to GET from: ${effectivePrefsServiceUrl}/api/v1/shell/configuration`);
             const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
+            console.log("ShellConfigContext: GET call SUCCEEDED.");
             const data = response.data;
-
-            // *** ADD LOGGING HERE ***
-            console.log("ShellConfigContext: Raw config response RECEIVED:", JSON.stringify(data, null, 2)); // Log raw response
+            console.log("ShellConfigContext: Raw config response RECEIVED:", JSON.stringify(data, null, 2));
 
             setConfig(data?.preferences ?? { frames: data?.frames ?? [] });
             setAvailableApps(data?.availableApps ?? null);
 
-            // --- Configure shared apiService ---
-            const backendUrl = data?.serviceEndpoints?.jobConfigServiceUrl; // Extract URL
-
-            // *** ADD LOGGING HERE ***
-            console.log(`ShellConfigContext: Extracted jobConfigServiceUrl: ${backendUrl}`); // Log extracted URL
-            console.log(`ShellConfigContext: Type of backendUrl: ${typeof backendUrl}`); // Log its type
+            const backendUrl = data?.serviceEndpoints?.jobConfigServiceUrl;
+            console.log(`ShellConfigContext: Extracted jobConfigServiceUrl: ${backendUrl}`);
+            console.log(`ShellConfigContext: Type of backendUrl: ${typeof backendUrl}`);
 
             if (backendUrl && typeof backendUrl === 'string') {
-                // *** ADD LOGGING HERE ***
                 console.log(`ShellConfigContext: Condition PASSED. Preparing to call configureApiService with URL: ${backendUrl}`);
-                configureApiService(backendUrl); // Call the configuration function
-                // *** ADD LOGGING HERE ***
+                configureApiService(backendUrl);
                 console.log(`ShellConfigContext: configureApiService was CALLED.`);
+                configurationSuccessful = true; // <<< SET FLAG TO TRUE
 
                 console.log("ShellConfigContext: Publishing shell:config:ready event.");
-                eventBus.publish(EventTypes.SHELL_CONFIG_READY, {
-                    source: 'ShellConfigContext',
+                eventBus.publish(EventTypes.SHELL_CONFIG_READY, { 
+                    source: "ShellConfigContext", 
                     payload: { backendUrl: backendUrl }
                 });
             } else {
-                // *** ADD LOGGING HERE ***
-                console.warn(`ShellConfigContext: Condition FAILED. jobConfigServiceUrl not found or invalid in response. apiService MAY NOT be configured correctly.`);
-                // Optionally, still mark as ready but log the warning prominently.
-                // setIsReady(true); // Or decide if readiness depends on this specific URL
+                console.warn(`ShellConfigContext: Condition FAILED. jobConfigServiceUrl not found or invalid. apiService MAY NOT be configured correctly.`);
+                // configurationSuccessful remains false
             }
-            // --- End Configuration ---
-
-            // Clear error if fetch succeeded AFTER potential previous errors
-            setError(null); // <-- Ensure error is cleared on success
+            setError(null); // Clear error on success
 
         } catch (err: any) {
-            // ... existing error handling ...
-            console.error("ShellConfigContext: Error fetching shell configuration:", err);
+            console.error("!!! ShellConfigContext: ERROR during fetchConfig try block !!!", err.message || err);
             let errorMessage = "Failed to fetch configuration.";
-            // ... (keep existing detailed error message logic) ...
+            if (axios.isAxiosError(err)) { // Make sure axios is imported if using isAxiosError
+                errorMessage = err.response?.data?.detail || err.message || errorMessage;
+                if(err.response?.status === 404) { /* ... */ }
+                else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED') { /* ... */ }
+            } else if (err instanceof Error) {
+                errorMessage = err.message;
+            }
             setError(errorMessage);
             setConfig(null);
             setAvailableApps(null);
-            // Ensure readiness is false on error
-            setIsReady(false); // <-- Explicitly set ready to false on error
+            // configurationSuccessful remains false
 
         } finally {
-            // *** Modify This Logic Slightly ***
-            // Set ready to true ONLY if the fetch succeeded AND configureApiService was intended to be called and likely succeeded
-            // We check !error which indicates the try block completed without throwing.
-            setIsReady(!error); // Set ready based on whether an error occurred during the fetch/config process.
-            console.log(`ShellConfigContext: fetchConfig finally block. Setting isReady to: ${!error}`);
-
+            // <<< MODIFIED LOGIC >>>
+            // Set ready ONLY if the configuration step was successful
+            setIsReady(configurationSuccessful);
+            console.log(`ShellConfigContext: fetchConfig finally block. configurationSuccessful=${configurationSuccessful}. Setting isReady to: ${configurationSuccessful}`);
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        console.log("!!! ShellConfigContext: useEffect[] calling fetchConfig !!!"); // <-- ADD THIS    
         fetchConfig();
     }, []); // Fetch on initial mount
 
