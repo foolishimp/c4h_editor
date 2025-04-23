@@ -22,7 +22,7 @@ try:
         LayoutInfoResponse,
         AppDefinition,
         # AppConfig, # AppConfig might not be used directly here
-        ServiceEndpoints,
+        ServiceEndpoints, LayoutDefinition,
         Frame
     )
 except ImportError:
@@ -38,7 +38,7 @@ except ImportError:
         LayoutInfoResponse,
         AppDefinition,
         # AppConfig,
-        ServiceEndpoints,
+        ServiceEndpoints, LayoutDefinition,
         Frame
     )
 
@@ -70,6 +70,23 @@ async def get_shell_configuration(user_id: str = Depends(get_current_user)):
         user_frames = await crud.get_user_frames(user_id)
         db_available_apps = await crud.get_available_apps()
         db_service_endpoints = await crud.get_service_endpoints() # Gets DB/default endpoints
+
+        # Get layout templates for frames that reference them
+        layout_templates = getattr(Request.app.state, "layout_templates", [])
+        layout_ids_in_use = set()
+        
+        # Collect all layoutId references from user frames
+        for frame in user_frames:
+            if hasattr(frame, 'layoutId') and frame.layoutId:
+                layout_ids_in_use.add(frame.layoutId)
+        
+        # Filter layouts to only include those referenced by user frames
+        filtered_layouts = []
+        if layout_templates:
+            for layout in layout_templates:
+                if layout.id in layout_ids_in_use:
+                    filtered_layouts.append(layout)
+        logger.debug(f"Including {len(filtered_layouts)} layout definitions for user {user_id}")
 
         # --- Determine the single correct URL for the running config-selector MFE ---
         # Get it from the environment config, using a specific key like 'config-selector-teams'
@@ -142,7 +159,8 @@ async def get_shell_configuration(user_id: str = Depends(get_current_user)):
         return ShellConfigurationResponse(
             frames=user_frames,
             availableApps=available_apps,
-            serviceEndpoints=service_endpoints # Contains the correctly formatted string URL now
+            serviceEndpoints=service_endpoints, # Contains the correctly formatted string URL now
+            layouts=filtered_layouts # Include the filtered layout definitions
         )
     except Exception as e:
         logger.error(f"Error fetching shell configuration for user {user_id}: {e}", exc_info=True)

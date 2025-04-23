@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios'; // Keep axios import for isAxiosError check
-import { AppDefinition, Preferences, ShellConfigurationResponse, eventBus, EventTypes } from 'shared'; // Added eventBus, EventTypes [cite: 414, 415, 466]
-// Using correct imports
+import { AppDefinition, Preferences, ShellConfigurationResponse, LayoutDefinition, 
+         eventBus, EventTypes } from 'shared'; // Updated imports to include LayoutDefinition
 import { configureApiService } from 'shared'; // Removed apiService import as it's not directly used here
 
 // Define the shape of the context state
@@ -10,6 +10,7 @@ export interface ShellConfigContextState {
     loading: boolean;
     error: string | null;
     availableApps: AppDefinition[] | null;
+    layouts: LayoutDefinition[] | null;
     prefsServiceUrl: string | null;
     isReady: boolean; // Flag indicating config fetch and API setup is complete
     fetchConfig: () => Promise<void>;
@@ -28,6 +29,7 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
     const [config, setConfig] = useState<Preferences | null>(null);
     const [availableApps, setAvailableApps] = useState<AppDefinition[] | null>(null);
     const [prefsServiceUrl, setPrefsServiceUrl] = useState<string | null>(null);
+    const [layouts, setLayouts] = useState<LayoutDefinition[] | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [isReady, setIsReady] = useState<boolean>(false); // Initialize readiness to false
     const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,10 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
 
             setConfig(data?.preferences ?? { frames: data?.frames ?? [] });
             setAvailableApps(data?.availableApps ?? null);
+            
+            // Set layout definitions from the API response
+            setLayouts(data?.layouts ?? null);
+            console.log("ShellConfigContext: Received layout definitions:", data?.layouts);
 
             const backendUrl = data?.serviceEndpoints?.jobConfigServiceUrl;
             console.log(`ShellConfigContext: Extracted jobConfigServiceUrl: ${backendUrl}`);
@@ -89,6 +95,7 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
             setError(errorMessage);
             setConfig(null);
             setAvailableApps(null);
+            setLayouts(null); // Clear layouts on error
             // configurationSuccessful remains false
 
         } finally {
@@ -111,10 +118,11 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
         loading,
         error,
         availableApps,
+        layouts,
         prefsServiceUrl,
         isReady, // Provide isReady in the context value
         fetchConfig
-    }), [config, loading, error, availableApps, prefsServiceUrl, isReady]); // Add isReady dependency
+    }), [config, loading, error, availableApps, layouts, prefsServiceUrl, isReady]); // Add layouts to dependencies
 
     console.log("ShellConfigProvider: Value being provided by Context:", contextValue);
     return (

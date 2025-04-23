@@ -14,10 +14,25 @@ export interface AppAssignment {
   // layoutInfo?: Record<string, any>; // Optional layout info
 }
 
+export interface LayoutWindow {
+  id: number; // Unique window ID within this layout
+  name: string; // Display name for the window
+  style: Record<string, any>; // CSS style properties for this window container
+}
+
+export interface LayoutDefinition {
+  id: string; // Unique identifier for the layout
+  name: string; // Display name of the layout
+  description: string; // Short description of the layout
+  containerStyle: Record<string, any>; // CSS style properties for the main container
+  windows: LayoutWindow[]; // Window definitions for this layout
+}
+
 export interface Frame {
   id: string; // Unique identifier for the Frame.
   name: string; // Display name of the Frame.
   order: number; // Display order of the Frame.
+  layoutId?: string; // Optional reference to a layout definition
   assignedApps: AppAssignment[]; // Apps assigned to this Frame.
 }
 
@@ -43,10 +58,12 @@ export interface Preferences {
   frames: Frame[];
   availableApps?: AppDefinition[]; // Add this property
 }
+
 export interface ServiceEndpoints {
   jobConfigServiceUrl?: string; // Base URL for the Job/Config Service API.
   // Add other service endpoints here as needed
 }
+
 
 // --- API Response/Request Models ---
 
@@ -55,6 +72,7 @@ export interface ShellConfigurationResponse {
   frames: Frame[]; 
   mainBackendUrl?: string;
   availableApps: AppDefinition[];
+  layouts: LayoutDefinition[];
   serviceEndpoints: ServiceEndpoints;
 }
 
@@ -62,4 +80,11 @@ export interface ShellConfigurationResponse {
 export interface ShellPreferencesRequest {
   frames: Frame[];
   // Add other preference sections here if needed in the future
+}
+
+export interface LayoutInfoResponse {
+  id: string;
+  name: string;
+  description: string;
+  window_count: number;
 }
