@@ -36,6 +36,19 @@ class AppConfig(BaseModel):
     url: Optional[str] = Field(None, description="URL for the app's remoteEntry.js in this environment.")
     # Add other environment-specific app config fields here
 
+class LayoutWindow(BaseModel):
+    """Defines a window within a layout template."""
+    id: int = Field(..., description="Unique identifier for the window within this layout.")
+    style: Dict[str, Any] = Field(default_factory=dict, description="CSS styles to apply to this window.")
+
+class LayoutDefinition(BaseModel):
+    """Defines a layout template for arranging multiple apps within a frame."""
+    id: str = Field(..., description="Unique identifier for the layout template.")
+    name: str = Field(..., description="Display name of the layout template.")
+    description: str = Field(..., description="Description of the layout's purpose or arrangement.")
+    containerStyle: Dict[str, Any] = Field(default_factory=dict, description="CSS styles for the container element.")
+    windows: List[LayoutWindow] = Field(..., description="Windows that make up this layout.")
+
 class ServiceEndpoints(BaseModel):
     """Defines endpoints for backend services the Shell needs to contact."""
     jobConfigServiceUrl: Optional[str] = Field(None, description="Base URL for the Job/Config Service API.")

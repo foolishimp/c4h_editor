@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Assuming routes are in ./api/routes/
 from shell_service.api.routes import shell as shell_router
 from shell_service.database import db  # <-- Corrected
-from shell_service.config import CURRENT_ENV, CURRENT_ENV_CONFIG  # Import environment config
+from shell_service.config import CURRENT_ENV, CURRENT_ENV_CONFIG, load_layout_templates  # Import environment config
 from shell_service.database import crud # <-- Corrected
 
 # Configure basic logging
@@ -27,6 +27,10 @@ async def lifespan(app: FastAPI):
     # Connect to database
     connected = await db.connect() # Check connection result
     logger.info(f"Database connection attempt during startup successful: {connected}") # Log result
+
+    # Load layout templates
+    app.state.layout_templates = load_layout_templates()
+    logger.info(f"Loaded {len(app.state.layout_templates)} layout templates")
 
     # Initialize default data
     await crud.initialize_default_data()
