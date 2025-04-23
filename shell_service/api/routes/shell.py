@@ -160,6 +160,15 @@ async def save_shell_preferences(
     # Validate frame IDs and generate any missing ones
     for frame in preferences.frames:
         # Basic check for missing or potentially invalid IDs
+        
+        # Validate that windowId is present in all assignments if layoutId is specified
+        if frame.layoutId:
+            for app_assignment in frame.assignedApps:
+                if not app_assignment.windowId:
+                    logger.warning(f"Frame {frame.id} has layoutId but assignment {app_assignment.appId} is missing windowId. Setting default windowId=1.")
+                    app_assignment.windowId = 1
+            logger.debug(f"Frame {frame.id} has layoutId={frame.layoutId} with {len(frame.assignedApps)} app assignments.")
+                    
         if not frame.id or not isinstance(frame.id, str) or len(frame.id) < 5:
             new_id = str(uuid.uuid4())
             logger.info(f"Generated new ID '{new_id}' for frame '{frame.name}' (Original ID: {frame.id})")

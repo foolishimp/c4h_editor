@@ -10,6 +10,7 @@ export type MFEType = 'ESM' | 'WebComponent' | 'Iframe';
 
 export interface AppAssignment {
   appId: string; // The unique ID of the assigned AppDefinition.
+  windowId?: number; // The specific window ID this app is assigned to (1-based)
   // layoutInfo?: Record<string, any>; // Optional layout info
 }
 

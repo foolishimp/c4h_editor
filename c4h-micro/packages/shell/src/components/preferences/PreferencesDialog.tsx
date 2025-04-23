@@ -24,6 +24,13 @@ interface PreferencesDialogProps {
     onClose: () => void;
 }
 
+// Define type for Layout Template from API
+interface LayoutInfoResponse {
+    id: string;
+    name: string;
+    description: string;
+    window_count: number;
+}
 // Define type for Frame Template placeholders
 interface FrameTemplate { id: string; name: string; slots: number; }
 
@@ -45,13 +52,9 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
     const [editingFrame, setEditingFrame] = useState<Frame | null>(null);
     const [isEditMode, setIsEditMode] = useState<boolean>(false);
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-
-    // Placeholder Data
-    const frameTemplates: FrameTemplate[] = [
-        { id: 'template-1', name: 'Single App Layout', slots: 1 },
-        { id: 'template-2', name: 'Two App Layout', slots: 2 },
-        { id: 'template-3', name: 'Three App Layout', slots: 3 },
-    ];
+    const [layoutTemplates, setLayoutTemplates] = useState<LayoutInfoResponse[]>([]);
+    const [loadingLayouts, setLoadingLayouts] = useState<boolean>(false);
+    const [layoutError, setLayoutError] = useState<string | null>(null);
 
     // --- Full Render Log ---
     console.log(`PreferencesDialog Render =========================`);
@@ -96,6 +99,35 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         // Only depend on config?.frames here, as availableApps changing shouldn't reset the frames editing state
     }, [open, config?.frames]); // Rerun if dialog opens or frames data changes
 
+    // useEffect to fetch layout templates when dialog opens
+    useEffect(() => {
+        console.log(`PreferencesDialog: useEffect[open] triggered for layout templates. open=${open}, layoutTemplates.length=${layoutTemplates.length}`);
+        if (open) {
+            fetchLayoutTemplates();
+        }
+    }, [open, prefsServiceUrl]); // Depend on open state and prefsServiceUrl
+
+    // Function to fetch layout templates from API
+    const fetchLayoutTemplates = async () => {
+        console.log("PreferencesDialog: fetchLayoutTemplates called.");
+        if (!prefsServiceUrl) {
+            console.error("PreferencesDialog: Cannot fetch layouts - prefsServiceUrl is not configured!");
+            setLayoutError("Layout service URL is not configured.");
+            return;
+        }
+        setLoadingLayouts(true);
+        setLayoutError(null);
+        try {
+            const response = await axios.get<LayoutInfoResponse[]>(`${prefsServiceUrl}/api/v1/shell/layouts`);
+            console.log("PreferencesDialog: Layout templates fetched:", response.data);
+            setLayoutTemplates(response.data);
+        } catch (err: any) {
+            setLayoutError(err.response?.data?.detail || err.message || 'Failed to load layout templates.');
+            console.error("PreferencesDialog: Error fetching layout templates:", err);
+        } finally {
+            setLoadingLayouts(false);
+        }
+    };
     // --- Callback Handlers with Logging ---
     const handleMoveFrame = useCallback((index: number, direction: 'up' | 'down') => {
         console.log(`PreferencesDialog: handleMoveFrame called. index=${index}, direction=${direction}`);
@@ -126,7 +158,8 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
 
     const handleEditFrame = (frameToEdit: Frame) => {
         console.log("PreferencesDialog: handleEditFrame called for frame:", frameToEdit);
-        const template = frameTemplates.find(t => t.slots === frameToEdit.assignedApps.length);
+        // Find template based on window count matching assigned apps
+        const template = layoutTemplates.find(t => t.window_count === frameToEdit.assignedApps.length);
         const initialTemplateId = template ? template.id : '';
         console.log(`PreferencesDialog: Initial template based on slots (${frameToEdit.assignedApps.length}): ${initialTemplateId}`);
         setSelectedTemplateId(initialTemplateId);
@@ -165,16 +198,16 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         setSelectedTemplateId(templateId); // Update template ID state first
 
         // Update editingFrame based on the *new* templateId
-        const template = frameTemplates.find(t => t.id === templateId);
-        const numberOfSlots = template ? template.slots : 0;
+        const template = layoutTemplates.find(t => t.id === templateId);
+        const numberOfSlots = template ? template.window_count : 0;
         console.log(`PreferencesDialog: Number of slots for template ${templateId}: ${numberOfSlots}`);
-
+        
         if (editingFrame) {
             const currentApps = editingFrame.assignedApps || []; // Ensure currentApps is an array
             // Create new app assignments array based on the new slot count
             const newAssignedApps: AppAssignment[] = Array(numberOfSlots).fill(null).map((_, index) =>
                 // Keep existing app if slot still exists, otherwise create empty assignment
-                currentApps[index] ? { ...currentApps[index] } : { appId: '' }
+                currentApps[index] ? { ...currentApps[index], windowId: index + 1 } : { appId: '', windowId: index + 1 }
             );
             console.log("PreferencesDialog: Updating editingFrame's assignedApps:", newAssignedApps);
             // Update the editingFrame state with the new assignedApps array
@@ -191,7 +224,8 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
             // Create a new array for assignedApps to ensure state update
             const updatedApps = [...editingFrame.assignedApps];
             if (slotIndex >= 0 && slotIndex < updatedApps.length) {
-                updatedApps[slotIndex] = { appId: appId };
+                const windowId = slotIndex + 1; // 1-based windowId
+                updatedApps[slotIndex] = { appId: appId, windowId: windowId };
                 console.log("PreferencesDialog: Updating assignedApps in editingFrame state:", updatedApps);
                 setEditingFrame(prev => prev ? { ...prev, assignedApps: updatedApps } : null);
             } else {
@@ -285,14 +319,26 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         // Prioritize selected template
         if (selectedTemplateId) {
             const template = frameTemplates.find(t => t.id === selectedTemplateId);
-            const slots = template ? template.slots : 0;
-            console.log(`  > getNumberOfSlots: Based on selectedTemplateId '${selectedTemplateId}', returning ${slots} slots.`);
-            return slots;
+            if (template) {
+                console.log(`  > getNumberOfSlots: Based on old static template for selectedTemplateId '${selectedTemplateId}', returning ${template.slots} slots.`);
+                return template.slots;
+            }
+            
+            // Now try finding the template in the dynamic templates from API
+            const apiTemplate = layoutTemplates.find(t => t.id === selectedTemplateId);
+            if (apiTemplate) {
+                const slots = apiTemplate.window_count;
+                console.log(`  > getNumberOfSlots: Based on API template for selectedTemplateId '${selectedTemplateId}', returning ${slots} slots.`);
+                return slots;
+            }
+            
+            console.log(`  > getNumberOfSlots: Template '${selectedTemplateId}' not found in either source, returning 0 slots.`);
+            return 0;
         }
         // If no template selected but we are editing an existing frame, use its current app count
         if (!editingFrame.id.startsWith('new-') && editingFrame.assignedApps) {
             const slots = editingFrame.assignedApps.length;
-            console.log(`  > getNumberOfSlots: Based on existing editingFrame.assignedApps length, returning ${slots} slots.`);
+            console.log(`  > getNumberOfSlots: Based on existing editingFrame.assignedApps length, returning ${slots} slots.`); 
             return slots;
         }
         // Default for new frame with no template selected yet
@@ -300,7 +346,7 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         return 0;
         // Depend on the state variables it uses
     }, [editingFrame, selectedTemplateId]);
-
+    
     // Calculate number of slots based on current state for rendering
     const numberOfSlots = getNumberOfSlots();
     console.log(`PreferencesDialog Render - Calculated numberOfSlots: ${numberOfSlots}`);
@@ -349,12 +395,18 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                                         value={selectedTemplateId}
                                         label="Frame Layout Template"
                                         onChange={handleTemplateChange}
-                                        disabled={isSaving}
+                                        disabled={isSaving || loadingLayouts}
                                     >
                                         <MenuItem value=""><em>Select a Layout...</em></MenuItem>
-                                        {frameTemplates.map(template => (
-                                            <MenuItem key={template.id} value={template.id}>
-                                                {template.name} ({template.slots} app slot{template.slots !== 1 ? 's' : ''})
+                                        {loadingLayouts && (
+                                            <MenuItem disabled><CircularProgress size={20} /> Loading layouts...</MenuItem>
+                                        )}
+                                        {layoutError && (
+                                            <MenuItem disabled sx={{ color: 'error.main' }}><em>Error: {layoutError}</em></MenuItem>
+                                        )}
+                                        {layoutTemplates.map(layout => (
+                                            <MenuItem key={layout.id} value={layout.id}>
+                                                {layout.name} ({layout.window_count} app slot{layout.window_count !== 1 ? 's' : ''}) - {layout.description}
                                             </MenuItem>
                                         ))}
                                     </Select>
