@@ -9,15 +9,6 @@ import ConfigManager from './ConfigManager';
 import { ConfigProvider } from './contexts/ConfigContext';
 import { configTypes, eventBus, EventTypes, bootstrapConfig } from 'shared';
 
-/**
- * Map between shell app IDs and normalized config types
- */
-const appIdToConfigType: Record<string, string> = {
-  'config-selector-workorders': 'workorder',
-  'config-selector-teams': 'teamconfig', 
-  'config-selector-teamconfigs': 'teamconfig',
-  'config-selector-runtime': 'runtimeconfig'
-};
 
 /**
  * Bootstrap function for config-selector MFE
@@ -44,37 +35,27 @@ export async function bootstrapMfe(mfeId: string) {
  * and shell readiness check
  */
 export function mount(props: any) {
-  const { domElement, appId = '', customProps = {} } = props; // Use appId from props
- 
+  const { domElement, appId = '', customProps = {} } = props; // Get appId and customProps
+
   // Call bootstrap when mounted
   bootstrapMfe(appId)
     .catch(err => console.error(`ConfigSelector: Bootstrap error during mount:`, err));
-  
-  // Determine config type from app ID or props
-  let configType = customProps.configType || 'workorder'; // Default
-  
-  if (appId) {
-    if (appIdToConfigType[appId]) {
-      // Direct mapping exists
-      configType = appIdToConfigType[appId];
-    } else {
-      // Try pattern matching
-      const matches = appId.match(/config-selector-(\w+)/i);
-      if (matches && matches[1]) {
-        const extracted = matches[1].toLowerCase();
-        
-        // Handle plural forms
-        if (extracted.endsWith('s') && configTypes[extracted.slice(0, -1)]) {
-          configType = extracted.slice(0, -1);
-        } else if (configTypes[extracted]) {
-          configType = extracted;
-        }
-      }
-    }
+
+  // *** START SIMPLIFICATION ***
+  // Directly use the configType prop passed from the Shell
+  const configType = customProps.configType;
+
+  if (!configType) {
+      console.error(`ConfigSelector Mount: configType not provided in customProps for appId: ${appId}`);
+      // Handle error: Render error message or throw
+      domElement.innerHTML = `<div style="color: red; padding: 1em;">Error: Configuration type missing for ${appId}. Ensure shell passes correct props.</div>`;
+      return { unmount: () => {} }; // Return minimal unmount
   }
-  
-  console.log(`ConfigSelector: Mount called with configType: ${configType} from appId: ${appId}`);
-  
+  // *** END SIMPLIFICATION ***
+
+  console.log(`ConfigSelector: Mount called. Using configType='${configType}' from props (appId: ${appId})`);
+
+  // Determine config type from app ID or props
   // Create shell-aware mount function
   const root = createRoot(domElement);
   const render = () => {
@@ -82,10 +63,11 @@ export function mount(props: any) {
       <StyledEngineProvider injectFirst>
         <ThemeProvider theme={createTheme()}>
           <CssBaseline />
+          {/* Pass the validated configType from props */}
           <ConfigProvider configType={configType} initialConfigId={customProps.configId}>
-            <ConfigManager 
-              configType={configType} 
-              {...customProps} 
+            <ConfigManager
+              configType={configType}
+              {...customProps}
               onNavigateTo={customProps.onNavigateTo}
               onNavigateBack={customProps.onNavigateBack}
             />

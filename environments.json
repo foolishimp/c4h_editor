@@ -5,12 +5,14 @@
 
     "shell":         { "url": "http://localhost:3100" },
 
-    "yaml-editor":            { "url": "http://localhost:3105/src/main.tsx" },
-    "config-selector-workorder": { "url": "http://localhost:3101/src/main.tsx" },
-    "config-selector-teams":  { "url": "http://localhost:3101/src/main.tsx" },
-    "config-selector-runtime":{ "url": "http://localhost:3101/src/main.tsx" },
-    "job-management":         { "url": "http://localhost:3104/src/main.tsx" },
-    "test-app":               { "url": "http://localhost:3106/src/main.tsx" }
+    "yaml-editor":   { "url": "http://localhost:3105/src/main.tsx" },
+
+    "workorder":     { "url": "http://localhost:3101/src/main.tsx" },
+    "teamconfig":    { "url": "http://localhost:3101/src/main.tsx" },
+    "runtimeconfig": { "url": "http://localhost:3101/src/main.tsx" },
+
+    "job-management":{ "url": "http://localhost:3104/src/main.tsx" },
+    "test-app":      { "url": "http://localhost:3106/src/main.tsx" }
   },
   "production": {
     "main_backend":  { "url": "https://api.example.com" },
@@ -18,11 +20,13 @@
 
     "shell":         { "url": "https://app.example.com" },
 
-    "yaml-editor":            { "url": "https://cdn.example.com/yaml-editor/latest/assets/yaml-editor.js" },
-    "config-selector-workorder": { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" },
-    "config-selector-teams":  { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" },
-    "config-selector-runtime":{ "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" },
-    "job-management":         { "url": "https://cdn.example.com/job-management/latest/assets/job-management.js" },
-    "test-app":               { "url": "https://cdn.example.com/test-app/latest/assets/test-app.js" }
+    "yaml-editor":   { "url": "https://cdn.example.com/yaml-editor/latest/assets/yaml-editor.js" },
+
+    "workorder":     { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" }, 
+    "teamconfig":    { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" }, 
+    "runtimeconfig": { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" }, 
+
+    "job-management":{ "url": "https://cdn.example.com/job-management/latest/assets/job-management.js" },
+    "test-app":      { "url": "https://cdn.example.com/test-app/latest/assets/test-app.js" }
   }
 }

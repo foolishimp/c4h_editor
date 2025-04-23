@@ -1,4 +1,3 @@
-// File: packages/shell/src/components/create/ConfigTypeSelector.tsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -9,16 +8,20 @@ import {
   CardActionArea,
   Grid,
   Button
-} from '@mui/material';
-import { configTypes } from 'shared';
+} from '@mui/material'; // Keep Button import
+import { configTypes, AppDefinition } from 'shared'; // Keep configTypes for metadata lookup, import AppDefinition
 import { 
   Description as DescriptionIcon,
   Group as GroupIcon,
   Settings as SettingsIcon 
 } from '@mui/icons-material';
+// Import the context hook
+import { useShellConfig } from '../../contexts/ShellConfigContext';
 
 const ConfigTypeSelector: React.FC = () => {
   const navigate = useNavigate();
+  // Get availableApps from the shell context
+  const { availableApps, loading: shellLoading, error: shellError } = useShellConfig();
   
   // Function to get an icon for a config type
   const getConfigTypeIcon = (configType: string) => {
@@ -34,10 +37,25 @@ const ConfigTypeSelector: React.FC = () => {
     }
   };
   
-  // Handle config type selection
+  // Handle config type selection (parameter is now the configType key)
   const handleSelectConfigType = (configType: string) => {
     navigate(`/configs/${configType}/new`);
   };
+  
+  // Filter availableApps to find only the config selector types
+  const availableConfigSelectors = React.useMemo(() => {
+    if (!availableApps) return [];
+    // Filter apps where the app.id is a key in our configTypes metadata registry
+    return availableApps.filter(app => configTypes.hasOwnProperty(app.id));
+  }, [availableApps]);
+
+  if (shellLoading) {
+    return <Typography sx={{p: 3}}>Loading available application types...</Typography>;
+  }
+
+  if (shellError) {
+    return <Typography sx={{p: 3}} color="error">Error loading application types: {shellError}</Typography>;
+  }
   
   return (
     <Box sx={{ p: 3 }}>
@@ -51,23 +69,28 @@ const ConfigTypeSelector: React.FC = () => {
       </Typography>
       
       <Grid container spacing={3}>
-        {Object.entries(configTypes).map(([type, config]) => (
-          <Grid item xs={12} sm={6} md={4} key={type}>
+        {/* Iterate over the filtered availableApps */}
+        {availableConfigSelectors.map((app) => {
+          // Use app.id (which is now 'workorder', 'teamconfig', etc.) to look up metadata
+          const configMetadata = configTypes[app.id];
+          if (!configMetadata) return null; // Should not happen if filter works
+
+          return (<Grid item xs={12} sm={6} md={4} key={app.id}>
             <Card>
-              <CardActionArea onClick={() => handleSelectConfigType(type)}>
+              <CardActionArea onClick={() => handleSelectConfigType(app.id)}>
                 <CardContent sx={{ textAlign: 'center', py: 4 }}>
-                  {getConfigTypeIcon(type)}
+                  {getConfigTypeIcon(app.id)} {/* Use app.id for icon lookup */}
                   <Typography variant="h5" component="div" sx={{ mt: 2 }}>
-                    {config.name}
+                    {configMetadata.name} {/* Get name from configTypes metadata */}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {config.description}
+                    {configMetadata.description}
                   </Typography>
                 </CardContent>
               </CardActionArea>
             </Card>
-          </Grid>
-        ))}
+          </Grid>)
+        })}
       </Grid>
     </Box>
   );

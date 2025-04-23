@@ -1,21 +1,21 @@
 {
   "availableApps": [
     {
-      "id": "config-selector-workorders",
+      "id": "workorder",
       "name": "Workorder Config Manager",
       "scope": "configSelector",
       "module": "./ConfigManager",
       "url": ""
     },
     {
-      "id": "config-selector-teams",
+      "id": "teamconfig",
       "name": "Team Config Manager",
       "scope": "configSelector",
       "module": "./ConfigManager",
       "url":  ""
     },
     {
-      "id": "config-selector-runtime",
+      "id": "runtimeconfig",
       "name": "Runtime Config Manager",
       "scope": "configSelector",
       "module": "./ConfigManager",

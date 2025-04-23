@@ -194,19 +194,6 @@ const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
        helperText="Describe the changes you made."
      />
 
-     { /* Action Buttons */ }
-     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-        {/* Back button moved to top */}
-        <span></span> {/* Placeholder for spacing */}
-       <Button
-         variant="contained" 
-         onClick={handleSave}
-         disabled={loading || saved || yaml === undefined || (isNew && !newIdInput)} // Disable save if new and no ID
-       >
-         {loading ? <CircularProgress size={24} /> : 'Save Configuration'}
-       </Button>
-     </Box>
-
       {/* Snackbar for feedback */}
       <Snackbar
         open={snackbarOpen}

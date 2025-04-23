@@ -19,15 +19,15 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useShellConfig, ShellConfigProvider } from './contexts/ShellConfigContext';
 import TabBar from './components/layout/TabBar';
-// Ensure all needed types/values are imported from shared
-import { AppAssignment, AppDefinition, eventBus, EventTypes, MFEType } from 'shared';
+// Ensure all needed types/values are imported from shared (including configTypes)
+import { AppAssignment, AppDefinition, eventBus, EventTypes, MFEType, configTypes } from 'shared';
 import { setupEventBusBridge } from './utils/eventBusBridge';
 import PreferencesDialog from './components/preferences/PreferencesDialog';
 
 // Theme definition
 const theme = createTheme({
     palette: {
-        primary: { main: '#1976d2' },
+        primary: { main: '#1976d2' }, //
         secondary: { main: '#dc004e' },
         background: { default: '#f5f7fa' },
     },
@@ -37,6 +37,7 @@ const theme = createTheme({
             'Ubuntu', 'Cantarell', 'Open Sans', 'Helvetica Neue', 'sans-serif',
         ].join(','),
     },
+    
 });
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode, message?: string }, { hasError: boolean, error: any }> {
@@ -248,15 +249,19 @@ function AppContent() {
             appId: appDef.id
         };
         const customProps: Record<string, any> = {};
-        if (appDef.id.startsWith('config-selector-')) {
-            const configTypeRaw = appDef.id.replace('config-selector-', '');
-            const configType = configTypeRaw.endsWith('s') ? configTypeRaw.slice(0, -1) : configTypeRaw;
+        // --- SIMPLIFIED LOGIC ---
+        // Directly check if the appDef.id is a known config type key
+        // Assuming 'configTypes' is imported from 'shared' or accessible here
+        // (You might need to add the import: import { configTypes } from 'shared';)
+        if (configTypes && configTypes.hasOwnProperty(appDef.id)) {
+            // If it is, use the appId directly as the configType prop
             Object.assign(customProps, {
-                configType,
+                configType: appDef.id, // e.g., 'teamconfig', 'workorder'
                 configId: activeConfigId,
                 onNavigateBack: () => setActiveConfigId(null),
                 onNavigateTo: (id: string) => setActiveConfigId(id)
             });
+            console.log(`App.tsx Mount Effect: Passing configType='${appDef.id}' as prop for ${appDef.id}`);
         }
 
         // --- Unmount Previous Module (Safety Check) ---
