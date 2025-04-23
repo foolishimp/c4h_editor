@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios'; // Need axios for the direct PUT call
+import axios from 'axios';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button, IconButton,
     Typography, Box, List, ListItem, ListItemText, ListItemIcon,
@@ -14,104 +14,36 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsIcon from '@mui/icons-material/Settings';
 
-// Use the context hook to get the correct URL for the preferences service
 import { useShellConfig } from '../../contexts/ShellConfigContext';
-// Import types
-import { Frame, AppAssignment, ShellPreferencesRequest, AppDefinition } from 'shared';
+// Import types from shared - Ensure shared package is built correctly after export changes
+import {
+    Frame, AppAssignment, ShellPreferencesRequest, AppDefinition, LayoutInfoResponse
+} from 'shared'; // Import LayoutInfoResponse
 
 interface PreferencesDialogProps {
     open: boolean;
     onClose: () => void;
 }
 
-// Define type for Layout Template from API
-interface LayoutInfoResponse {
-    id: string;
-    name: string;
-    description: string;
-    window_count: number;
-}
-// Define type for Frame Template placeholders
-interface FrameTemplate { id: string; name: string; slots: number; }
+// REMOVED FrameTemplate interface
 
 const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) => {
-    // 1. Call the hook FIRST and assign the result to contextData
-    const contextData = useShellConfig();
+    const { config, loading: configLoading, error: configError, fetchConfig, prefsServiceUrl, availableApps } = useShellConfig();
 
-    // 2. Log the value received from the hook
-    console.log("PreferencesDialog: Value received from useShellConfig() hook:", contextData);
-
-    // 3. Destructure AFTER logging, including availableApps
-    const { config, loading: configLoading, error: configError, fetchConfig, prefsServiceUrl, availableApps } = contextData;
-
-    // State variables
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [editedFrames, setEditedFrames] = useState<Frame[]>([]);
-    const [editingFrame, setEditingFrame] = useState<Frame | null>(null);
+    const [editedFrames, setEditedFrames] = useState<Frame[]>([]); // Use Frame type
+    const [editingFrame, setEditingFrame] = useState<Frame | null>(null); // Use Frame type
     const [isEditMode, setIsEditMode] = useState<boolean>(false);
-    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-    const [layoutTemplates, setLayoutTemplates] = useState<LayoutInfoResponse[]>([]);
+    const [layoutTemplates, setLayoutTemplates] = useState<LayoutInfoResponse[]>([]); // Use LayoutInfoResponse type
     const [loadingLayouts, setLoadingLayouts] = useState<boolean>(false);
     const [layoutError, setLayoutError] = useState<string | null>(null);
+    const [selectedLayoutId, setSelectedLayoutId] = useState<string>(''); // Store the selected layout ID
 
-    // --- Full Render Log ---
-    console.log(`PreferencesDialog Render =========================`);
-    console.log(`  > open: ${open}`);
-    console.log(`  > isEditMode: ${isEditMode}`);
-    console.log(`  > isSaving: ${isSaving}`);
-    console.log(`  > config loading/error: loading=${configLoading}, error=${configError}`);
-    // Log the destructured config object (should contain frames)
-    console.log(`  > destructured 'config' object:`, config);
-    // Log the destructured availableApps directly
-    console.log(`  > destructured 'availableApps' (length):`, availableApps?.length);
-    console.log(`  > selectedTemplateId state:`, selectedTemplateId);
-    console.log(`  > editingFrame state:`, editingFrame ? { id: editingFrame.id, name: editingFrame.name, apps: editingFrame.assignedApps } : null);
-    console.log(`  > editedFrames state (length):`, editedFrames?.length);
-    console.log(`==================================================`);
-    // --- END LOG ---
-
-
-    // useEffect to initialize local state when dialog opens or config changes
-    useEffect(() => {
-        console.log(`PreferencesDialog: useEffect[open, config?.frames] triggered. open=${open}`);
-        // Use the config from the contextData directly here if needed, or the destructured one
-        if (open && config?.frames) {
-            console.log("PreferencesDialog: Initializing state from config.frames");
-            const sortedFrames = [...config.frames]
-                .sort((a, b) => a.order - b.order)
-                // Deep copy assignedApps to prevent mutation issues
-                .map(f => ({ ...f, assignedApps: [...(f.assignedApps || [])].map(app => ({ ...app })) }));
-            setEditedFrames(sortedFrames);
-            setSaveError(null);
-            setSuccessMessage(null);
-            // Reset edit mode state only when opening
-            if (!isEditMode) { // Avoid resetting if already editing
-                setIsEditMode(false);
-                setEditingFrame(null);
-                setSelectedTemplateId('');
-            }
-            console.log("PreferencesDialog: State initialized.");
-        } else if (!open) {
-            console.log("PreferencesDialog: Dialog closed.");
-        }
-        // Only depend on config?.frames here, as availableApps changing shouldn't reset the frames editing state
-    }, [open, config?.frames]); // Rerun if dialog opens or frames data changes
-
-    // useEffect to fetch layout templates when dialog opens
-    useEffect(() => {
-        console.log(`PreferencesDialog: useEffect[open] triggered for layout templates. open=${open}, layoutTemplates.length=${layoutTemplates.length}`);
-        if (open) {
-            fetchLayoutTemplates();
-        }
-    }, [open, prefsServiceUrl]); // Depend on open state and prefsServiceUrl
-
-    // Function to fetch layout templates from API
-    const fetchLayoutTemplates = async () => {
-        console.log("PreferencesDialog: fetchLayoutTemplates called.");
+    // Fetch layout templates
+    const fetchLayoutTemplates = useCallback(async () => {
         if (!prefsServiceUrl) {
-            console.error("PreferencesDialog: Cannot fetch layouts - prefsServiceUrl is not configured!");
             setLayoutError("Layout service URL is not configured.");
             return;
         }
@@ -119,238 +51,210 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
         setLayoutError(null);
         try {
             const response = await axios.get<LayoutInfoResponse[]>(`${prefsServiceUrl}/api/v1/shell/layouts`);
-            console.log("PreferencesDialog: Layout templates fetched:", response.data);
             setLayoutTemplates(response.data);
         } catch (err: any) {
             setLayoutError(err.response?.data?.detail || err.message || 'Failed to load layout templates.');
-            console.error("PreferencesDialog: Error fetching layout templates:", err);
         } finally {
             setLoadingLayouts(false);
         }
-    };
-    // --- Callback Handlers with Logging ---
+    }, [prefsServiceUrl]);
+
+    // Initialize state
+    useEffect(() => {
+        if (open && config?.frames) {
+            const sortedFrames = [...config.frames]
+                .sort((a, b) => a.order - b.order)
+                .map(f => ({ ...f, assignedApps: [...(f.assignedApps || [])].map(app => ({ ...app })) }));
+            setEditedFrames(sortedFrames);
+            setSaveError(null);
+            setSuccessMessage(null);
+            if (!isEditMode) {
+                setIsEditMode(false);
+                setEditingFrame(null);
+                setSelectedLayoutId('');
+            }
+        } else if (!open) {
+            setIsEditMode(false);
+            setEditingFrame(null);
+            setSelectedLayoutId('');
+        }
+    }, [open, config?.frames]); // isEditMode removed from deps
+
+    // Fetch layouts when dialog opens
+    useEffect(() => {
+        if (open && layoutTemplates.length === 0) {
+            fetchLayoutTemplates();
+        }
+    }, [open, fetchLayoutTemplates, layoutTemplates.length]);
+
+    // --- Callback Handlers ---
     const handleMoveFrame = useCallback((index: number, direction: 'up' | 'down') => {
-        console.log(`PreferencesDialog: handleMoveFrame called. index=${index}, direction=${direction}`);
         setEditedFrames(currentFrames => {
             const newFrames = [...currentFrames];
             const targetIndex = direction === 'up' ? index - 1 : index + 1;
-            if (targetIndex < 0 || targetIndex >= newFrames.length) {
-                console.log("PreferencesDialog: Move out of bounds, returning current frames.");
-                return currentFrames;
-            }
+            if (targetIndex < 0 || targetIndex >= newFrames.length) return currentFrames;
             [newFrames[index], newFrames[targetIndex]] = [newFrames[targetIndex], newFrames[index]];
-            const reorderedFrames = newFrames.map((frame, idx) => ({ ...frame, order: idx }));
-            console.log("PreferencesDialog: Frames reordered locally:", reorderedFrames);
-            return reorderedFrames;
+            return newFrames.map((frame, idx) => ({ ...frame, order: idx }));
         });
-        setSuccessMessage(null); setSaveError(null); // Clear feedback on edit
+        setSuccessMessage(null); setSaveError(null);
     }, []);
 
     const handleAddNewFrame = () => {
-        console.log("PreferencesDialog: handleAddNewFrame called.");
-        const newFrame: Frame = { id: `new-${Date.now()}`, name: 'New Tab', order: editedFrames.length, assignedApps: [] };
-        console.log("PreferencesDialog: Setting editingFrame for new tab:", newFrame);
+        // Explicitly define type, ensuring layoutId and assignedApps exist
+        const newFrame: Frame = {
+            id: `new-${Date.now()}`,
+            name: 'New Tab',
+            order: editedFrames.length,
+            layoutId: undefined, // Start with no layout
+            assignedApps: [] // Start with empty apps
+        };
         setEditingFrame(newFrame);
-        setSelectedTemplateId(''); // Reset template for new frame
+        setSelectedLayoutId('');
         setIsEditMode(true);
         setSuccessMessage(null); setSaveError(null);
     };
 
     const handleEditFrame = (frameToEdit: Frame) => {
-        console.log("PreferencesDialog: handleEditFrame called for frame:", frameToEdit);
-        // Find template based on window count matching assigned apps
-        const template = layoutTemplates.find(t => t.window_count === frameToEdit.assignedApps.length);
-        const initialTemplateId = template ? template.id : '';
-        console.log(`PreferencesDialog: Initial template based on slots (${frameToEdit.assignedApps.length}): ${initialTemplateId}`);
-        setSelectedTemplateId(initialTemplateId);
-        // Deep copy assignedApps
-        const frameCopy = { ...frameToEdit, assignedApps: frameToEdit.assignedApps.map(app => ({ ...app })) };
+        // Ensure assignedApps is an array when copying
+        const frameCopy: Frame = { ...frameToEdit, assignedApps: (frameToEdit.assignedApps || []).map(app => ({ ...app })) };
         setEditingFrame(frameCopy);
+        setSelectedLayoutId(frameToEdit.layoutId || ''); // Use layoutId from Frame type
         setIsEditMode(true);
         setSuccessMessage(null); setSaveError(null);
     };
 
     const handleCancelEdit = () => {
-        console.log("PreferencesDialog: handleCancelEdit called.");
         setIsEditMode(false);
         setEditingFrame(null);
-        setSelectedTemplateId('');
+        setSelectedLayoutId('');
     };
 
     const handleDeleteFrame = (frameIdToDelete: string) => {
-        console.log(`PreferencesDialog: handleDeleteFrame called for ID: ${frameIdToDelete}`);
-        if (window.confirm(`Are you sure you want to delete tab ${frameIdToDelete}? This takes effect after clicking 'Save All Preferences'.`)) {
-            console.log(`PreferencesDialog: Deleting frame ${frameIdToDelete} locally.`);
-            setEditedFrames(currentFrames => {
-                const updatedFrames = currentFrames.filter(f => f.id !== frameIdToDelete).map((frame, idx) => ({ ...frame, order: idx }));
-                console.log("PreferencesDialog: Frames after local deletion:", updatedFrames);
-                return updatedFrames;
-            });
+        if (window.confirm(`Delete tab "${editedFrames.find(f => f.id === frameIdToDelete)?.name || frameIdToDelete}"?`)) {
+            setEditedFrames(currentFrames => currentFrames
+                .filter(f => f.id !== frameIdToDelete)
+                .map((frame, idx) => ({ ...frame, order: idx }))
+            );
             setSuccessMessage(null); setSaveError(null);
-        } else {
-            console.log("PreferencesDialog: Frame deletion cancelled by user.");
         }
     };
 
     const handleTemplateChange = (event: SelectChangeEvent<string>) => {
-        const templateId = event.target.value;
-        console.log(`PreferencesDialog: handleTemplateChange called. New templateId: ${templateId}`);
-        setSelectedTemplateId(templateId); // Update template ID state first
+        const newLayoutId = event.target.value;
+        setSelectedLayoutId(newLayoutId);
 
-        // Update editingFrame based on the *new* templateId
-        const template = layoutTemplates.find(t => t.id === templateId);
+        const template = layoutTemplates.find(t => t.id === newLayoutId);
         const numberOfSlots = template ? template.window_count : 0;
-        console.log(`PreferencesDialog: Number of slots for template ${templateId}: ${numberOfSlots}`);
-        
+
         if (editingFrame) {
-            const currentApps = editingFrame.assignedApps || []; // Ensure currentApps is an array
-            // Create new app assignments array based on the new slot count
-            const newAssignedApps: AppAssignment[] = Array(numberOfSlots).fill(null).map((_, index) =>
-                // Keep existing app if slot still exists, otherwise create empty assignment
-                currentApps[index] ? { ...currentApps[index], windowId: index + 1 } : { appId: '', windowId: index + 1 }
-            );
-            console.log("PreferencesDialog: Updating editingFrame's assignedApps:", newAssignedApps);
-            // Update the editingFrame state with the new assignedApps array
-            setEditingFrame(prev => prev ? { ...prev, assignedApps: newAssignedApps } : null);
-        } else {
-            console.log("PreferencesDialog: editingFrame is null, cannot update assignedApps.");
+            const currentApps = editingFrame.assignedApps || [];
+            // Create new app assignments array
+            const newAssignedApps: AppAssignment[] = Array(numberOfSlots).fill(null).map((_, index) => {
+                const windowId = index + 1;
+                const existingApp = currentApps.find(app => app.windowId === windowId);
+                // Ensure AppAssignment includes windowId
+                return existingApp ? { ...existingApp } : { appId: '', windowId: windowId };
+            });
+            // Update editingFrame state, including the layoutId
+            setEditingFrame(prev => prev ? { ...prev, layoutId: newLayoutId || undefined, assignedApps: newAssignedApps } : null);
         }
     };
 
     const handleAppAssignmentChange = (slotIndex: number, event: SelectChangeEvent<string>) => {
         const appId = event.target.value;
-        console.log(`PreferencesDialog: handleAppAssignmentChange called. slotIndex=${slotIndex}, appId=${appId}`);
+        const windowId = slotIndex + 1; // Derive windowId
         if (editingFrame) {
-            // Create a new array for assignedApps to ensure state update
-            const updatedApps = [...editingFrame.assignedApps];
-            if (slotIndex >= 0 && slotIndex < updatedApps.length) {
-                const windowId = slotIndex + 1; // 1-based windowId
-                updatedApps[slotIndex] = { appId: appId, windowId: windowId };
-                console.log("PreferencesDialog: Updating assignedApps in editingFrame state:", updatedApps);
-                setEditingFrame(prev => prev ? { ...prev, assignedApps: updatedApps } : null);
+            const updatedApps = [...(editingFrame.assignedApps || [])];
+            const existingAssignmentIndex = updatedApps.findIndex(app => app.windowId === windowId);
+
+            if (existingAssignmentIndex !== -1) {
+                 // Update existing, ensuring windowId is included
+                updatedApps[existingAssignmentIndex] = { ...updatedApps[existingAssignmentIndex], appId: appId, windowId: windowId };
+            } else if (slotIndex < numberOfSlots) {
+                // Add new assignment for this window if it doesn't exist (should only happen if array was empty)
+                 updatedApps[slotIndex] = { appId: appId, windowId: windowId };
+                 console.warn(`App Assignment: Added new entry for slotIndex ${slotIndex} / windowId ${windowId} as it wasn't found.`);
             } else {
-                console.log(`PreferencesDialog: Invalid slotIndex ${slotIndex} for assignedApps length ${updatedApps.length}`);
+                 console.error(`App Assignment: Invalid slotIndex ${slotIndex} or windowId ${windowId} for assignment.`);
+                 return; // Prevent adding invalid data
             }
-        } else {
-            console.log("PreferencesDialog: editingFrame is null, cannot update app assignment.");
+
+            setEditingFrame(prev => prev ? { ...prev, assignedApps: updatedApps } : null);
         }
     };
 
+
     const handleSaveEdit = () => {
-        console.log("PreferencesDialog: handleSaveEdit called.");
         if (!editingFrame || !editingFrame.name.trim()) {
-            console.log("PreferencesDialog: SaveEdit failed - Tab Name required.");
             setSaveError("Tab Name required.");
             return;
         }
-        console.log("PreferencesDialog: Applying local edits for frame:", editingFrame);
         setSaveError(null);
         setEditedFrames(currentFrames => {
             const index = currentFrames.findIndex(f => f.id === editingFrame.id);
             const newFrames = [...currentFrames];
-            // Ensure deep copy of assignedApps when saving locally
-            const frameToSave = { ...editingFrame, assignedApps: editingFrame.assignedApps.map(app => ({ ...app })) };
+            // Create a copy ensuring assignedApps exists and includes windowId
+            const frameToSave: Frame = {
+                ...editingFrame,
+                assignedApps: (editingFrame.assignedApps || []).map(app => ({
+                    appId: app.appId,
+                    windowId: app.windowId // Ensure windowId is present
+                }))
+            };
             if (index !== -1) {
-                console.log(`PreferencesDialog: Updating existing frame at index ${index}.`);
                 newFrames[index] = frameToSave;
             } else {
-                console.log("PreferencesDialog: Adding new frame.");
                 newFrames.push(frameToSave);
             }
-            // Re-calculate order after adding/updating
-            const finalFrames = newFrames.map((frame, idx) => ({ ...frame, order: idx }));
-            console.log("PreferencesDialog: editedFrames state updated locally:", finalFrames);
-            return finalFrames;
+            return newFrames.map((frame, idx) => ({ ...frame, order: idx }));
         });
-        handleCancelEdit(); // Exit edit mode
+        handleCancelEdit();
     };
 
     const handleSave = async () => {
-        console.log("PreferencesDialog: handleSave called (Save All Preferences).");
         setIsSaving(true);
         setSaveError(null);
         setSuccessMessage(null);
         try {
-            // Re-calculate order just before saving to be absolutely sure
-            const framesToSave = editedFrames.map((frame, idx) => ({ ...frame, order: idx }));
+            const framesToSave = editedFrames.map((frame, idx) => ({
+                ...frame,
+                order: idx,
+                // Ensure assignedApps has windowId before saving
+                assignedApps: (frame.assignedApps || []).map(app => ({ appId: app.appId, windowId: app.windowId }))
+            }));
             const payload: ShellPreferencesRequest = { frames: framesToSave };
 
-            if (!prefsServiceUrl) {
-                console.error("PreferencesDialog: Prefs Service URL is not configured in context!");
-                throw new Error("Preferences Service URL is not configured.");
-            }
+            if (!prefsServiceUrl) throw new Error("Preferences Service URL is not configured.");
+
             const saveUrl = `${prefsServiceUrl}/api/v1/shell/preferences`;
-
-            console.log(`PreferencesDialog: Saving preferences via PUT to: ${saveUrl}`);
-            console.log("PreferencesDialog: Payload:", JSON.stringify(payload, null, 2));
-
+            console.log(`Saving preferences to: ${saveUrl}`, payload);
             const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
             const response = await axios.put<{ message: string }>(saveUrl, payload, { headers });
-
-            console.log("PreferencesDialog: Save response:", response.data);
             setSuccessMessage(response.data.message || 'Preferences saved successfully!');
             await fetchConfig(); // Refresh main config context
-            console.log("PreferencesDialog: fetchConfig called after save.");
-            setTimeout(() => {
-                if (open) { // Check if dialog is still meant to be open before closing
-                    console.log("PreferencesDialog: Closing dialog after successful save.");
-                    onClose();
-                } else {
-                    console.log("PreferencesDialog: Dialog was closed before save timeout completed.");
-                }
-            }, 1500); // Close after delay
+            setTimeout(() => { if (open) onClose(); }, 1500);
         } catch (err: any) {
             const errorDetail = err.response?.data?.detail || err.message || 'Failed to save preferences.';
-            console.error("PreferencesDialog: Error saving preferences:", err.response?.data || err);
             setSaveError(errorDetail);
         } finally {
-            console.log("PreferencesDialog: Setting isSaving to false.");
             setIsSaving(false);
         }
     };
 
-    // Utility to get slot count based on current state
+    // Calculate number of slots based on selected layout
     const getNumberOfSlots = useCallback((): number => {
-        console.log("PreferencesDialog: getNumberOfSlots called.");
-        if (!editingFrame) {
-            console.log("  > getNumberOfSlots: No editingFrame, returning 0");
-            return 0;
+        if (selectedLayoutId) {
+            const template = layoutTemplates.find(t => t.id === selectedLayoutId);
+            return template ? template.window_count : 0;
         }
-        // Prioritize selected template
-        if (selectedTemplateId) {
-            const template = frameTemplates.find(t => t.id === selectedTemplateId);
-            if (template) {
-                console.log(`  > getNumberOfSlots: Based on old static template for selectedTemplateId '${selectedTemplateId}', returning ${template.slots} slots.`);
-                return template.slots;
-            }
-            
-            // Now try finding the template in the dynamic templates from API
-            const apiTemplate = layoutTemplates.find(t => t.id === selectedTemplateId);
-            if (apiTemplate) {
-                const slots = apiTemplate.window_count;
-                console.log(`  > getNumberOfSlots: Based on API template for selectedTemplateId '${selectedTemplateId}', returning ${slots} slots.`);
-                return slots;
-            }
-            
-            console.log(`  > getNumberOfSlots: Template '${selectedTemplateId}' not found in either source, returning 0 slots.`);
-            return 0;
+        // If editing and no template selected, use current app count IF layoutId is not set
+        if (editingFrame && !editingFrame.layoutId && editingFrame.assignedApps) {
+             return editingFrame.assignedApps.length;
         }
-        // If no template selected but we are editing an existing frame, use its current app count
-        if (!editingFrame.id.startsWith('new-') && editingFrame.assignedApps) {
-            const slots = editingFrame.assignedApps.length;
-            console.log(`  > getNumberOfSlots: Based on existing editingFrame.assignedApps length, returning ${slots} slots.`); 
-            return slots;
-        }
-        // Default for new frame with no template selected yet
-        console.log("  > getNumberOfSlots: Defaulting to 0 (new frame or no template/apps).");
         return 0;
-        // Depend on the state variables it uses
-    }, [editingFrame, selectedTemplateId]);
-    
-    // Calculate number of slots based on current state for rendering
-    const numberOfSlots = getNumberOfSlots();
-    console.log(`PreferencesDialog Render - Calculated numberOfSlots: ${numberOfSlots}`);
+    }, [selectedLayoutId, layoutTemplates, editingFrame]);
 
+    const numberOfSlots = getNumberOfSlots();
 
     // --- JSX Rendering ---
     return (
@@ -360,22 +264,17 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                 <IconButton onClick={onClose} aria-label="close" disabled={isSaving}><CloseIcon /></IconButton>
             </DialogTitle>
             <DialogContent dividers>
-                {/* Config Loading/Error State */}
+                {/* Loading/Error States */}
                 {configLoading && <CircularProgress />}
-                {/* Check destructured configLoading/configError */}
                 {!configLoading && configError && !config && <Alert severity="error" sx={{ mb: 2 }}>Could not load initial configuration: {configError}</Alert>}
-
-                {/* Save Operation Feedback */}
                 {successMessage && <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccessMessage(null)}>{successMessage}</Alert>}
                 {saveError && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSaveError(null)}>{saveError}</Alert>}
 
-                {/* Render main content only if config was loaded or fetch attempted */}
-                {/* Use destructured config here */}
                 {!configLoading && config && (
                     <Box>
                         {/* --- Edit/Create View --- */}
                         {isEditMode && editingFrame ? (
-                            <Box> {/* Single Parent for Edit View */}
+                            <Box>
                                 <Typography variant="h6" gutterBottom>
                                     {editingFrame.id.startsWith('new-') ? 'Create New Tab' : `Edit Tab: ${editingFrame.name}`}
                                 </Typography>
@@ -392,129 +291,91 @@ const PreferencesDialog: React.FC<PreferencesDialogProps> = ({ open, onClose }) 
                                     <InputLabel id="frame-layout-label">Frame Layout Template</InputLabel>
                                     <Select
                                         labelId="frame-layout-label"
-                                        value={selectedTemplateId}
+                                        value={selectedLayoutId}
                                         label="Frame Layout Template"
                                         onChange={handleTemplateChange}
                                         disabled={isSaving || loadingLayouts}
                                     >
                                         <MenuItem value=""><em>Select a Layout...</em></MenuItem>
-                                        {loadingLayouts && (
-                                            <MenuItem disabled><CircularProgress size={20} /> Loading layouts...</MenuItem>
-                                        )}
-                                        {layoutError && (
-                                            <MenuItem disabled sx={{ color: 'error.main' }}><em>Error: {layoutError}</em></MenuItem>
-                                        )}
+                                        {loadingLayouts && <MenuItem disabled><CircularProgress size={20} /> Loading layouts...</MenuItem>}
+                                        {layoutError && <MenuItem disabled sx={{ color: 'error.main' }}><em>Error: {layoutError}</em></MenuItem>}
                                         {layoutTemplates.map(layout => (
                                             <MenuItem key={layout.id} value={layout.id}>
-                                                {layout.name} ({layout.window_count} app slot{layout.window_count !== 1 ? 's' : ''}) - {layout.description}
+                                                {layout.name} ({layout.window_count} slot{layout.window_count !== 1 ? 's' : ''}) - {layout.description}
                                             </MenuItem>
                                         ))}
                                     </Select>
                                 </FormControl>
 
                                 {/* App Assignment Dropdowns */}
-                                {numberOfSlots > 0 && (
-                                    <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Assign Applications to Slots:</Typography>
-                                )}
-
-                                {/* Log before outer map */}
-                                {(() => {
-                                    console.log(`PreferencesDialog Render: About to map ${numberOfSlots} slots.`);
-                                    return null;
-                                })()}
-
+                                {numberOfSlots > 0 && <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>Assign Applications:</Typography>}
                                 {Array.from({ length: numberOfSlots }).map((_, index) => {
-                                    // Log inside outer map
-                                    console.log(`PreferencesDialog Render: Rendering controls for Slot ${index + 1}`);
+                                    const windowId = index + 1;
+                                    // Ensure editingFrame and assignedApps exist before finding
+                                    const currentAppId = editingFrame?.assignedApps?.find(app => app.windowId === windowId)?.appId || '';
                                     return (
                                         <Box key={`slot-${index}`} sx={{ display: 'flex', gap: 2, mb: 1.5, alignItems: 'center' }}>
-                                            <Typography sx={{ width: '60px', textAlign: 'right', pr: 1, color: 'text.secondary' }}>Slot {index + 1}:</Typography>
+                                            <Typography sx={{ width: '80px', textAlign: 'right', pr: 1, color: 'text.secondary' }}>Window {windowId}:</Typography>
                                             <FormControl fullWidth margin="none" size="small">
                                                 <InputLabel id={`app-select-label-${index}`}>Select App</InputLabel>
                                                 <Select
                                                     labelId={`app-select-label-${index}`}
-                                                    value={editingFrame?.assignedApps?.[index]?.appId || ''}
+                                                    value={currentAppId}
                                                     label="Select App"
                                                     onChange={(e) => handleAppAssignmentChange(index, e)}
                                                     disabled={isSaving}
                                                 >
                                                     <MenuItem value=""><em>-- Empty Slot --</em></MenuItem>
-                                                    {/* --- CORRECTED: Use destructured availableApps --- */}
-                                                    {availableApps?.map((app: AppDefinition) => {
-                                                        console.log(`PreferencesDialog: Rendering MenuItem for app: ${app.id} - ${app.name}`);
-                                                        return (
-                                                            <MenuItem key={app.id} value={app.id}>{app.name} ({app.id})</MenuItem>
-                                                        );
-                                                    })}
-                                                    {/* --- END CORRECTION --- */}
+                                                    {/* Ensure availableApps is checked */}
+                                                    {availableApps?.map((app: AppDefinition) => (
+                                                        <MenuItem key={app.id} value={app.id}>{app.name} ({app.id})</MenuItem>
+                                                    ))}
                                                 </Select>
                                             </FormControl>
                                         </Box>
                                     );
                                 })}
-                                {/* --- END App Assignment --- */}
-
-
                                 {/* Edit Actions */}
                                 <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                                     <Button onClick={handleCancelEdit} disabled={isSaving}>Cancel Edit</Button>
                                     <Button variant="contained" onClick={handleSaveEdit} disabled={isSaving || !editingFrame?.name?.trim()}>Apply Changes Locally</Button>
                                 </Box>
                                 <Divider sx={{ my: 3 }} />
-                            </Box> // End Edit Form Box
+                            </Box>
                         ) : (
                             /* --- List View --- */
-                            <Box> {/* Single Parent for List View */}
+                            <Box>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                                     <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>Manage Tabs</Typography>
-                                    <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleAddNewFrame} disabled={isSaving || isEditMode}>
-                                        Add New Tab
-                                    </Button>
+                                    <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={handleAddNewFrame} disabled={isSaving || isEditMode}>Add New Tab</Button>
                                 </Box>
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Add, remove, or reorder tabs. Changes only persist after clicking "Save All Preferences".
-                                </Typography>
-                                {/* List of Editable Frames */}
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>Add, remove, or reorder tabs.</Typography>
                                 <List>
                                     {editedFrames?.map((frame, index) => (
-                                        <ListItem
-                                            key={frame.id || `frame-${index}`} // Use index as fallback key if needed
-                                            secondaryAction={
-                                                <>
-                                                    <IconButton aria-label={`Move ${frame.name} up`} size="small" onClick={() => handleMoveFrame(index, 'up')} disabled={index === 0 || isSaving || isEditMode}><ArrowUpwardIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton aria-label={`Move ${frame.name} down`} size="small" onClick={() => handleMoveFrame(index, 'down')} disabled={index === editedFrames.length - 1 || isSaving || isEditMode}><ArrowDownwardIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton aria-label={`Edit ${frame.name}`} size="small" onClick={() => handleEditFrame(frame)} disabled={isSaving || isEditMode}><SettingsIcon fontSize="inherit" /></IconButton>
-                                                    <IconButton aria-label={`Delete ${frame.name}`} size="small" onClick={() => handleDeleteFrame(frame.id)} disabled={isSaving || isEditMode}><DeleteIcon fontSize="inherit" /></IconButton>
-                                                </>
-                                            }
-                                            sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 }, pr: '130px' /* Adjust padding for actions */ }}
-                                        >
-                                            <ListItemIcon sx={{ minWidth: '30px', cursor: 'grab', color: 'action.disabled' }} aria-hidden="true"><DragHandleIcon fontSize='small' /></ListItemIcon>
+                                        <ListItem key={frame.id || `frame-${index}`} secondaryAction={
+                                            <>
+                                                <IconButton size="small" onClick={() => handleMoveFrame(index, 'up')} disabled={index === 0 || isSaving || isEditMode}><ArrowUpwardIcon fontSize="inherit" /></IconButton>
+                                                <IconButton size="small" onClick={() => handleMoveFrame(index, 'down')} disabled={index === editedFrames.length - 1 || isSaving || isEditMode}><ArrowDownwardIcon fontSize="inherit" /></IconButton>
+                                                <IconButton size="small" onClick={() => handleEditFrame(frame)} disabled={isSaving || isEditMode}><SettingsIcon fontSize="inherit" /></IconButton>
+                                                <IconButton size="small" onClick={() => handleDeleteFrame(frame.id)} disabled={isSaving || isEditMode}><DeleteIcon fontSize="inherit" /></IconButton>
+                                            </>
+                                        } sx={{ borderBottom: 1, borderColor: 'divider', '&:last-child': { borderBottom: 0 }, pr: '130px' }}>
+                                            <ListItemIcon sx={{ minWidth: '30px', cursor: 'grab', color: 'action.disabled' }}><DragHandleIcon fontSize='small' /></ListItemIcon>
                                             <ListItemText primary={frame.name || '(Unnamed Tab)'} secondary={`ID: ${frame.id || '(unsaved)'}`} />
                                         </ListItem>
                                     ))}
                                 </List>
-                                {/* Message if no frames */}
                                 {editedFrames?.length === 0 && !isEditMode && (
-                                    <Typography sx={{ mt: 3, p: 2, fontStyle: 'italic', textAlign: 'center', color: 'text.secondary', border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>
-                                        No tabs configured. Click "Add New Tab" to get started.
-                                    </Typography>
+                                    <Typography sx={{ mt: 3, p: 2, fontStyle: 'italic', textAlign: 'center', color: 'text.secondary', border: '1px dashed', borderColor: 'divider', borderRadius: 1 }}>No tabs configured.</Typography>
                                 )}
-                            </Box> // End List View Box
+                            </Box>
                         )}
-                    </Box> // End Conditional Content Box
+                    </Box>
                 )}
             </DialogContent>
-            {/* Main Dialog Actions */}
             <DialogActions sx={{ p: 2 }}>
                 <Button onClick={onClose} disabled={isSaving}>Cancel</Button>
-                <Button
-                    onClick={handleSave}
-                    variant="contained"
-                    color="primary"
-                    // Disable save if editing, or config still loading, or save in progress
-                    disabled={isSaving || isEditMode || configLoading || !!configError}
-                >
+                <Button onClick={handleSave} variant="contained" color="primary" disabled={isSaving || isEditMode || configLoading || !!configError}>
                     {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Save All Preferences'}
                 </Button>
             </DialogActions>

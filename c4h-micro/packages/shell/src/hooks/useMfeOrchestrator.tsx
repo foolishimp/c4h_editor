@@ -1,421 +1,228 @@
+// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/hooks/useMfeOrchestrator.tsx
 /**
  * /packages/shell/src/hooks/useMfeOrchestrator.tsx
  * Custom hook to handle the lifecycle (mounting, unmounting) of Microfrontends (MFEs).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useShellConfig } from '../contexts/ShellConfigContext';
 import * as ReactDOM from 'react-dom/client';
 import { Box, Typography, CircularProgress } from '@mui/material';
-import { AppDefinition, Frame, MFEType, Preferences, LayoutDefinition, configTypes } from 'shared';
+// Import types from shared package
+import {
+    AppDefinition, Frame, Preferences, LayoutDefinition, LayoutWindow,
+    configTypes, AppAssignment, bootstrapConfig
+} from 'shared';
+import { useShellConfig } from '../contexts/ShellConfigContext';
 
+// Define props for the hook
 interface MfeOrchestratorProps {
     activeFrameId: string | null;
     config: Preferences | null;
     availableApps: AppDefinition[] | null;
-    onConfigNavigate: (action: 'navigateTo' | 'back', target?: string) => void; // Callback for config navigation
+    layouts: Record<string, LayoutDefinition> | null;
+    onConfigNavigate: (action: 'navigateTo' | 'back', target?: string) => void;
 }
 
-// Define a simple Error Boundary specific to MFE loading
-class MfeErrorBoundary extends React.Component<{ children: React.ReactNode, frameId: string | null }, { hasError: boolean, error: any }> {
-    constructor(props: { children: React.ReactNode, frameId: string | null }) {
-        super(props);
-        this.state = { hasError: false, error: null };
-    }
-    static getDerivedStateFromError(error: any) { return { hasError: true, error }; }
-    componentDidCatch(error: Error, errorInfo: React.ErrorInfo) { console.error(`MfeErrorBoundary (Frame ${this.props.frameId}):`, error, errorInfo); }
-    render() {
-        if (this.state.hasError) {
+// --- Error Boundary Component ---
+interface MfeErrorBoundaryProps { children: React.ReactNode; mfeId: string; containerId: string; }
+interface MfeErrorBoundaryState { hasError: boolean; error: Error | null; errorInfo: React.ErrorInfo | null; }
+class MfeErrorBoundary extends React.Component<MfeErrorBoundaryProps, MfeErrorBoundaryState> { /* ... same correct version as before ... */
+    constructor(props: MfeErrorBoundaryProps) { super(props); this.state = { hasError: false, error: null, errorInfo: null }; }
+    static getDerivedStateFromError(error: Error): Partial<MfeErrorBoundaryState> | null { return { hasError: true, error: error }; }
+    componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void { console.error(`MfeErrorBoundary (${this.props.mfeId} in ${this.props.containerId}): Uncaught error:`, error, errorInfo); this.setState({ errorInfo: errorInfo }); }
+    render(): React.ReactNode { if (this.state.hasError) { return ( <Box sx={{ p: 2, color: 'error.main', border: '1px dashed red', height: '100%', overflow: 'auto' }}> <Typography variant="subtitle1" gutterBottom>Error Loading: {this.props.mfeId}</Typography> <Typography variant="caption" display="block">Container ID: {this.props.containerId}</Typography> <details style={{ whiteSpace: 'pre-wrap', marginTop: '0.5em', fontSize: '0.8em' }}> <summary>Details</summary> {this.state.error?.toString()} <br /> <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.errorInfo?.componentStack}</pre> </details> </Box> ); } return this.props.children; }
+ }
+
+// --- Container Creation Helper ---
+const createWindowContainerRefCallback = ( frameId: string, windowId: number, containerRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>> ): React.RefCallback<HTMLDivElement> => { const containerId = `mfe-container-${frameId}-window-${windowId}`; return (node: HTMLDivElement | null): void => { if (node) { containerRefs.current[containerId] = node; } }; };
+
+// --- Single Container Component ---
+interface SingleContainerProps { frameId: string | null; containerRef: React.RefCallback<HTMLDivElement>; }
+const SingleContainerComponent: React.FC<SingleContainerProps> = ({ frameId, containerRef }) => ( <div ref={containerRef} id={`mfe-container-wrapper-${frameId || 'empty'}`} style={{ height: '100%', width: '100%', overflow: 'auto', position: 'relative' }}> <Typography sx={{ p: 1, fontStyle: 'italic', color: 'text.secondary', position: 'absolute', top: 0, left: 0 }}> {frameId ? 'Loading application...' : 'Select a tab.'} </Typography> </div> );
+const SingleContainer = React.memo(SingleContainerComponent);
+
+// --- Layout Container Component ---
+interface LayoutContainerProps { frameId: string; layout: LayoutDefinition; containerRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>; }
+const LayoutContainerComponent: React.FC<LayoutContainerProps> = ({ frameId, layout, containerRefs }) => { console.log(`LayoutContainer rendering frame ${frameId} using layout ${layout.id}`); return ( <div id={`mfe-layout-container-${frameId}`} style={{ height: '100%', width: '100%', overflow: 'hidden', ...layout.containerStyle }}> {layout.windows.map((windowDef: LayoutWindow) => ( <div key={`window-${windowDef.id}`} ref={createWindowContainerRefCallback(frameId, windowDef.id, containerRefs)} id={`mfe-container-${frameId}-window-${windowDef.id}`} style={{ overflow: 'auto', position: 'relative', ...windowDef.style }}> <Typography sx={{ p: 1, fontStyle: 'italic', color: 'text.secondary', position: 'absolute', top: 0, left: 0 }}> {`Window ${windowDef.id}: Loading...`} </Typography> </div> ))} </div> ); };
+const LayoutContainer = React.memo(LayoutContainerComponent);
+
+// --- Main Hook ---
+export function useMfeOrchestrator({ activeFrameId, config, availableApps, layouts: propLayouts, onConfigNavigate }: MfeOrchestratorProps) {
+    const { fetchLayout } = useShellConfig();
+    const windowContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
+    const mfeContainerRef = useRef<HTMLDivElement | null>(null);
+    const mountedModulesRef = useRef<Record<string, { unmount: () => void; appId: string }>>({});
+    const [layoutLoading, setLayoutLoading] = useState<boolean>(false);
+    const [currentLayout, setCurrentLayout] = useState<LayoutDefinition | null>(null);
+
+    useEffect(() => { windowContainersRef.current = {}; }, [activeFrameId]);
+
+    // Helper to get current frame and layout
+    const getActiveFrameAndLayout = useCallback(() => {
+        if (!activeFrameId || !config?.frames) return { activeFrame: null, activeLayout: null, layoutId: null };
+        const activeFrame = config.frames.find(f => f.id === activeFrameId);
+        if (!activeFrame) return { activeFrame: null, activeLayout: null, layoutId: null };
+        
+        const layoutId = activeFrame.layoutId;
+        let activeLayout: LayoutDefinition | null = null;
+        
+        if (layoutId && propLayouts && propLayouts[layoutId]) {
+            activeLayout = propLayouts[layoutId];
+        } else if (layoutId && currentLayout && currentLayout.id === layoutId) {
+            activeLayout = currentLayout;
+        }
+        
+        return { activeFrame, activeLayout, layoutId };
+    }, [activeFrameId, config?.frames, propLayouts, currentLayout]);
+
+    // Main Mount/Unmount Effect
+    useEffect(() => {
+        let isEffectActive = true;
+        const currentFrameIdForMount = activeFrameId;
+        console.log(`MFE Orchestrator: EFFECT RUNNING for Frame ID: ${currentFrameIdForMount}`);
+
+        // --- Cleanup Function --- **MOVED TO TOP OF EFFECT SCOPE**
+        const cleanupPreviousMfes = () => {
+            console.log(`...Cleanup: Unmounting ${Object.keys(mountedModulesRef.current).length} modules.`);
+            Object.entries(mountedModulesRef.current).forEach(([containerId, moduleInfo]) => {
+                try { moduleInfo.unmount(); } catch (err) { console.error(`...Unmount error ${moduleInfo.appId}:`, err); }
+                const containerElement = document.getElementById(containerId);
+                if(containerElement) containerElement.innerHTML = '';
+            });
+            mountedModulesRef.current = {};
+             if (mfeContainerRef.current) mfeContainerRef.current.innerHTML = '';
+             windowContainersRef.current = {};
+        };
+        // --- END Cleanup Function ---
+
+        // --- GUARD CLAUSE ---
+        if (!currentFrameIdForMount || !config || !availableApps) {
+            console.log(`Orchestrator Effect: Prerequisites not met (frameId=${currentFrameIdForMount}, config=${!!config}, apps=${!!availableApps}). Skipping mount.`);
+            // Cleanup if frame becomes null or config disappears
+            if (!currentFrameIdForMount || !config) {
+                 cleanupPreviousMfes(); // Now declared above, safe to call
+            }
+            return; // Exit effect early
+        }
+        // --- END GUARD CLAUSE ---
+
+        const { activeFrame, activeLayout, layoutId } = getActiveFrameAndLayout();
+        
+        // If we need a layout but don't have it yet, fetch it
+        if (activeFrame && layoutId && !activeLayout && !layoutLoading) {
+            console.log(`MFE Orchestrator: Need to fetch layout ${layoutId} for frame ${activeFrame.id}`);
+            setLayoutLoading(true);
+            
+            fetchLayout(layoutId)
+                .then(layout => {
+                    if (isEffectActive && layout) {
+                        console.log(`MFE Orchestrator: Successfully fetched layout ${layoutId}`);
+                        setCurrentLayout(layout);
+                        // Don't mount here - effect will re-run when currentLayout is updated
+                    } else if (isEffectActive) {
+                        console.error(`MFE Orchestrator: Failed to fetch layout ${layoutId}`);
+                    }
+                })
+                .catch(err => {
+                    if (isEffectActive) {
+                        console.error(`MFE Orchestrator: Error fetching layout ${layoutId}:`, err);
+                    }
+                })
+                .finally(() => {
+                    if (isEffectActive) {
+                        setLayoutLoading(false);
+                    }
+                });
+                
+            return; // Exit early, we'll come back when layout is fetched
+        }
+
+        const usingLayout = !!activeLayout;
+        console.log(`  > usingLayout flag: ${usingLayout}`);
+
+        // --- Mount Function ---
+        const mountMfes = async () => {
+            const { activeFrame: currentActiveFrame, activeLayout: currentActiveLayout } = getActiveFrameAndLayout();
+            const currentUsingLayout = !!currentActiveLayout;
+
+            if (!currentActiveFrame?.assignedApps || currentActiveFrame.assignedApps.length === 0) {
+                 console.log(`...Mount Skip: No active frame or no assigned apps.`);
+                 cleanupPreviousMfes(); // Use cleanup defined above
+                  const placeholderText = '<div style="padding: 1em; font-style: italic;">Frame has no application assigned.</div>';
+                  if (!currentUsingLayout && mfeContainerRef.current) mfeContainerRef.current.innerHTML = placeholderText;
+                  else if (currentUsingLayout && currentActiveLayout?.windows?.[0]) { /* ... render placeholder in layout ... */ }
+                 return;
+            }
+
+            console.log(`...Mounting ${currentActiveFrame.assignedApps.length} app(s) for frame ${currentFrameIdForMount}. Layout: ${currentUsingLayout}`);
+
+            await Promise.all(currentActiveFrame.assignedApps.map(async (assignment: AppAssignment) => {
+                // (Rest of mounting logic within map - same as before)
+                 if (!isEffectActive) return;
+                 const { appId, windowId } = assignment;
+                 const appDef = availableApps.find(app => app.id === appId);
+                 if (!appDef?.url) { console.error(`...Mount Error (Loop): AppDef/URL missing for ${appId}`); return; }
+                 let targetContainerElement: HTMLElement | null = null;
+                 let targetContainerId: string = '';
+                 console.log(`...Loop: Processing appId=${appId}, windowId=${windowId}`);
+                 if (currentUsingLayout && windowId && currentActiveLayout) { targetContainerId = `mfe-container-${currentFrameIdForMount}-window-${windowId}`; for (let i = 0; i < 5; i++) { targetContainerElement = document.getElementById(targetContainerId); if (targetContainerElement) break; await new Promise(resolve => setTimeout(resolve, 20 * i)); } console.log(`...Loop: Layout targetContainerId=${targetContainerId}, Found Element: ${!!targetContainerElement}`); }
+                 else if (!currentUsingLayout) { targetContainerId = `mfe-container-wrapper-${currentFrameIdForMount}`; targetContainerElement = mfeContainerRef.current; console.log(`...Loop: Single targetContainerId=${targetContainerId}, Found Element: ${!!targetContainerElement}`); if (mountedModulesRef.current[targetContainerId]) { console.log(`...Mount Skip (Single): Container ${targetContainerId} occupied by ${mountedModulesRef.current[targetContainerId].appId}. Skipping ${appId}.`); return; } }
+                 if (!targetContainerElement) { console.warn(`...Mount Skip (Loop): Container ${targetContainerId} not found for ${appId}.`); return; }
+                 if (mountedModulesRef.current[targetContainerId]) { console.log(`...Mount Skip (Loop): Module ${mountedModulesRef.current[targetContainerId].appId} already mounted in ${targetContainerId}.`); return; }
+                 targetContainerElement.innerHTML = ''; const loadingIndicator = document.createElement('div'); loadingIndicator.style.cssText = 'padding:1em; font-style:italic; color:grey;'; loadingIndicator.innerText = `Loading ${appDef.name}...`; targetContainerElement.appendChild(loadingIndicator);
+                 const baseProps = { domElement: targetContainerElement, appId: appDef.id, windowId: windowId || 1 }; const customProps: Record<string, any> = {}; if (configTypes?.[appDef.id]) { Object.assign(customProps, { configType: appDef.id, onNavigateTo: (id: string) => onConfigNavigate('navigateTo', id), onNavigateBack: () => onConfigNavigate('back') }); }
+                 try {
+                     console.log(`...Importing ${appDef.id} from ${appDef.url}`); const module = await import(/* @vite-ignore */ appDef.url);
+                     if (!isEffectActive || activeFrameId !== currentFrameIdForMount || !targetContainerElement?.isConnected) { if (targetContainerElement?.contains(loadingIndicator)) targetContainerElement.removeChild(loadingIndicator); console.log(`...Mount Abort ${appDef.id}`); return; }
+                     if (targetContainerElement.contains(loadingIndicator)) targetContainerElement.removeChild(loadingIndicator);
+                     let unmountFn: (() => void) | undefined = undefined; if (typeof module.bootstrapMfe === 'function') await module.bootstrapMfe(appDef.id); else await bootstrapConfig(appDef.id);
+                     if (typeof module.mount === 'function') { const mountResult = module.mount({ ...baseProps, customProps }); unmountFn = mountResult?.unmount || module.unmount; }
+                     else if (module.default && typeof module.default === 'function') { const ReactComponent = module.default; const root = ReactDOM.createRoot(targetContainerElement); root.render( <React.StrictMode> <MfeErrorBoundary mfeId={appDef.id} containerId={targetContainerId}> <ReactComponent {...baseProps} {...customProps} /> </MfeErrorBoundary> </React.StrictMode> ); unmountFn = () => { try { root.unmount(); } catch (e) { console.error(`Unmount error ${appDef.id}:`, e); }}; }
+                     else { throw new Error(`Invalid MFE: ${appDef.id}`); }
+                     if (unmountFn && typeof unmountFn === 'function') { mountedModulesRef.current[targetContainerId] = { unmount: unmountFn, appId: appDef.id }; console.log(`...Stored unmount for ${appDef.id} in ${targetContainerId}`); }
+                     else { console.warn(`...No unmount fn for ${appDef.id}`); }
+                 } catch (mountErr) { console.error(`Mount Error (${appDef.id} in ${targetContainerId}):`, mountErr); if (targetContainerElement?.contains(loadingIndicator)) targetContainerElement.removeChild(loadingIndicator); if(targetContainerElement) targetContainerElement.innerHTML = `<div style="color: red; padding: 1em;">Failed to mount ${appDef.name}. Check console.</div>`; }
+
+            })); // End Promise.all map
+        }; // End mountMfes function
+
+        // --- Execute Logic ---
+        cleanupPreviousMfes(); // Call cleanup defined above
+        mountMfes().catch(err => console.error("Error during mountMfes:", err));
+
+        // --- Return Cleanup for useEffect ---
+        return () => {
+            isEffectActive = false;
+            console.log(`MFE Orchestrator: Effect cleanup running for frame ${currentFrameIdForMount}`);
+            cleanupPreviousMfes(); // Call cleanup defined above
+        };
+    // Ensure all dependencies used within the effect are listed
+    }, [activeFrameId, config, availableApps, propLayouts, onConfigNavigate, getActiveFrameAndLayout, fetchLayout, layoutLoading, currentLayout]);
+
+    // --- MfeContainer Component Factory ---
+    // useCallback depends on getActiveFrameAndLayout's dependencies now
+    const MfeContainer = useCallback(() => {
+        const { activeFrame, activeLayout } = getActiveFrameAndLayout(); // Call helper defined outside hook
+        
+        if (layoutLoading) {
             return (
-                <Box sx={{ p: 2, color: 'error.main', border: '1px dashed red' }}>
-                    <Typography variant="h6">Error Loading Application</Typography>
-                    <Typography variant="body2">Failed to load or render the application for frame {this.props.frameId || 'unknown'}.</Typography>
-                    <details style={{ whiteSpace: 'pre-wrap', marginTop: '0.5em', fontSize: '0.8em' }}>
-                        <summary>Details</summary>
-                        {this.state.error?.toString()}
-                    </details>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                    <CircularProgress size={40} />
+                    <Typography sx={{ ml: 2 }}>Loading layout...</Typography>
                 </Box>
             );
         }
-        return this.props.children;
-    }
-}
-
-// Helper function to create a container ref for a specific window
-const createWindowContainer = (frameId: string, windowId: number, containerRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>) => {
-    const containerId = `mfe-container-${frameId}-window-${windowId}`;
-    return (node: HTMLDivElement) => {
-        if (node) {
-            containerRefs.current[containerId] = node;
-        }
-    };
-};
-
-// Component to render a single app container when no layout is defined
-interface SingleContainerProps {
-    frameId: string | null;
-    containerRef: React.RefObject<HTMLDivElement>;
-}
-
-const SingleContainer: React.FC<SingleContainerProps> = ({ frameId, containerRef }) => (
-    <div
-        ref={containerRef}
-        id={`mfe-container-wrapper-${frameId || 'empty'}`}
-        style={{ height: '100%', width: '100%', overflow: 'auto' }}
-    >
-        {!frameId && <Typography sx={{ p: 3, fontStyle: 'italic' }}>Select a tab.</Typography>}
-    </div>
-);
-
-// Component to render a multi-app layout container
-interface LayoutContainerProps {
-    frameId: string;
-    layout: LayoutDefinition;
-    containerRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
-}
-
-const LayoutContainer: React.FC<LayoutContainerProps> = ({ frameId, layout, containerRefs }) => {
-    return (
-        <div
-            id={`mfe-layout-container-${frameId}`}
-            style={{
-                height: '100%',
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                ...layout.containerStyle
-            }}
-        >
-            {layout.windows.map(window => (
-                <div
-                    key={`window-${window.id}`}
-                    ref={createWindowContainer(frameId, window.id, containerRefs)}
-                    id={`mfe-container-${frameId}-window-${window.id}`}
-                    style={{
-                        ...window.style,
-                        overflow: 'auto',
-                    }}
-                >
-                    <Typography sx={{ p: 1, fontStyle: 'italic', color: 'text.secondary' }}>
-                        {window.name} - Loading...
-                    </Typography>
-                </div>
-            ))}
-        </div>
-    );
-};
-
-export function useMfeOrchestrator({ activeFrameId, config, availableApps, onConfigNavigate }: MfeOrchestratorProps) {
-    // Get layout definitions from the shell config context
-    const { layouts } = useShellConfig();
-    
-    // Ref to store container elements for each window of the active frame
-    const windowContainersRef = useRef<Record<string, HTMLDivElement | null>>({});
-    
-    // Store unmount functions for currently mounted MFEs, keyed by container ID
-    const mountedModulesRef = useRef<Record<string, { unmount: () => void; containerId: string }>>({});
-
-    // For backward compatibility - traditional single container approach
-    const mfeContainerRef = useRef<HTMLDivElement | null>(null);
-    
-    // Find the active frame and its layout definition
-    const getActiveFrameAndLayout = useCallback(() => {
-        if (!activeFrameId || !config || !config.frames) {
-            return { activeFrame: null, activeLayout: null };
+        
+        if (!activeFrameId || !activeFrame) {
+            return <SingleContainer frameId={null} containerRef={(node) => { mfeContainerRef.current = node; }} />;
         }
         
-        const activeFrame = config.frames.find(f => f.id === activeFrameId);
-        if (!activeFrame) {
-            return { activeFrame: null, activeLayout: null };
+        if (activeLayout) {
+            return <LayoutContainer frameId={activeFrame.id} layout={activeLayout} containerRefs={windowContainersRef} />;
         }
         
-        // Find layout definition if frame has layoutId
-        let activeLayout = null;
-        if (activeFrame.layoutId && layouts && layouts.length > 0) {
-            activeLayout = layouts.find(l => l.id === activeFrame.layoutId) || null;
-        }
-        
-        return { activeFrame, activeLayout };
-    }, [activeFrameId, config, layouts]);
+        return <SingleContainer frameId={activeFrameId} containerRef={(node) => { mfeContainerRef.current = node; }} />;
+    // Update dependency array for MfeContainer
+    }, [activeFrameId, getActiveFrameAndLayout, layoutLoading]);
 
-    // Effect for mounting/unmounting MFEs when activeFrameId or config changes
-    useEffect(() => {
-        let isEffectActive = true;
-        const currentFrameIdForMount = activeFrameId; // Capture frame ID for this effect instance
-        
-        // Get active frame and layout
-        const { activeFrame, activeLayout } = getActiveFrameAndLayout();
-        
-        // Determine if we're using a layout or single container
-        const usingLayout = !!activeLayout;
-        
-        // Reference the appropriate container(s)
-        const singleContainer = mfeContainerRef.current; // Traditional single container
-        const currentWindowContainers = { ...windowContainersRef.current }; // Copy of window containers
-        
-        console.log(`useMfeOrchestrator: Mount Effect triggered. Frame ID: ${currentFrameIdForMount}, Using Layout: ${usingLayout}`);
-
-        // --- Cleanup Function ---
-        const cleanupPreviousMfes = () => {
-            // Clean up all mounted modules
-            Object.entries(mountedModulesRef.current).forEach(([id, moduleInfo]) => {
-                if (moduleInfo?.unmount) {
-                    console.log(`useMfeOrchestrator: Cleanup - Unmounting MFE with ID ${id}`);
-                    try {
-                        moduleInfo.unmount();
-                    } catch (err) {
-                        console.error(`useMfeOrchestrator: Cleanup - Error during unmount for module ${id}:`, err);
-                    }
-                }
-            });
-            
-            // Reset mounted modules
-            mountedModulesRef.current = {};
-            
-            // Clear container contents
-            if (singleContainer) {
-                singleContainer.innerHTML = '';
-            }
-            
-            Object.values(currentWindowContainers).forEach(container => {
-                if (container) {
-                    container.innerHTML = '';
-                }
-            });
-        };
-
-        // Skip mounting if prerequisites are not met
-        if (!activeFrameId || !config || !availableApps) {
-            console.log("useMfeOrchestrator: Skipping mount (Prerequisites not met).");
-            cleanupPreviousMfes();
-            return () => {
-                isEffectActive = false;
-                cleanupPreviousMfes();
-            };
-        }
-
-        // Verify we have a frame
-        if (!activeFrame) {
-            console.log(`useMfeOrchestrator: Skipping mount (Frame ${activeFrameId} not found).`);
-            cleanupPreviousMfes();
-            return () => {
-                isEffectActive = false;
-                cleanupPreviousMfes();
-            };
-        }
-
-        // Verify frame has assigned apps
-        if (!activeFrame.assignedApps || activeFrame.assignedApps.length === 0) {
-            console.log(`useMfeOrchestrator: Frame ${activeFrameId} has no apps assigned.`);
-            if (singleContainer) {
-                singleContainer.innerHTML = '<div style="padding: 1em; font-style: italic;">Frame has no application assigned.</div>';
-            }
-            cleanupPreviousMfes();
-            return () => {
-                isEffectActive = false;
-                cleanupPreviousMfes();
-            };
-        }
-
-        // Create a map of window IDs to app assignments
-        const windowAppMap: Record<number, any> = {};
-        
-        if (usingLayout) {
-            // Process assignments with window IDs (for layout)
-            activeFrame.assignedApps.forEach(assignment => {
-                const windowId = assignment.windowId || 1; // Default to window 1 if not specified
-                windowAppMap[windowId] = assignment;
-            });
-        } else {
-            // For non-layout, we'll just use the first app assignment
-            windowAppMap[1] = activeFrame.assignedApps[0];
-        }
-
-        // Mount apps in each window container
-        const mountPromises: Promise<void>[] = [];
-        
-        // Process each window and its assigned app
-        Object.entries(windowAppMap).forEach(([windowIdStr, assignment]) => {
-            const windowId = parseInt(windowIdStr, 10);
-            
-            // Determine the container for this app
-            let containerElement: HTMLDivElement | null = null;
-            const containerId = usingLayout 
-                ? `mfe-container-${activeFrameId}-window-${windowId}`
-                : `mfe-container-wrapper-${activeFrameId}`;
-                
-            if (usingLayout) {
-                containerElement = windowContainersRef.current[containerId];
-            } else {
-                containerElement = singleContainer;
-            }
-            
-            // Skip if no container
-            if (!containerElement) {
-                console.warn(`useMfeOrchestrator: No container found for ${containerId}`);
-                return; // Skip this iteration
-            }
-            
-            // Find app definition
-            const appDef = availableApps.find(app => app.id === assignment.appId);
-            if (!appDef || !appDef.url) {
-                console.error(`useMfeOrchestrator: App definition or URL missing for ${assignment.appId}`);
-                containerElement.innerHTML = `<div style="color: red; padding: 1em;">Error: Cannot load app ${assignment.appId}. Definition or URL missing.</div>`;
-                return; // Skip this iteration
-            }
-            
-            // Clear container before new mount attempt
-            containerElement.innerHTML = '';
-
-            // Create loading indicator
-            const loadingIndicator = document.createElement('div');
-            loadingIndicator.style.padding = '1em';
-            loadingIndicator.innerText = `Loading ${appDef.name}...`;
-            containerElement.appendChild(loadingIndicator);
-            
-            // Prepare props for this app
-            const baseProps = { domElement: containerElement, appId: appDef.id, windowId };
-            const customProps: Record<string, any> = {};
-            
-            // Add navigation props for config types
-            if (configTypes && configTypes.hasOwnProperty(appDef.id)) {
-                Object.assign(customProps, {
-                    configType: appDef.id,
-                    onNavigateTo: (id: string) => onConfigNavigate('navigateTo', id),
-                    onNavigateBack: () => onConfigNavigate('back')
-                });
-            }
-            
-            // Import and mount the module
-            const mountPromise = import(/* @vite-ignore */ appDef.url)
-                .then(async module => {
-                    // Check if effect is still active
-                    if (!isEffectActive || activeFrameId !== currentFrameIdForMount || !containerElement?.isConnected) {
-                        console.log(`useMfeOrchestrator: Aborting ESM mount for ${appDef.id} in window ${windowId}. Effect inactive or container disconnected.`);
-                        if (containerElement?.contains(loadingIndicator)) {
-                            try { containerElement.removeChild(loadingIndicator); } catch (e) { /* ignore */ }
-                        }
-                        return;
-                    }
-                    
-                    // Remove loading indicator
-                    if (containerElement.contains(loadingIndicator)) {
-                        try { containerElement.removeChild(loadingIndicator); } catch (e) { /* ignore */ }
-                    }
-                    
-                    console.log(`useMfeOrchestrator: ESM Module loaded for ${appDef.id} in window ${windowId}`, module);
-                    
-                    try {
-                        // Bootstrap MFE if function exists
-                        if (module.bootstrapMfe) {
-                            console.log(`useMfeOrchestrator: Bootstrapping ${appDef.id} in window ${windowId}`);
-                            await module.bootstrapMfe(appDef.id);
-                        }
-                        
-                        let unmountFn: (() => void) | undefined = undefined;
-                        
-                        // Attempt to mount using standard methods
-                        if (module.mount) {
-                            console.log(`useMfeOrchestrator: Mounting ${appDef.id} via module.mount() in window ${windowId}`);
-                            const mountResult = module.mount({ ...baseProps, customProps });
-                            unmountFn = mountResult?.unmount || module.unmount;
-                        } else if (module.default && typeof module.default === 'function') {
-                            // Assume React Component export
-                            console.log(`useMfeOrchestrator: Mounting ${appDef.id} as React component in window ${windowId}`);
-                            const ReactComponent = module.default;
-                            const root = ReactDOM.createRoot(containerElement);
-                            
-                            root.render(
-                                <React.StrictMode>
-                                    <MfeErrorBoundary frameId={currentFrameIdForMount}>
-                                        <ReactComponent {...baseProps} {...customProps} />
-                                    </MfeErrorBoundary>
-                                </React.StrictMode>
-                            );
-                            
-                            unmountFn = () => {
-                                console.log(`useMfeOrchestrator: Unmounting React component ${appDef.id} in window ${windowId}`);
-                                try { root.unmount(); } catch (e) { console.error("Error during reactRoot.unmount:", e); }
-                            };
-                        } else {
-                            throw new Error(`Module ${appDef.id} is not a valid ESM MFE (no mount function or default React component export).`);
-                        }
-                        
-                        // Store unmount function
-                        if (unmountFn && typeof unmountFn === 'function') {
-                            const moduleId = `${currentFrameIdForMount}-${windowId}-${appDef.id}`;
-                            mountedModulesRef.current[moduleId] = { 
-                                unmount: unmountFn,
-                                containerId
-                            };
-                            console.log(`useMfeOrchestrator: Stored unmount function for ${moduleId}`);
-                        }
-                    } catch (mountErr) {
-                        console.error(`useMfeOrchestrator: Error mounting/rendering ESM module ${appDef.id} in window ${windowId}:`, mountErr);
-                        containerElement.innerHTML = `<div style="color: red; padding: 1em;">Failed to mount/render application ${appDef.name}. Check console.</div>`;
-                    }
-                })
-                .catch(importErr => {
-                    if (!isEffectActive || activeFrameId !== currentFrameIdForMount || !containerElement?.isConnected) {
-                        return;
-                    }
-                    
-                    console.error(`useMfeOrchestrator: Error importing module ${appDef.id} from ${appDef.url}:`, importErr);
-                    
-                    if (containerElement.contains(loadingIndicator)) {
-                        try { containerElement.removeChild(loadingIndicator); } catch(e) { /* ignore */ }
-                    }
-                    
-                    containerElement.innerHTML = `<div style="color: red; padding: 1em;">Failed to load application module ${appDef.name}. Check console & network tab.</div>`;
-                });
-                
-            mountPromises.push(mountPromise);
-        });
-        
-        // Return cleanup function
-        return () => {
-            isEffectActive = false;
-            console.log(`useMfeOrchestrator: Effect cleanup running for frame ${currentFrameIdForMount}`);
-            cleanupPreviousMfes();
-        };
-    }, [activeFrameId, config, availableApps, onConfigNavigate, getActiveFrameAndLayout]);
-
-    // Component to render the MFE container(s)
-    const MfeContainer = useCallback(() => {
-        // Get active frame and layout
-        const { activeFrame, activeLayout } = getActiveFrameAndLayout();
-        
-        // Check if we have a valid frame and layout
-        const hasLayout = activeFrame && activeLayout;
-        
-        // Render appropriate container
-        if (!activeFrame) {
-            return (
-                <SingleContainer 
-                    frameId={activeFrameId} 
-                    containerRef={mfeContainerRef} 
-                />
-            );
-        }
-        
-        if (hasLayout) {
-            return (
-                <LayoutContainer 
-                    frameId={activeFrame.id} 
-                    layout={activeLayout} 
-                    containerRefs={windowContainersRef}
-                />
-            );
-        }
-        
-        // Fallback to single container
-        return (
-            <SingleContainer 
-                frameId={activeFrameId} 
-                containerRef={mfeContainerRef} 
-            />
-        );
-    }, [activeFrameId, getActiveFrameAndLayout]);
-
-    // Return the component factory
     return { MfeContainer };
-} // This closing brace should match the function definition's opening brace
+} // End of useMfeOrchestrator Hook

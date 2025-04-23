@@ -9,265 +9,240 @@ from typing import List, Dict, Any, Optional
 import logging
 import copy
 import uuid
-import os # Added os import for environ access (though config module handles it)
+import os
 
-# Correct import path for database/models/config if running from project root
-# Adjust based on how you run the service (e.g., uvicorn shell_service.main:app)
+# Correct import path
 try:
     from shell_service.database import crud
-    from shell_service.config import CURRENT_ENV_CONFIG # Import environment config
+    # Import the function, not the dict
+    from shell_service.config import load_environment_config
     from shell_service.models.preferences import (
         ShellConfigurationResponse,
         ShellPreferencesRequest,
         LayoutInfoResponse,
         AppDefinition,
-        # AppConfig, # AppConfig might not be used directly here
         ServiceEndpoints, LayoutDefinition,
         Frame
     )
 except ImportError:
-    # Fallback for potential direct execution or testing issues
-    # This might indicate a PYTHONPATH issue if it occurs during normal startup
+    # Fallback
     print("Warning: Could not perform relative import, trying absolute.")
-    # Assuming db, config, models are sibling directories or in PYTHONPATH
     from database import crud # type: ignore
-    from config import CURRENT_ENV_CONFIG # type: ignore
+    from config import load_environment_config # type: ignore
     from models.preferences import ( # type: ignore
         ShellConfigurationResponse,
         ShellPreferencesRequest,
         LayoutInfoResponse,
         AppDefinition,
-        # AppConfig,
         ServiceEndpoints, LayoutDefinition,
         Frame
     )
 
-
-# Configure logger
 logger = logging.getLogger(__name__)
-
-# Create router
 router = APIRouter(prefix="/api/v1/shell", tags=["shell_preferences"])
 
-# Simple user extraction from headers (replace with your auth system)
 async def get_current_user(x_user_id: Optional[str] = Header(None)):
-    """Extract user ID from headers or use default."""
-    # In a real app, you'd validate this user ID against a session or token
-    user = x_user_id or "default_user" # Use a consistent default if anonymous needed
+    user = x_user_id or "default_user"
     logger.debug(f"Extracted user_id: {user}")
     return user
 
 @router.get("/configuration", response_model=ShellConfigurationResponse)
-async def get_shell_configuration(user_id: str = Depends(get_current_user)):
-    """
-    Retrieves the complete shell configuration including user frames,
-    available microfrontend apps, and backend service endpoints, using
-    environment-specific overrides where applicable.
-    """
+async def get_shell_configuration(
+    request: Request, # Ensure request instance is passed
+    user_id: str = Depends(get_current_user)
+):
     logger.info(f"Fetching shell configuration for user: {user_id}")
     try:
+        # --- Access state directly and log ---
+        environment_config = {}
+        layout_definitions = {}
+        try:
+            environment_config = request.app.state.environment_config
+            layout_definitions = request.app.state.layout_templates # Direct access
+            logger.debug(f"Direct access request.app.state.layout_templates type: {type(layout_definitions)}")
+            logger.debug(f"Direct access request.app.state.layout_templates keys: {layout_definitions.keys() if isinstance(layout_definitions, dict) else 'N/A'}")
+        except AttributeError as state_err:
+            logger.error(f"Error accessing app state during request: {state_err}", exc_info=True)
+            # Decide how to handle - fail request or use defaults?
+            environment_config = {} # Fallback
+            layout_definitions = {} # Fallback
+
+        if not isinstance(layout_definitions, dict):
+             logger.error(f"request.app.state.layout_templates is not a dictionary (Type: {type(layout_definitions)}). Resetting to empty dict.")
+             layout_definitions = {}
+        # --- End State Access ---
+
+
+        if not environment_config:
+             logger.warning("Environment configuration not found in app state during request!")
+
         # Fetch base data from DB
         user_frames = await crud.get_user_frames(user_id)
         db_available_apps = await crud.get_available_apps()
-        db_service_endpoints = await crud.get_service_endpoints() # Gets DB/default endpoints
+        db_service_endpoints = await crud.get_service_endpoints()
 
-        # Get layout templates for frames that reference them
-        layout_templates = getattr(Request.app.state, "layout_templates", [])
-        layout_ids_in_use = set()
-        
-        # Collect all layoutId references from user frames
-        for frame in user_frames:
-            if hasattr(frame, 'layoutId') and frame.layoutId:
-                layout_ids_in_use.add(frame.layoutId)
-        
-        # Filter layouts to only include those referenced by user frames
-        filtered_layouts = []
-        if layout_templates:
-            for layout in layout_templates:
-                if layout.id in layout_ids_in_use:
-                    filtered_layouts.append(layout)
+        layout_ids_in_use = {frame.layoutId for frame in user_frames if hasattr(frame, 'layoutId') and frame.layoutId}
+        # Use the layout_definitions fetched from state
+        filtered_layouts = [layout_def for layout_id, layout_def in layout_definitions.items() if layout_id in layout_ids_in_use]
         logger.debug(f"Including {len(filtered_layouts)} layout definitions for user {user_id}")
 
-        # --- Determine the single correct URL for the running config-selector MFE ---
-        # Get it from the environment config, using a specific key like 'config-selector-teams'
-        # IMPORTANT: Ensure this key exists and has the correct URL in your environments.json
-        # IMPORTANT: Use the correct filename (e.g., config-selector.js) from your Vite build!
-        config_selector_config = CURRENT_ENV_CONFIG.get('config-selector-teams', {}) # Example key
-        config_selector_running_url = config_selector_config.get('url', '')
-        # Adjust filename if necessary based on Vite build output for config-selector
-        if config_selector_running_url and 'remoteEntry.js' in config_selector_running_url:
-             # Example adjustment - check your actual filename!
-             config_selector_running_url = config_selector_running_url.replace('remoteEntry.js', 'config-selector.js')
-             logger.info(f"Adjusted config-selector running URL: {config_selector_running_url}")
-        # --- End Determine Config Selector URL ---
-
-
         # --- Process Available Apps URLs ---
+        config_selector_config = environment_config.get('config-selector-teams', {})
+        config_selector_running_url = config_selector_config.get('url', '')
         available_apps = []
         for app_def in db_available_apps:
-            # Create a copy to potentially modify
             app = copy.deepcopy(app_def)
-            env_app_config = {} # Default to empty
-
-            # --- Logic to assign CORRECT URL based on ID ---
+            env_app_config = {}
             if app.id.startswith("config-selector-"):
-                # Assign the single running URL to all config-selector variants
-                if config_selector_running_url:
-                    app.url = config_selector_running_url
-                    logger.debug(f"Assigning running config-selector URL to {app.id}: {app.url}")
-                else:
-                    logger.warning(f"No running URL found in environment for config-selector key used. App '{app.id}' URL from DB: {app.url}")
-                    # Keep DB URL as fallback
+                if config_selector_running_url: app.url = config_selector_running_url
             else:
-                # For other apps, check if their specific key exists in env config
-                env_app_config = CURRENT_ENV_CONFIG.get(app.id, {}) # Use app.id as the key
+                env_app_config = environment_config.get(app.id, {})
                 env_url = env_app_config.get("url")
-                if env_url and isinstance(env_url, str):
-                    app.url = env_url # Override with environment URL
-                    logger.debug(f"Using environment URL for app {app.id}: {app.url}")
-                # else:
-                    # logger.debug(f"Using DB/default URL for app {app.id}: {app.url}")
-            # --- End URL Assignment Logic ---
-
+                if env_url and isinstance(env_url, str): app.url = env_url
             available_apps.append(app)
         # --- End App URL Processing ---
 
-
         # --- Process Service Endpoints URL ---
-        # Start with the endpoint object fetched from DB/defaults
         service_endpoints = db_service_endpoints
-
-        # Check for 'main_backend' configuration in the loaded environment JSON
-        main_backend_config = CURRENT_ENV_CONFIG.get("main_backend")
+        main_backend_config = environment_config.get("main_backend")
         if main_backend_config and isinstance(main_backend_config, dict):
-             # Extract the 'url' string from the main_backend object
-             backend_url_from_config = main_backend_config.get("url")
-             if backend_url_from_config and isinstance(backend_url_from_config, str):
-                 # Assign the *string* URL directly to the field
-                 service_endpoints.jobConfigServiceUrl = backend_url_from_config
-                 logger.info(f"Using environment-specific URL for main backend: {service_endpoints.jobConfigServiceUrl}")
-             else:
-                 logger.warning("Found 'main_backend' in env config but 'url' key was missing or not a string. Using DB/default URL: %s", service_endpoints.jobConfigServiceUrl)
+            backend_url_from_config = main_backend_config.get("url")
+            if backend_url_from_config and isinstance(backend_url_from_config, str):
+                service_endpoints.jobConfigServiceUrl = backend_url_from_config
+                logger.info(f"Using environment URL for main backend: {service_endpoints.jobConfigServiceUrl}")
+            else:
+                logger.warning("main_backend found but 'url' missing/invalid. Using DB/default: %s", service_endpoints.jobConfigServiceUrl)
         else:
-             logger.info("No 'main_backend' object found in environment config. Using DB/default URL: %s", service_endpoints.jobConfigServiceUrl)
+            logger.info("No main_backend in env config. Using DB/default: %s", service_endpoints.jobConfigServiceUrl)
         # --- End Service Endpoint URL Processing ---
 
-        # Log the final response structure being sent
-        logger.debug(f"Final configuration being returned for user {user_id}: Frames={len(user_frames)}, Apps={len(available_apps)}, Endpoints={service_endpoints.model_dump()}")
+        logger.debug(f"Final configuration for user {user_id}: Frames={len(user_frames)}, Apps={len(available_apps)}, Layouts={len(filtered_layouts)}, Endpoints={service_endpoints.model_dump()}")
 
-        # Return the final composed configuration
         return ShellConfigurationResponse(
             frames=user_frames,
             availableApps=available_apps,
-            serviceEndpoints=service_endpoints, # Contains the correctly formatted string URL now
-            layouts=filtered_layouts # Include the filtered layout definitions
+            serviceEndpoints=service_endpoints,
+            layouts=filtered_layouts
         )
     except Exception as e:
         logger.error(f"Error fetching shell configuration for user {user_id}: {e}", exc_info=True)
-        # Raise HTTPException to return a 500 error to the client
         raise HTTPException(status_code=500, detail="Failed to retrieve shell configuration.")
+
 
 @router.put("/preferences")
 async def save_shell_preferences(
     preferences: ShellPreferencesRequest = Body(...),
     user_id: str = Depends(get_current_user)
 ):
-    """Saves the user's frame preferences."""
     logger.info(f"Saving preferences for user: {user_id} ({len(preferences.frames)} frames)")
-
-    # Validate frame IDs and generate any missing ones
+    # (Keep validation logic from previous correct version)
     for frame in preferences.frames:
-        # Basic check for missing or potentially invalid IDs
-        
-        # Validate that windowId is present in all assignments if layoutId is specified
+        if not frame.id or not isinstance(frame.id, str) or len(frame.id) < 5:
+            frame.id = str(uuid.uuid4())
         if frame.layoutId:
             for app_assignment in frame.assignedApps:
-                if not app_assignment.windowId:
-                    logger.warning(f"Frame {frame.id} has layoutId but assignment {app_assignment.appId} is missing windowId. Setting default windowId=1.")
+                # Ensure windowId exists before checking its value
+                if not hasattr(app_assignment, 'windowId') or app_assignment.windowId is None:
                     app_assignment.windowId = 1
-            logger.debug(f"Frame {frame.id} has layoutId={frame.layoutId} with {len(frame.assignedApps)} app assignments.")
-                    
-        if not frame.id or not isinstance(frame.id, str) or len(frame.id) < 5:
-            new_id = str(uuid.uuid4())
-            logger.info(f"Generated new ID '{new_id}' for frame '{frame.name}' (Original ID: {frame.id})")
-            frame.id = new_id
-        # Ensure order is sequential before saving (can be done here or in crud)
-        # Example: preferences.frames.sort(key=lambda f: f.order)
-        # for index, frame in enumerate(preferences.frames):
-        #     frame.order = index
-
     try:
         success = await crud.save_user_frames(user_id, preferences.frames)
         if not success:
-            # Log specific error from crud if available, otherwise generic message
             logger.error(f"crud.save_user_frames returned False for user {user_id}")
             raise HTTPException(status_code=500, detail="Failed to save preferences to database.")
-
         return {"message": "Preferences saved successfully."}
-    except HTTPException:
-        raise # Re-raise HTTPException if it came from CRUD or validation
+    except HTTPException: raise
     except Exception as e:
         logger.error(f"Unexpected error saving shell preferences for user {user_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred while saving preferences.")
 
+
 @router.get("/available-apps", response_model=List[AppDefinition])
-async def get_available_apps_endpoint(): # Renamed function
-    """
-    Retrieves the list of available microfrontend apps, applying env overrides.
-    (Optional endpoint as apps are also returned in /configuration)
-    """
+async def get_available_apps_endpoint(request: Request): # Add request
     logger.info("Fetching available apps via dedicated endpoint")
     try:
-        # Re-use the logic from get_shell_configuration to get apps with env URLs
+        # Access environment config from app state
+        environment_config = getattr(request.app.state, "environment_config", {})
         db_available_apps = await crud.get_available_apps()
-
-        # --- Determine the single correct URL for the running config-selector MFE ---
-        config_selector_config = CURRENT_ENV_CONFIG.get('config-selector-teams', {}) # Example key
+        config_selector_config = environment_config.get('config-selector-teams', {})
         config_selector_running_url = config_selector_config.get('url', '')
-        if config_selector_running_url and 'remoteEntry.js' in config_selector_running_url:
-             config_selector_running_url = config_selector_running_url.replace('remoteEntry.js', 'config-selector.js') # Adjust if needed
-        # --- End Determine URL ---
-
         available_apps = []
         for app_def in db_available_apps:
             app = copy.deepcopy(app_def)
             env_app_config = {}
-
             if app.id.startswith("config-selector-"):
-                if config_selector_running_url:
-                    app.url = config_selector_running_url
+                if config_selector_running_url: app.url = config_selector_running_url
             else:
-                env_app_config = CURRENT_ENV_CONFIG.get(app.id, {})
+                env_app_config = environment_config.get(app.id, {})
                 env_url = env_app_config.get("url")
-                if env_url and isinstance(env_url, str):
-                    app.url = env_url
-
+                if env_url and isinstance(env_url, str): app.url = env_url
             available_apps.append(app)
         return available_apps
     except Exception as e:
         logger.error(f"Error fetching available apps via dedicated endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve available apps.")
 
+
 @router.get("/layouts", response_model=List[LayoutInfoResponse])
 async def get_layout_templates(request: Request):
-    """
-    Retrieves the list of available layout templates for arranging multiple apps within a frame.
-    These layouts are loaded during application startup and stored in app state.
-    """
     logger.info("Fetching available layout templates")
     try:
-        # Access the layout templates stored in app state during startup
-        layout_templates = getattr(request.app.state, "layout_templates", None)
-        
-        if not layout_templates:
+        # --- Access state directly and log ---
+        layout_definitions = {}
+        try:
+            layout_definitions = request.app.state.layout_templates # Direct access
+            logger.debug(f"Direct access request.app.state.layout_templates type: {type(layout_definitions)}")
+            logger.debug(f"Direct access request.app.state.layout_templates keys: {layout_definitions.keys() if isinstance(layout_definitions, dict) else 'N/A'}")
+        except AttributeError as state_err:
+            logger.error(f"Error accessing app state during request: {state_err}", exc_info=True)
+            layout_definitions = {} # Fallback
+
+        if not isinstance(layout_definitions, dict):
+             logger.error(f"request.app.state.layout_templates is not a dictionary (Type: {type(layout_definitions)}). Resetting to empty dict.")
+             layout_definitions = {}
+        # --- End State Access ---
+
+        if not layout_definitions:
             logger.warning("No layout templates found in application state")
             return []
-            
-        # Convert layout definitions to response objects
-        layout_info_list = [LayoutInfoResponse(id=layout.id, name=layout.name, 
-                                              description=layout.description,
-                                              window_count=len(layout.windows)) for layout in layout_templates]
+
+        layout_info_list = [
+            LayoutInfoResponse(
+                id=layout.id, name=layout.name, description=layout.description,
+                window_count=len(layout.windows)
+            ) for layout in layout_definitions.values() # Iterate through dict values
+        ]
+        logger.info(f"Returning {len(layout_info_list)} layout templates.")
         return layout_info_list
     except Exception as e:
         logger.error(f"Error fetching layout templates: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve layout templates.")
+    
+@router.get("/layouts/{layout_id}", response_model=LayoutDefinition)
+async def get_layout_template(request: Request, layout_id: str):
+    """Get the complete definition for a specific layout template."""
+    logger.info(f"Fetching layout template for ID: {layout_id}")
+    try:
+        # Access layout definitions from app state
+        layout_definitions = getattr(request.app.state, "layout_templates", {})
+        
+        if not isinstance(layout_definitions, dict):
+            logger.error(f"request.app.state.layout_templates is not a dictionary (Type: {type(layout_definitions)})")
+            raise HTTPException(status_code=500, detail="Server error: Invalid layout storage format")
+            
+        # Find the layout with the specified ID
+        if layout_id in layout_definitions:
+            layout = layout_definitions[layout_id]
+            logger.info(f"Found layout template: {layout_id}")
+            return layout
+        else:
+            logger.warning(f"Layout template not found: {layout_id}")
+            available_layouts = list(layout_definitions.keys())
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Layout '{layout_id}' not found. Available layouts: {available_layouts}"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching layout template {layout_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error retrieving layout template: {str(e)}")

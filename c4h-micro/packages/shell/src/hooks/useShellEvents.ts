@@ -3,6 +3,7 @@
  * Custom hook to encapsulate shell event bus subscriptions and bridge setup.
  */
 import { useEffect } from 'react';
+// Import EventTypes as a value, not just a type
 import { eventBus, EventTypes, EventDetail, NavigationRequestPayload } from 'shared';
 import { setupEventBusBridge } from '../utils/eventBusBridge';
 
@@ -17,7 +18,6 @@ export function useShellEvents({ onNavigationRequest, onYamlEditRequest }: UseSh
     useEffect(() => {
         console.log("useShellEvents: Setting up event bus bridge.");
         const bridge = setupEventBusBridge(window);
-        // Cleanup function for the bridge
         return () => {
             console.log("useShellEvents: Tearing down event bus bridge.");
             bridge.tearDown();
@@ -35,10 +35,10 @@ export function useShellEvents({ onNavigationRequest, onYamlEditRequest }: UseSh
             }
         };
         console.log("useShellEvents: Subscribing to navigation:request event.");
-        const unsubscribe = eventBus.subscribe(EventTypes.NAVIGATION_REQUEST, handleNavigation);
-        // Cleanup function
+        // Use the EventTypes enum value correctly
+        const unsubscribe = eventBus.subscribe(EventTypes.NAVIGATION_REQUEST, handleNavigation); // FIXED
         return () => {
-            console.log("useShellEvents: Unsubscribing from navigation:request event.");
+           console.log("useShellEvents: Unsubscribing from navigation:request event.");
             unsubscribe();
         };
     }, [onNavigationRequest]); // Rerun if the callback changes
@@ -46,12 +46,12 @@ export function useShellEvents({ onNavigationRequest, onYamlEditRequest }: UseSh
     // Effect for handling in-place YAML editor requests
     useEffect(() => {
         console.log("useShellEvents: Subscribing to config:edit:yaml event.");
+        // Assuming 'config:edit:yaml' is a string literal type, not part of EventTypes enum
         const unsubscribe = eventBus.subscribe('config:edit:yaml', onYamlEditRequest);
-        // Cleanup function
         return () => {
             console.log("useShellEvents: Unsubscribing from config:edit:yaml event.");
             unsubscribe();
         };
     }, [onYamlEditRequest]); // Rerun if the callback changes
 
-}
+} // End of useShellEvents Hook

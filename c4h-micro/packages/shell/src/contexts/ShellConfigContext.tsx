@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios'; // Keep axios import for isAxiosError check
-import { AppDefinition, Preferences, ShellConfigurationResponse, LayoutDefinition, 
-         eventBus, EventTypes } from 'shared'; // Updated imports to include LayoutDefinition
-import { configureApiService } from 'shared'; // Removed apiService import as it's not directly used here
+// File: /Users/jim/src/apps/c4h_editor_aidev/c4h-micro/packages/shell/src/contexts/ShellConfigContext.tsx
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
+import axios from 'axios';
+// Import types and values correctly from shared package
+import {
+    AppDefinition, Preferences, ShellConfigurationResponse, LayoutDefinition,
+    eventBus, EventTypes, configureApiService, checkApiServiceReady // EventTypes is now exported as value
+} from 'shared';
 
 // Define the shape of the context state
 export interface ShellConfigContextState {
@@ -10,121 +13,122 @@ export interface ShellConfigContextState {
     loading: boolean;
     error: string | null;
     availableApps: AppDefinition[] | null;
-    layouts: LayoutDefinition[] | null;
+    layouts: Record<string, LayoutDefinition> | null;
     prefsServiceUrl: string | null;
-    isReady: boolean; // Flag indicating config fetch and API setup is complete
+    isReady: boolean;
     fetchConfig: () => Promise<void>;
+    fetchLayout: (layoutId: string) => Promise<LayoutDefinition | null>;
 }
 
-// Create the context with a default undefined value
 const ShellConfigContext = createContext<ShellConfigContextState | undefined>(undefined);
 
-// Define the provider component props
 interface ShellConfigProviderProps {
     children: ReactNode;
 }
 
-// Create the provider component
 export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ children }) => {
     const [config, setConfig] = useState<Preferences | null>(null);
     const [availableApps, setAvailableApps] = useState<AppDefinition[] | null>(null);
     const [prefsServiceUrl, setPrefsServiceUrl] = useState<string | null>(null);
-    const [layouts, setLayouts] = useState<LayoutDefinition[] | null>(null);
+    const [layouts, setLayouts] = useState<Record<string, LayoutDefinition> | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
-    const [isReady, setIsReady] = useState<boolean>(false); // Initialize readiness to false
+    const [isReady, setIsReady] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Inside ShellConfigContext.tsx
-    const fetchConfig = async () => {
-        console.log("!!! ShellConfigContext: useEffect[] calling fetchConfig !!!"); // Moved log here
+    const fetchConfig = useCallback(async () => {
         console.log("!!! ShellConfigContext: fetchConfig START !!!");
-        setLoading(true);
-        setIsReady(false); // Ensure ready is false at the start
-        setError(null);
-        let configurationSuccessful = false; // <<< NEW FLAG
-
+        setLoading(true); setIsReady(false); setError(null);
+        let configurationSuccessful = false;
         const effectivePrefsServiceUrl = import.meta.env.VITE_PREFS_SERVICE_URL || 'http://localhost:8011';
         setPrefsServiceUrl(effectivePrefsServiceUrl);
         const configFetcher = axios.create({ baseURL: effectivePrefsServiceUrl });
 
         try {
-            console.log(`ShellConfigContext: Preparing to GET from: ${effectivePrefsServiceUrl}/api/v1/shell/configuration`);
             const response = await configFetcher.get<ShellConfigurationResponse>('/api/v1/shell/configuration');
-            console.log("ShellConfigContext: GET call SUCCEEDED.");
             const data = response.data;
-            console.log("ShellConfigContext: Raw config response RECEIVED:", JSON.stringify(data, null, 2));
+            console.log("ShellConfigContext: Raw config response:", data ? JSON.stringify(data).substring(0, 500) + '...' : 'null');
 
-            setConfig(data?.preferences ?? { frames: data?.frames ?? [] });
+            const fetchedFrames = data?.preferences?.frames ?? data?.frames ?? [];
+            setConfig({ frames: fetchedFrames });
             setAvailableApps(data?.availableApps ?? null);
-            
-            // Set layout definitions from the API response
-            setLayouts(data?.layouts ?? null);
-            console.log("ShellConfigContext: Received layout definitions:", data?.layouts);
+            setLayouts({});  // Initialize an empty layouts object
 
             const backendUrl = data?.serviceEndpoints?.jobConfigServiceUrl;
-            console.log(`ShellConfigContext: Extracted jobConfigServiceUrl: ${backendUrl}`);
-            console.log(`ShellConfigContext: Type of backendUrl: ${typeof backendUrl}`);
-
             if (backendUrl && typeof backendUrl === 'string') {
-                console.log(`ShellConfigContext: Condition PASSED. Preparing to call configureApiService with URL: ${backendUrl}`);
                 configureApiService(backendUrl);
-                console.log(`ShellConfigContext: configureApiService was CALLED.`);
-                configurationSuccessful = true; // <<< SET FLAG TO TRUE
-
-                console.log("ShellConfigContext: Publishing shell:config:ready event.");
-                eventBus.publish(EventTypes.SHELL_CONFIG_READY, { 
-                    source: "ShellConfigContext", 
+                configurationSuccessful = true;
+                // Use the EventTypes enum value correctly
+                eventBus.publish(EventTypes.SHELL_CONFIG_READY, { // FIXED
+                    source: "ShellConfigContext",
                     payload: { backendUrl: backendUrl }
                 });
             } else {
-                console.warn(`ShellConfigContext: Condition FAILED. jobConfigServiceUrl not found or invalid. apiService MAY NOT be configured correctly.`);
-                // configurationSuccessful remains false
+                console.warn(`ShellConfigContext: jobConfigServiceUrl not found/invalid. apiService not configured.`);
             }
-            setError(null); // Clear error on success
-
+            setError(null);
         } catch (err: any) {
-            console.error("!!! ShellConfigContext: ERROR during fetchConfig try block !!!", err.message || err);
-            let errorMessage = "Failed to fetch configuration.";
-            if (axios.isAxiosError(err)) { // Make sure axios is imported if using isAxiosError
-                errorMessage = err.response?.data?.detail || err.message || errorMessage;
-                if(err.response?.status === 404) { /* ... */ }
-                else if (err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED') { /* ... */ }
-            } else if (err instanceof Error) {
-                errorMessage = err.message;
-            }
-            setError(errorMessage);
-            setConfig(null);
-            setAvailableApps(null);
-            setLayouts(null); // Clear layouts on error
-            // configurationSuccessful remains false
-
+            // ... (error handling as before) ...
+             console.error("!!! ShellConfigContext: ERROR during fetchConfig !!!", err.message || err);
+             let errorMessage = "Failed to fetch shell configuration.";
+             if (axios.isAxiosError(err)) {
+                 errorMessage = err.response?.data?.detail || err.message || errorMessage;
+                 if (err.code === 'ERR_NETWORK' || err.code === 'ECONNREFUSED') {
+                      errorMessage = `Network error connecting to preferences service at ${effectivePrefsServiceUrl}. Is it running?`;
+                 }
+             } else if (err instanceof Error) {
+                 errorMessage = err.message;
+             }
+             setError(errorMessage);
+             setConfig(null); setAvailableApps(null); setLayouts(null);
         } finally {
-            // <<< MODIFIED LOGIC >>>
-            // Set ready ONLY if the configuration step was successful
             setIsReady(configurationSuccessful);
-            console.log(`ShellConfigContext: fetchConfig finally block. configurationSuccessful=${configurationSuccessful}. Setting isReady to: ${configurationSuccessful}`);
+            console.log(`ShellConfigContext: fetchConfig finally. configurationSuccessful=${configurationSuccessful}. isReady=${configurationSuccessful}`);
             setLoading(false);
         }
-    };
+    }, []);
+
+    // Add a new function to fetch a specific layout
+    const fetchLayout = useCallback(async (layoutId: string): Promise<LayoutDefinition | null> => {
+        if (!prefsServiceUrl) {
+            console.error("Cannot fetch layout: prefsServiceUrl is not set");
+            return null;
+        }
+
+        // If we already have this layout, return it
+        if (layouts && layouts[layoutId]) {
+            console.log(`ShellConfigContext: Using cached layout ${layoutId}`);
+            return layouts[layoutId];
+        }
+
+        console.log(`ShellConfigContext: Fetching layout ${layoutId} from ${prefsServiceUrl}/api/v1/shell/layouts/${layoutId}`);
+        try {
+            const response = await axios.get<LayoutDefinition>(`${prefsServiceUrl}/api/v1/shell/layouts/${layoutId}`);
+            const layoutDefinition = response.data;
+            
+            console.log(`ShellConfigContext: Successfully fetched layout ${layoutId}`);
+            
+            // Update the layouts state with this layout
+            setLayouts(prev => {
+                const updatedLayouts = { ...(prev || {}) };
+                updatedLayouts[layoutId] = layoutDefinition;
+                return updatedLayouts;
+            });
+            
+            return layoutDefinition;
+        } catch (err) {
+            console.error(`ShellConfigContext: Error fetching layout ${layoutId}:`, err);
+            return null;
+        }
+    }, [prefsServiceUrl, layouts]);
 
     useEffect(() => {
-        console.log("!!! ShellConfigContext: useEffect[] calling fetchConfig !!!"); // <-- ADD THIS    
         fetchConfig();
-    }, []); // Fetch on initial mount
+    }, [fetchConfig]);
 
-    // Memoize the context value
-    const contextValue = React.useMemo(() => ({
-        config,
-        loading,
-        error,
-        availableApps,
-        layouts,
-        prefsServiceUrl,
-        isReady, // Provide isReady in the context value
-        fetchConfig
-    }), [config, loading, error, availableApps, layouts, prefsServiceUrl, isReady]); // Add layouts to dependencies
+    const contextValue = useMemo(() => ({
+        config, loading, error, availableApps, layouts, prefsServiceUrl, isReady, fetchConfig, fetchLayout
+    }), [config, loading, error, availableApps, layouts, prefsServiceUrl, isReady, fetchConfig, fetchLayout]);
 
-    console.log("ShellConfigProvider: Value being provided by Context:", contextValue);
     return (
         <ShellConfigContext.Provider value={contextValue}>
             {children}
@@ -132,11 +136,8 @@ export const ShellConfigProvider: React.FC<ShellConfigProviderProps> = ({ childr
     );
 };
 
-// Custom hook to use the shell config context
 export const useShellConfig = (): ShellConfigContextState => {
     const context = useContext(ShellConfigContext);
-    if (context === undefined) {
-        throw new Error('useShellConfig must be used within a ShellConfigProvider');
-    }
+    if (context === undefined) throw new Error('useShellConfig must be used within a ShellConfigProvider');
     return context;
 };

@@ -1,0 +1,10 @@
+{
+  "id": "main-with-right-sidebar",
+  "name": "Main + Right Sidebar (70/30)",
+  "description": "Main content area with a smaller sidebar on the right.",
+  "containerStyle": { "display": "flex", "flexDirection": "row", "height": "100%", "width": "100%", "gap": "8px" },
+  "windows": [
+    { "id": 1, "style": { "flex": "1 1 70%", "overflow": "auto", "borderRight": "1px solid #e0e0e0" } },
+    { "id": 2, "style": { "flex": "0 0 30%", "overflow": "auto" } }
+  ]
+}

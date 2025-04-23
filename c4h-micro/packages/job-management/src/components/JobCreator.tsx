@@ -58,7 +58,7 @@ const JobCreator: React.FC = () => {
       try {
         const endpoint = configTypes[configType]?.apiEndpoints.list;
         if (endpoint) {
-          const response = await api.get(endpoint); // [cite: 963]
+          const response = await api.get(endpoint); // // // // // [cite: 963]
           const configs = Array.isArray(response.data) ? response.data : [];
 
           if (Array.isArray(configs)) {
@@ -67,7 +67,7 @@ const JobCreator: React.FC = () => {
               return {
                 id: item.id,
                 description: description,
-                updated_at: item.updated_at // Expecting backend to provide this [cite: 1950]
+                updated_at: item.updated_at // Expecting backend to provide this // // // // [cite: 1950]
               };
             }).filter(item => item.id); // Ensure ID exists
 
@@ -75,7 +75,7 @@ const JobCreator: React.FC = () => {
             mappedOptions.sort((a, b) => {
               const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
               const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-              return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA); // Descending sort [cite: 1205, 1206]
+              return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA); // Descending sort // // // // [cite: 1205, 1206]
             });
 
             options[configType] = mappedOptions;
@@ -116,12 +116,12 @@ const JobCreator: React.FC = () => {
     eventBus.subscribe('configListUpdated', handleConfigUpdate);
 
     console.log("JobCreator: Subscribing to configListUpdated event.");
-    const unsubscribe = eventBus.subscribe('configListUpdated', handleConfigUpdate); // [cite: 985]
+    const unsubscribe = eventBus.subscribe('configListUpdated', handleConfigUpdate); // // // // // [cite: 985]
 
     // Cleanup function to unsubscribe when component unmounts
     return () => {
       console.log("JobCreator: Unsubscribing from configListUpdated event.");
-      unsubscribe(); // [cite: 987]
+      unsubscribe(); // // // // // [cite: 987]
     };
   }, [loadConfigOptions]); // Depend on loadConfigOptions
 
@@ -136,11 +136,11 @@ const JobCreator: React.FC = () => {
     if (isFormValid) {
       try {
         const configList: JobConfigReference[] = [
-          { id: runtimeconfigId, config_type: 'runtimeconfig' }, // [cite: 1211]
-          { id: teamconfigId, config_type: 'teamconfig' },       // [cite: 1211]
-          { id: workorderId, config_type: 'workorder' }         // [cite: 1212]
+          { id: runtimeconfigId, config_type: 'runtimeconfig' }, // // // // // [cite: 1211]
+          { id: teamconfigId, config_type: 'teamconfig' },       // // // // // [cite: 1211]
+          { id: workorderId, config_type: 'workorder' }         // // // // // [cite: 1212]
         ];
-        submitJobConfigurations(configList); // [cite: 1213]
+        submitJobConfigurations(configList); // // // // // [cite: 1213]
       } catch (err) { /* Error is handled by the context */ }
     }
   };
