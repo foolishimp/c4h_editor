@@ -66,3 +66,10 @@ class ShellPreferencesRequest(BaseModel):
     """Request model for the PUT /shell/preferences endpoint."""
     frames: List[Frame] = Field(..., description="The complete, updated list of frames for the user.")
     # Add other preference sections here if needed in the future
+
+class LayoutInfoResponse(BaseModel):
+    """Response model for the GET /shell/layouts endpoint."""
+    id: str = Field(..., description="Unique identifier for the layout template.")
+    name: str = Field(..., description="Display name of the layout template.")
+    description: str = Field(..., description="Description of the layout's purpose or arrangement.")
+    window_count: int = Field(..., description="Number of windows in this layout template.")

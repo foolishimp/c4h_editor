@@ -1,12 +1,10 @@
-# File: /Users/jim/src/apps/c4h_editor_aidev/shell_service/api/routes/shell.py
-# --- CORRECTED Version ---
 """
 API routes for the Preferences Shell Service.
 Provides endpoints for the frontend shell to fetch its configuration
 and save user preferences.
 """
 
-from fastapi import APIRouter, HTTPException, Body, Depends, Header, Query
+from fastapi import APIRouter, HTTPException, Body, Depends, Header, Query, Request
 from typing import List, Dict, Any, Optional
 import logging
 import copy
@@ -21,6 +19,7 @@ try:
     from shell_service.models.preferences import (
         ShellConfigurationResponse,
         ShellPreferencesRequest,
+        LayoutInfoResponse,
         AppDefinition,
         # AppConfig, # AppConfig might not be used directly here
         ServiceEndpoints,
@@ -36,6 +35,7 @@ except ImportError:
     from models.preferences import ( # type: ignore
         ShellConfigurationResponse,
         ShellPreferencesRequest,
+        LayoutInfoResponse,
         AppDefinition,
         # AppConfig,
         ServiceEndpoints,
@@ -220,3 +220,27 @@ async def get_available_apps_endpoint(): # Renamed function
     except Exception as e:
         logger.error(f"Error fetching available apps via dedicated endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve available apps.")
+
+@router.get("/layouts", response_model=List[LayoutInfoResponse])
+async def get_layout_templates(request: Request):
+    """
+    Retrieves the list of available layout templates for arranging multiple apps within a frame.
+    These layouts are loaded during application startup and stored in app state.
+    """
+    logger.info("Fetching available layout templates")
+    try:
+        # Access the layout templates stored in app state during startup
+        layout_templates = getattr(request.app.state, "layout_templates", None)
+        
+        if not layout_templates:
+            logger.warning("No layout templates found in application state")
+            return []
+            
+        # Convert layout definitions to response objects
+        layout_info_list = [LayoutInfoResponse(id=layout.id, name=layout.name, 
+                                              description=layout.description,
+                                              window_count=len(layout.windows)) for layout in layout_templates]
+        return layout_info_list
+    except Exception as e:
+        logger.error(f"Error fetching layout templates: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve layout templates.")
