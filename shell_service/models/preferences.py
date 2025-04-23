@@ -12,6 +12,7 @@ import uuid
 class AppAssignment(BaseModel):
     """How an App is assigned within a Frame."""
     appId: str = Field(..., description="The unique ID of the assigned AppDefinition.")
+    windowId: int = Field(..., description="The 1-based ID of the window within the layout this app is assigned to")
     # layoutInfo: Optional[Dict[str, Any]] = Field(None, description="Optional layout info if multiple apps per frame are supported.")
 
 class Frame(BaseModel):
@@ -19,6 +20,7 @@ class Frame(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the Frame.")
     name: str = Field(..., description="Display name of the Frame.")
     order: int = Field(0, description="Display order of the Frame.")
+    layoutId: Optional[str] = Field(None, description="ID of the layout template applied to this frame")
     assignedApps: List[AppAssignment] = Field(default_factory=list, description="Apps assigned to this Frame.")
 
 # --- Models for Available Apps and Service Endpoints ---

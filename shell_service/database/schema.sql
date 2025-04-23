@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS frames (
     user_id TEXT NOT NULL,                 -- Identifier for the user these frames belong to
     name TEXT NOT NULL,                    -- Display name of the frame (tab)
     "order" INTEGER NOT NULL DEFAULT 0,    -- Display order (using quotes for reserved word compatibility)
+    layout_id TEXT,                        -- ID of the layout template applied to this frame
     -- Store JSON as TEXT for SQLite compatibility
     assigned_apps TEXT NOT NULL DEFAULT '[]', -- JSON array of AppAssignment objects {appId: string}
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
