@@ -4,10 +4,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline'; 
+import CssBaseline from '@mui/material/CssBaseline';
 import ConfigManager from './ConfigManager';
 import { ConfigProvider } from './contexts/ConfigContext';
-import { configTypes, eventBus, EventTypes } from 'shared';
+import { configTypes, eventBus, EventTypes, bootstrapConfig } from 'shared';
 
 /**
  * Map between shell app IDs and normalized config types
@@ -20,12 +20,36 @@ const appIdToConfigType: Record<string, string> = {
 };
 
 /**
+ * Bootstrap function for config-selector MFE
+ * Called by shell when mounting to ensure proper configuration
+ */
+export async function bootstrapMfe(mfeId: string) {
+  console.log(`ConfigSelector: Bootstrap called for ${mfeId}`);
+  
+  try {
+    const result = await bootstrapConfig(mfeId);
+    if (!result.success) {
+      console.error(`ConfigSelector: Bootstrap failed: ${result.error}`);
+      return { success: false, error: result.error };
+    }
+    return { success: true, config: result.config };
+  } catch (error) {
+    console.error(`ConfigSelector: Bootstrap error:`, error);
+    return { success: false, error };
+  }
+}
+
+/**
  * Mount function for ConfigSelector with proper config type detection
  * and shell readiness check
  */
 export function mount(props: any) {
   const { domElement, appId = '', customProps = {} } = props; // Use appId from props
  
+  // Call bootstrap when mounted
+  bootstrapMfe(appId)
+    .catch(err => console.error(`ConfigSelector: Bootstrap error during mount:`, err));
+  
   // Determine config type from app ID or props
   let configType = customProps.configType || 'workorder'; // Default
   

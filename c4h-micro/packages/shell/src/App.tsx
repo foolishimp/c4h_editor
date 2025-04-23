@@ -330,7 +330,7 @@ function AppContent() {
         loadingIndicator.innerText = `Loading ${appDef.name}...`;
         containerElement.appendChild(loadingIndicator);
 
-        import(/* @vite-ignore */ appDef.url).then(module => {
+        import(/* @vite-ignore */ appDef.url).then(async module => {
              // Add check for currentFrameIdForMount consistency inside async callback
             if (!isEffectActive || activeFrameId !== currentFrameIdForMount || !containerElement.isConnected) {
                 console.log(`App.tsx: Mount Effect - Aborting ESM mount for ${appDef.id}. Effect inactive, frame changed, or container disconnected.`);
@@ -342,6 +342,16 @@ function AppContent() {
             console.log(`App.tsx: Mount Effect - ESM Module loaded for ${appDef.id}`, module);
 
             try {
+                // Call bootstrap function if MFE supports it
+                if (module.bootstrapMfe && typeof module.bootstrapMfe === 'function') {
+                    console.log(`Shell: Calling bootstrapMfe for ${appDef.id}`);
+                    try {
+                        await module.bootstrapMfe(appDef.id);
+                    } catch (bootstrapError) {
+                        console.error(`Shell: Error bootstrapping MFE ${appDef.id}:`, bootstrapError);
+                    }
+                }
+                
                 let unmountFn: (() => void) | undefined = undefined;
                 if (module.mount && typeof module.mount === 'function') {
                     console.log(`App.tsx: Mount Effect - Mounting ${appDef.id} via module.mount()...`);

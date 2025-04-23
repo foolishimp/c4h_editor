@@ -29,15 +29,10 @@ export const configureApiService = (baseUrl: string | undefined) => {
   const finalBaseUrl = baseUrl || API_BASE_URL;
   console.log(`apiService: configureApiService CALLED with: ${baseUrl}. Setting base URL to: ${finalBaseUrl}`);
 
-  if (axiosInstance.defaults.baseURL !== finalBaseUrl) {
-    console.log(`apiService: Configuring baseURL to: ${finalBaseUrl}`);
-    axiosInstance.defaults.baseURL = finalBaseUrl;
-    isApiConfigured = true; // Mark as configured
-  } else {
-    console.log(`apiService: baseURL already set to: ${finalBaseUrl}`);
-    // If it's already set to the final URL (even if it's the default), consider it configured.
-    isApiConfigured = true;
-  }
+  // Always set regardless of previous value to ensure consistency across MFEs
+  axiosInstance.defaults.baseURL = finalBaseUrl;
+  isApiConfigured = true; // Mark as configured
+  console.log(`apiService: Successfully configured with baseURL: ${finalBaseUrl}`);
 };
 
 // --- NEW: Function to check readiness ---

@@ -108,16 +108,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
   const loadConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // --- UPDATED CHECK ---
-    if (!checkApiServiceReady()) { // Check readiness directly from apiService
-        console.log("ConfigContext: Waiting for API service to be ready before loading configs...");
-        // Optionally set a specific loading message or just return
-        // setError("Waiting for shell configuration..."); // Or handle differently
-        setLoading(false); // Ensure loading is stopped if we return early
-        return; // Don't proceed if shell isn't ready
-    }
-    // --- END CHECK ---
-    console.log(`ConfigContext: Shell is ready. Proceeding to load configs for ${configType}.`);
+    console.log(`ConfigContext: Proceeding to load configs for ${configType} (assuming bootstrap complete).`);
     try {
       const response = await apiService.getConfigs(configType);
       setConfigs(response || []);
@@ -236,16 +227,8 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
     if (!currentConfig) {
       setError('No configuration selected to save'); setLoading(false); return null;
     }
-
     const isNew = !currentConfig.id || currentConfig.id === 'new' || currentConfig.id === '';
 
-    // --- USE DIRECT CHECK ---
-    if (!checkApiServiceReady()) { // Check readiness directly from apiService
-        console.error("ConfigContext: Cannot save config, API service is not ready.");
-        setError("Cannot save: Shell configuration not ready. Please wait or refresh.");
-        setLoading(false);
-        return null;
-    }
     // --- END CHECK ---
     const effectiveId = isNew ? idFromEditor?.trim() : currentConfig.id;
 

@@ -15,6 +15,7 @@ export * from './types/shell';
 export * from './types/iframe';        
 export * from './types/events';        
 
+export * from './utils/bootstrapHelper';
 // Use regular 'export' for modules that export runtime values (or mixed)
 export * from './config/configTypes';
 
