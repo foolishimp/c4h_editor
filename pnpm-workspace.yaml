@@ -1,0 +1,4 @@
+# ~/src/apps/c4h_editor_aidev/pnpm-workspace.yaml
+packages:
+  # Specifies that packages are located in subdirectories under c4h-micro/packages/
+  - 'c4h-micro/packages/*'

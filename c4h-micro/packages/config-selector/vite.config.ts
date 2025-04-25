@@ -1,78 +1,56 @@
-// File: packages/config-selector/vite.config.ts
-/// <reference path="../shared/src/types/federation.d.ts" />
-
+/**
+ * /packages/config-selector/vite.config.ts
+ * Vite configuration for config-selector microfrontend
+ * --- UPDATED: Removed 'shared' from externals ---
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
 
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+
 export default defineConfig({
-  plugins: [
-    react(),
-    federation({
-      name: 'configSelector',
-      filename: 'remoteEntry.js',
-      exposes: {
-        './ConfigManager': './src/ConfigManager.tsx'
-      },
-      remotes: {
-        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js'
-      },
-      shared: {
-        react: { 
-          singleton: true,
-          requiredVersion: '*',  // Change to '*'
-          eager: true
-        },
-        'react-dom': {
-          singleton: true,
-          requiredVersion: '*',  // Change to '*'
-          eager: true
-        },
-        '@mui/material': {
-          singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        '@mui/icons-material': {
-          singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        'shared': {
-          singleton: true,
-          eager: true
-        }
-      }
-    })
-  ],
+  plugins: [react()],
   build: {
-    modulePreload: false,
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist',
+    lib: {
+      entry: path.resolve(__dirname, 'src/main.tsx'),
+      name: 'ConfigSelector',
+      formats: ['es'],
+      // fileName removed here
+    },
     rollupOptions: {
+      // Shared removed from externals
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        '@mui/material',
+        '@mui/icons-material',
+        '@emotion/react',
+        '@emotion/styled'
+        // 'shared' // <-- REMOVED
+      ],
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js'
+        entryFileNames: 'assets/config-selector.js', // Keep explicit filename
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
-  server: {
-    port: 3003,
-    strictPort: true,
-    cors: true
-  },
-  preview: {
-    port: 3003,
-    strictPort: true,
-    cors: true
-  },
+  // Removed server/preview sections
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      'shared': path.resolve(__dirname, '../shared/src') // Keep alias for build
     }
   }
 });

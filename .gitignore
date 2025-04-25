@@ -15,6 +15,7 @@ lib64/
 parts/
 sdist/
 var/
+.venv/
 wheels/
 *.egg-info/
 .installed.cfg
@@ -81,6 +82,7 @@ data/backups/*
 logs/
 *.db
 *.sqlite3
+*.txt
 
 # OS specific
 .DS_Store
@@ -93,3 +95,6 @@ Thumbs.db
 /backup_txt/
 /data/
 workspaces/
+repositories/workorders
+repositories/teamconfigs
+repositories/runtimeconfigs

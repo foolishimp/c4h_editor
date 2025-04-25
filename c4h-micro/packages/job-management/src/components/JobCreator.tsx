@@ -1,5 +1,3 @@
-// File: /Users/jim/src/apps/c4h_editor/c4h-micro/packages/job-management/src/components/JobCreator.tsx
-
 import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
 import {
   Alert,
@@ -14,8 +12,7 @@ import {
   Select,
   MenuItem
 } from '@mui/material';
-// *** ADD eventBus import ***
-import { configTypes, api, JobConfigReference, eventBus } from 'shared'; // [cite: 917]
+import { configTypes, api, JobConfigReference, eventBus, EventDetail } from 'shared';
 import { useJobContext } from '../contexts/JobContext';
 
 interface ConfigOption {
@@ -99,16 +96,16 @@ const JobCreator: React.FC = () => {
 
   // --- Subscribe to eventBus for updates ---
   useEffect(() => {
-    const handleConfigUpdate = (data: { configType: string }) => {
-      // Check if the updated type is one we care about
-      if (REQUIRED_CONFIG_TYPES.includes(data?.configType)) {
-        console.log(`JobCreator: Received configListUpdated event for ${data.configType}. Refreshing options.`);
-        loadConfigOptions(); // Reload options when relevant config type changes
-      }
+      const handleConfigUpdate = (detail: EventDetail) => {
+        // Check if the updated type is one we care about
+        if (REQUIRED_CONFIG_TYPES.includes(detail?.payload?.configType)) {
+            console.log(`JobCreator: Received configListUpdated event for ${detail.payload.configType}. Refreshing options.`);
+            loadConfigOptions();
+        }
     };
+    eventBus.subscribe('configListUpdated', handleConfigUpdate);
 
     console.log("JobCreator: Subscribing to configListUpdated event.");
-    // Subscribe returns an unsubscribe function
     const unsubscribe = eventBus.subscribe('configListUpdated', handleConfigUpdate); // [cite: 985]
 
     // Cleanup function to unsubscribe when component unmounts

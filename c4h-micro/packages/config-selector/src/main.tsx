@@ -1,50 +1,60 @@
-// File: packages/config-selector/src/main.tsx
-import React, { useState } from 'react';
-import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { CssBaseline, Container, Box, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
+/**
+ * /packages/config-selector/src/main.tsx
+ */
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { ThemeProvider, createTheme, StyledEngineProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import ConfigManager from './ConfigManager';
+import { ConfigProvider } from './contexts/ConfigContext';
 import { configTypes } from 'shared';
 
-// Simple demo app for standalone development
-const App = () => {
-  const [selectedConfigType, setSelectedConfigType] = useState<string>('workorder');
-
-  return (
-    <BrowserRouter>
-      <CssBaseline />
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Box sx={{ mb: 4 }}>
-          <h1>Config Selector Demo</h1>
-          <p>This is a standalone demo of the Config Selector component.</p>
-          
-          <FormControl fullWidth sx={{ mb: 4 }}>
-            <InputLabel id="config-type-label">Configuration Type</InputLabel>
-            <Select
-              labelId="config-type-label"
-              value={selectedConfigType}
-              label="Configuration Type"
-              onChange={(e) => setSelectedConfigType(e.target.value)}
-            >
-              {Object.entries(configTypes).map(([key, config]) => (
-                <MenuItem key={key} value={key}>{config.name}</MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-        
-        <Routes>
-          <Route path="/" element={<ConfigManager configType={selectedConfigType} />} />
-          <Route path="/:configType" element={<ConfigManager />} />
-          <Route path="/:configType/:id" element={<ConfigManager />} />
-        </Routes>
-      </Container>
-    </BrowserRouter>
-  );
+// Define mapping between app IDs and config types
+const appIdToConfigType: Record<string, string> = {
+  'config-selector-workorders': 'workorder',
+  'config-selector-teams': 'teamconfig',
+  'config-selector-runtime': 'runtimeconfig'
 };
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Create mount function with configType detection
+export function mount(props: any) {
+  const { domElement, appId = '', customProps = {} } = props; // Use appId from props
+// Determine config type from app ID
+  let configType = 'workorder';
+// Default
+  
+  if (appId && appIdToConfigType[appId]) { // Check map using appId
+    configType = appIdToConfigType[appId];
+  } else {
+    // Try extracting from pattern
+    const matches = appId.match(/config-selector-(\w+)/i); // Match against appId
+    if (matches && matches[1]) {
+      const extracted = matches[1].toLowerCase();
+      
+      // Check if this is a plural that we need to make singular
+      if (extracted.endsWith('s') && configTypes[extracted.slice(0, -1)]) {
+        configType = extracted.slice(0, -1);
+      } else if (configTypes[extracted]) {
+        configType = extracted;
+      }
+    }
+  }
+  
+  console.log(`Mounting ConfigManager with configType: ${configType} (from app ID: ${appId})`);
+// Create root and render
+  const root = createRoot(domElement);
+  root.render(
+    <StyledEngineProvider injectFirst>
+      <ThemeProvider theme={createTheme()}>
+        <CssBaseline />
+        <ConfigProvider configType={configType} initialConfigId={customProps.configId}> {/* Pass initialConfigId if provided */}
+          <ConfigManager configType={configType} {...props.customProps} />
+        </ConfigProvider>
+      </ThemeProvider>
+    </StyledEngineProvider>
+  );
+  
+  return { unmount: () => root.unmount() };
+}
+
+export default ConfigManager;

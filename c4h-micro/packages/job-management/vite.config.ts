@@ -1,75 +1,58 @@
-// File: packages/job-management/vite.config.ts
-/// <reference path="../shared/src/types/federation.d.ts" />
-
+/**
+ * /packages/job-management/vite.config.ts
+ * Vite configuration for job-management microfrontend
+ * --- UPDATED: Removed 'shared' from externals ---
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
+
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [
     react(),
-    federation({
-      name: 'jobManagement',
-      filename: 'remoteEntry.js',
-      exposes: {
-        './JobManager': './src/JobManager.tsx',
-      },
-      shared: {
-        react: { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        'react-dom': { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        '@mui/material': {
-          singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        '@mui/icons-material': {
-          singleton: true,
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        'shared': {
-          singleton: true,
-          eager: true
-        }
-      }
-    })
   ],
   build: {
-    modulePreload: false,
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist',
+    lib: {
+      entry: path.resolve(__dirname, 'src/main.tsx'),
+      name: 'JobManagement',
+      formats: ['es'],
+      // fileName removed here
+    },
     rollupOptions: {
+      // Shared removed from externals
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        '@mui/material',
+        '@mui/icons-material',
+        '@emotion/react',
+        '@emotion/styled'
+        // 'shared' // <-- REMOVED
+        // Consider externalizing: 'axios', 'date-fns', 'react-router-dom' if needed
+      ],
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js'
+        entryFileNames: 'assets/job-management.js', // Keep explicit filename
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
-  server: {
-    port: 3004,
-    strictPort: true,
-    cors: true
-  },
-  preview: {
-    port: 3004,
-    strictPort: true,
-    cors: true
-  },
+  // Removed server/preview sections
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      'shared': path.resolve(__dirname, '../shared/src') // Keep alias for build
     }
   }
 });

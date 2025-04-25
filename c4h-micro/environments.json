@@ -1,0 +1,15 @@
+{
+  "development": {
+    "main_backend":  { "url": "http://localhost:8011" },
+    "prefs_service": { "url": "http://localhost:8010" },
+    "shell":         { "url": "http://localhost:3100" },
+
+    "yaml-editor":            { "url": "http://localhost:3105/src/main.tsx" },
+    "config-selector-workorder": { "url": "http://localhost:3103/src/main.tsx" }, 
+    "config-selector-teams":  { "url": "http://localhost:3103/src/main.tsx" }, 
+    "config-selector-runtime":{ "url": "http://localhost:3103/src/main.tsx" }, 
+    "job-management":         { "url": "http://localhost:3104/src/main.tsx" }, 
+
+    "test-app":               { "url": "http://localhost:3106/src/main.tsx" }
+  }
+}

@@ -1,65 +1,61 @@
-// File: packages/yaml-editor/vite.config.ts
-/// <reference path="../shared/src/types/federation.d.ts" />
-
+/**
+ * /packages/yaml-editor/vite.config.ts
+ * Vite configuration for yaml-editor microfrontend
+ * --- UPDATED: Removed 'shared' from externals ---
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
+
+// Recreate __dirname functionality in ESM if needed for path resolution
+// import { fileURLToPath } from 'url';
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
 
 export default defineConfig({
   plugins: [
     react(),
-    federation({
-      name: 'yamlEditor',
-      filename: 'remoteEntry.js',
-      exposes: {
-        './YamlEditor': './src/YamlEditor.tsx'
-      },
-      shared: {
-        react: { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        'react-dom': { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        '@mui/material': {
-          singleton: true,
-          requiredVersion: '^5.0.0'
-        }
-      }
-    })
   ],
   build: {
-    modulePreload: false,
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
+    outDir: 'dist',
+    lib: {
+      entry: path.resolve(__dirname, 'src/main.tsx'),
+      name: 'YamlEditor',
+      formats: ['es'],
+      // fileName removed here
+    },
     rollupOptions: {
+       // Shared removed from externals
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        '@mui/material',
+        '@mui/icons-material',
+        '@emotion/react',
+        '@emotion/styled',
+        // 'shared', // <-- REMOVED
+        // Keep other specific externals if needed and provided by shell import map
+        '@monaco-editor/react',
+        'monaco-editor',
+        'js-yaml'
+      ],
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js'
+        entryFileNames: 'assets/yaml-editor.js', // Keep explicit filename
+        chunkFileNames: 'assets/[name].[hash].js',
+        assetFileNames: 'assets/[name].[ext]'
       }
     }
   },
-  server: {
-    port: 3002,
-    strictPort: true,
-    cors: true
-  },
-  preview: {
-    port: 3002,
-    strictPort: true,
-    cors: true
-  },
+  // Removed server/preview sections
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      'shared': path.resolve(__dirname, '../shared/src') // Keep alias for build
     }
   }
 });

@@ -66,60 +66,74 @@ class C4HService:
 
     # ADD/REPLACE this function in /Users/jim/src/apps/c4h_editor/backend/services/c4h_service.py
     
-    async def submit_job_with_configs(self, configurations: List[Dict[str, Any]]) -> JobSubmissionResponse:
+    async def submit_job_with_configs(self, config_contents: List[Dict[str, Any]]) -> JobSubmissionResponse:
         """
         Submit a job with a list of configuration objects to the C4H service.
-        
+
         Args:
-            configurations: List of configuration objects in priority order (leftmost = highest priority)
-                           These will be sent directly to the C4H Service for internal merging
-        
+            config_contents: List of configuration *content* dictionaries in priority order.
+                        These will be sent directly to the C4H Service for internal merging
+
         Returns:
             JobSubmissionResponse with job_id and status
         """
-        if not configurations or not isinstance(configurations, list):
+        if not config_contents or not isinstance(config_contents, list):
             raise ValueError("configurations must be a non-empty list")
 
-        logger.info(f"Preparing job submission with {len(configurations)} configurations")
-        
+        logger.info(f"Preparing job submission to C4H service with {len(config_contents)} config content objects.")
+
         # Create URL
         url_parts = [self.api_base]
         if self.api_version:
             url_parts.append(self.api_version)
         url_parts.append("jobs")
         url = "/".join(s.strip('/') for s in url_parts)
-        
+
         # Prepare headers
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
-        
+
         logger.info(f"Submitting job to URL: {url}")
+
+        # --- Main Try Block ---
         try:
-            # Log the configurations being sent (safely limiting detail for large configs)
-            config_summary = [f"Config {i}: {c.get('id', 'unknown')} ({c.get('config_type', 'unknown')})" 
-                             for i, c in enumerate(configurations)]
-            logger.info(f"Configurations in submission: {config_summary}")
-        except Exception as e:
-            logger.error(f"Error logging config summary: {e}")
-        
-        try:
-            # Wrap the list in the expected dictionary structure
-            payload = {"configs": configurations}
+            # --- Logging logic moved inside the main try block ---
+            payload = {"configs": config_contents}
+            log_limit = 2000
+            try:
+                # Attempt to serialize and log the payload (truncated)
+                payload_str = json.dumps(payload, indent=2, default=str)
+                logged_payload = payload_str[:log_limit] + ('...' if len(payload_str) > log_limit else '')
+                logger.debug(f"C4H Service Client: Sending payload (truncated):\n{logged_payload}")
+            except Exception as log_e:
+                # Log a warning if serialization/logging fails, but don't stop the request
+                logger.warning(f"C4H Service Client: Could not serialize payload for logging: {log_e}")
+            # --- End of moved logging logic ---
+
+            # Make the actual HTTP POST request
             response = await self.http_client.post(url, headers=headers, json=payload)
-            
+
+            # Handle potential API errors (>= 400 status codes)
             if response.status_code >= 400:
                 logger.error(f"C4H API error: status_code={response.status_code}, response={response.text}")
                 return JobSubmissionResponse(
-                    job_id="", status="error", 
+                    job_id="", status="error",
                     message=f"C4H API error: {response.status_code} - {response.text}"
                 )
-            
+
+            # Process successful response
             response_data = response.json()
+            logger.info(f"C4H Service job submission successful. Response: {response_data}")
             return JobSubmissionResponse(**response_data)
-        except Exception as e:
-            logger.error(f"Error submitting job: {e}", exc_info=True)
-            return JobSubmissionResponse(job_id="", status="error", message=f"Error submitting job: {str(e)}")
+
+        # --- Exception handling for the main try block ---
+        except httpx.RequestError as req_err: # More specific exception for HTTP client errors
+            logger.error(f"C4H Service Client: HTTP Request Error during POST to {url}: {req_err}", exc_info=True)
+            return JobSubmissionResponse(job_id="", status="error", message=f"HTTP Request Error: {str(req_err)}")
+        except Exception as e: # Catch other potential errors (e.g., during response parsing)
+            logger.error(f"C4H Service Client: Unexpected error during POST to {url}: {e}", exc_info=True)
+            return JobSubmissionResponse(job_id="", status="error", message=f"Unexpected error submitting job: {str(e)}")
 
     async def get_job_status(self, job_id: str) -> JobStatusResponse:
         """Check the status of a job."""
@@ -140,8 +154,9 @@ class C4HService:
         # Send real request
         try:
             logger.info(f"Attempting GET request to URL: {url}")
-            response = await self.http_client.get(url, headers=headers)
+            response = await self.http_client.get(url, headers=headers) # No change needed here
 
+            
             # Handle errors
             if response.status_code >= 400:
                 logger.error(f"C4H API error getting status: status_code={response.status_code}, response={response.text}")
@@ -152,6 +167,7 @@ class C4HService:
                     error_msg += f": {detail}"
                 except Exception:
                     error_msg = response.text
+                
                 # Return a minimal response with error
                 return JobStatusResponse(
                     job_id=job_id, status="error", error=error_msg,
@@ -164,7 +180,7 @@ class C4HService:
             # Convert API response to our model, providing defaults for timestamps if missing
             created_at_str = response_data.get("created_at", datetime.utcnow().isoformat())
             updated_at_str = response_data.get("updated_at", datetime.utcnow().isoformat())
-
+            logger.debug(f"C4H Service job status response for {job_id}: {response_data}")
             return JobStatusResponse(
                 job_id=response_data.get("job_id", job_id),
                 status=response_data.get("status", "unknown"),
@@ -209,7 +225,7 @@ class C4HService:
         # Send real request
         try:
             logger.info(f"Attempting POST request to URL: {url}")
-            response = await self.http_client.post(url, headers=headers) # Assuming cancel is POST
+            response = await self.http_client.post(url, headers=headers) # No change needed here
 
             # Handle errors
             if response.status_code >= 400:

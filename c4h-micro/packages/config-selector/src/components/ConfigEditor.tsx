@@ -1,340 +1,203 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
-import {
-  Box,
-  Button,
-  TextField,
-  Typography,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Snackbar,
-  Alert,
-  Paper
+/**
+ * /packages/config-selector/src/components/ConfigEditor.tsx
+ * Configuration editor that directly embeds YamlEditor
+ */
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, Typography, Snackbar, Alert, TextField, Button, 
+  CircularProgress, Paper 
 } from '@mui/material';
 import { useConfigContext } from '../contexts/ConfigContext';
 import { configTypes } from 'shared';
 
-// Lazy load YamlEditor component
-const YamlEditor = lazy(() => import('yamlEditor/YamlEditor'));
+// Direct import from yaml-editor
+import YamlEditor from 'yaml-editor';
 
 interface ConfigEditorProps {
   configId: string;
-  onBack?: () => void;
+  onBack: () => void;
 }
 
 const ConfigEditor: React.FC<ConfigEditorProps> = ({ configId, onBack }) => {
-  const { 
+  const {
     configType,
-    currentConfig, 
-    yaml, 
-    loading, 
-    error, 
-    saved,
-    loadConfig,
-    createNewConfig,
+    currentConfig,
+    yaml,
     updateYaml,
-    saveConfig
+    saveConfig,
+    loading,
+    error: contextError,
+    saved,
+    loadConfig
   } = useConfigContext();
-  
-  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [configIdInput, setConfigIdInput] = useState('');
-  const [descriptionInput, setDescriptionInput] = useState('');
-  const [yamlEditorError, setYamlEditorError] = useState<string | null>(null);
-  const [editorInitialized, setEditorInitialized] = useState(false);
-  
-  // Config name from registry
-  const configName = configTypes[configType]?.name || configType;
-  
-  // Custom navigation handler that doesn't rely on React Router
-  const handleNavigate = (path: string) => {
-    window.location.href = path;
-  };
-  
-  // Load config or create new one
-  useEffect(() => {
-    console.log("ConfigEditor: Processing configId:", configId);
-    
-    // Prevent duplicate initialization
-    if (!editorInitialized) {
-      if (configId === 'new') {
-        console.log("ConfigEditor: Creating new config");
-        createNewConfig();
-        setConfigIdInput('');
-        setEditorInitialized(true);
-      } else {
-        console.log("ConfigEditor: Loading existing config:", configId);
-        loadConfig(configId);
-        setEditorInitialized(true);
-      }
-    }
-  }, [configId, loadConfig, createNewConfig, editorInitialized]);
-  
-  // Update configIdInput when currentConfig changes
-  useEffect(() => {
-    if (currentConfig) {
-      console.log('ConfigEditor: Updating inputs from currentConfig', currentConfig);
-      setConfigIdInput(currentConfig.id || '');
-      setDescriptionInput(currentConfig.metadata?.description || '');
-    }
-  }, [currentConfig]);
-  
-  // Track changes
-  useEffect(() => {
-    setHasChanges(configId === 'new' || 
-      (currentConfig && (configIdInput !== currentConfig.id || descriptionInput !== currentConfig.metadata?.description))
-    );
-  }, [configId, currentConfig, configIdInput, yaml]);
 
-  // Update description in currentConfig when it changes
+  // Local state
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  const [newIdInput, setNewIdInput] = useState<string>("");
+  const [commitMessage, setCommitMessage] = useState("");
+
+  // Determine if we are creating a new config
+  const isNew = configId === 'new';
+
+  // Load config when component mounts or configId changes
   useEffect(() => {
-    if (currentConfig && currentConfig.metadata) {
-      console.log('ConfigEditor: Updating description in currentConfig', descriptionInput);
-      currentConfig.metadata.description = descriptionInput;
+    console.log(`ConfigEditor: Loading config ${configId}`);
+    loadConfig(configId);
+  }, [configId, loadConfig]);
+
+  // Update local state if currentConfig changes
+  useEffect(() => {
+    if (currentConfig && !isNew) {
+      setNewIdInput(currentConfig.id || "");
+    } else if (isNew) {
+      setNewIdInput("");
     }
-  }, [currentConfig, descriptionInput]);
-  
-  // Handle back button click
-  const handleBack = () => {
-    if (hasChanges) {
-      setShowDiscardDialog(true);
-    } else {
-      if (onBack) {
-        onBack();
-      } else {
-        handleNavigate(`/configs/${configType}`);
-      }
-    }
-  };
-  
-  // Handle discard dialog confirm
-  const handleDiscardConfirm = () => {
-    setShowDiscardDialog(false);
-    setEditorInitialized(false); // Reset for next load
-    if (onBack) {
-      onBack();
-    } else {
-      handleNavigate(`/configs/${configType}`);
-    }
-  };
-  
-  // Handle discard dialog cancel
-  const handleDiscardCancel = () => {
-    setShowDiscardDialog(false);
-  };
-  
+  }, [currentConfig, isNew]);
+
   // Handle save
   const handleSave = async () => {
-    if (configId === 'new') {
-      // For new configs, update both id and description
-      if (currentConfig && currentConfig.metadata) {
-        console.log(`ConfigEditor: Saving new config with ID: ${configIdInput} and description: ${descriptionInput}`);
-      } else {
-        console.log('ConfigEditor: Warning - currentConfig or metadata is undefined');
-      }
-      if (!configIdInput.trim()) {
-        // Show validation error
-        return;
-      }
-      console.log(`Saving new config with ID: ${configIdInput}`);
+    const idToSave = isNew ? newIdInput : configId;
+    if (!idToSave || !idToSave.trim()) {
+      setSnackbarMessage("Configuration ID cannot be empty.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
     }
+
+    console.log(`ConfigEditor: Saving ${configType} config ${idToSave}`);
+    const result = await saveConfig(idToSave, commitMessage);
     
-    // Save with the configIdInput for new configs
-    const savedConfig = await saveConfig(configId === 'new' ? configIdInput : undefined);
-    
-    if (savedConfig) {
-      // Navigate to the config page if this was a new config
-      if (configId === 'new') {
-        setEditorInitialized(false); // Reset for next load
-        handleNavigate(`/configs/${configType}/${savedConfig.id}`);
+    if (result) {
+      setSnackbarMessage("Configuration saved successfully!");
+      setSnackbarSeverity("success");
+      setCommitMessage("");
+      
+      if (isNew) {
+        setTimeout(() => onBack && onBack(), 1000);
       }
+    } else {
+      setSnackbarMessage(contextError || "Failed to save configuration.");
+      setSnackbarSeverity("error");
     }
+    setSnackbarOpen(true);
   };
-  
-  // Handle YAML change
-  const handleYamlChange = (newYaml: string) => {
-    updateYaml(newYaml);
-    setHasChanges(true);
-  };
-  
-  // Error boundary for YamlEditor
-  const handleYamlEditorError = (error: Error) => {
-    console.error('YamlEditor error:', error);
-    setYamlEditorError(error.message);
-  };
-  
+
+  // Show loading indicator
   if (loading && !currentConfig) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 3 }}>
         <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Loading configuration...</Typography>
       </Box>
     );
   }
-  
-  return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5">
-          {configId === 'new' ? `Create New ${configName}` : `Edit ${configName}: ${currentConfig?.id}`}
+
+  // Show error if loading failed
+  if (contextError && !currentConfig) {
+    return <Alert severity="error" sx={{ m: 3 }}>Error loading configuration: {contextError}</Alert>;
+  }
+
+  // For new configs, show ID input form
+  if (isNew && !newIdInput) {
+    return (
+      <Box sx={{ p: 0 }}>
+        <Typography variant="h5" gutterBottom>
+          Create New {configTypes[configType]?.name || configType}
         </Typography>
-        <Box>
-          <Button 
-            variant="outlined" 
-            onClick={handleBack}
-            sx={{ mr: 1 }}
-          >
-            Back
+        
+        <TextField
+          label="Configuration ID"
+          value={newIdInput}
+          onChange={(e) => setNewIdInput(e.target.value.trim())}
+          fullWidth
+          required
+          margin="normal"
+          sx={{ mb: 2 }}
+          disabled={loading}
+          helperText="Enter a unique ID for the new configuration."
+        />
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+          <Button variant="outlined" onClick={onBack} disabled={loading}>
+            Back to List
           </Button>
-          <Button 
-            variant="contained" 
-            onClick={handleSave}
-            disabled={loading || (configId === 'new' && !configIdInput.trim())}
+          <Button
+            variant="contained"
+            onClick={() => setNewIdInput(newIdInput || `new-${Date.now()}`)}
+            disabled={loading || !!newIdInput}
           >
-            {loading ? <CircularProgress size={24} /> : 'Save'}
+            Continue to Editor
           </Button>
         </Box>
       </Box>
-      
-      {/* ID field for new configs */}
-      {configId === 'new' && (
-        <Box sx={{ mb: 3 }}>
-          <TextField
-            label={`${configName} ID`}
-            fullWidth
-            value={configIdInput}
-            onChange={(e) => setConfigIdInput(e.target.value)}
-            margin="normal"
-            variant="outlined"
-            required
-            error={!configIdInput.trim()}
-            helperText={!configIdInput.trim() ? `${configName} ID is required` : `Unique identifier for this ${configName.toLowerCase()}`}
-          />
-        </Box>
-      )}
-      
-      {/* Display the Config ID for existing configs */}
-      {configId !== 'new' && currentConfig?.id && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            {`${configName} ID: `}
-            <Box component="span" fontWeight="bold">
-              {currentConfig.id}
-            </Box>
-          </Typography>
-        </Box>
-      )}
-      
-      {/* Description field for all configs */}
-      <Box sx={{ mb: 3 }}>
-        <TextField
-          label={`${configName} Description`}
-          fullWidth
-          value={descriptionInput}
-          onChange={(e) => setDescriptionInput(e.target.value)}
-          margin="normal"
-          variant="outlined"
-          helperText={`Description for this ${configName.toLowerCase()}`}
-          />
-        </Box>
-      
-      {/* YAML Editor */}
-      {yamlEditorError ? (
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" color="error">YAML Editor failed to load</Typography>
-          <Typography variant="body1">{yamlEditorError}</Typography>
-          <Typography variant="body2" sx={{ mt: 2 }}>
-            Fallback: You can edit the YAML directly in this text field:
-          </Typography>
-          <TextField
-            multiline
-            fullWidth
-            minRows={10}
-            maxRows={20}
-            value={yaml}
-            onChange={(e) => handleYamlChange(e.target.value)}
-            sx={{ mt: 2 }}
-          />
-        </Paper>
+    );
+  }
+
+  // Main editor view with YamlEditor directly embedded
+  return (
+    <Box sx={{ p: 0 }}>
+      <Typography variant="h5" gutterBottom>
+        {isNew ? `Create New ${configTypes[configType]?.name || configType}` : `Edit ${configTypes[configType]?.name || configType}: ${currentConfig?.id || configId}`}
+      </Typography>
+
+      {/* YamlEditor component */}
+      {yaml !== undefined ? (
+        <YamlEditor
+          yaml={yaml}
+          onChange={updateYaml}
+          onSave={handleSave}
+          readOnly={loading}
+          title={`${configTypes[configType]?.name || configType} Configuration`}
+          description="Edit the configuration in YAML format. Changes will be applied when you save."
+        />
       ) : (
-        <Suspense fallback={
-          <Paper sx={{ p: 3, height: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <CircularProgress />
-          </Paper>
-        }>
-          <ErrorBoundary onError={handleYamlEditorError}>
-            <YamlEditor
-              yaml={yaml}
-              onChange={handleYamlChange}
-              onSave={handleSave}
-              title={`${configName} Configuration`}
-              description={`Edit the ${configName.toLowerCase()} configuration in YAML format. Changes will only be applied when you save.`}
-            />
-          </ErrorBoundary>
-        </Suspense>
+        <Paper sx={{ p: 3, textAlign: 'center', mb: 2 }}>
+          <CircularProgress size={24} sx={{ mb: 2 }} />
+          <Typography>Loading YAML content...</Typography>
+        </Paper>
       )}
-      
-      {/* Error message */}
-      {error && (
-        <Snackbar open={!!error} autoHideDuration={6000}>
-          <Alert severity="error" sx={{ width: '100%' }}>
-            {error}
-          </Alert>
-        </Snackbar>
-      )}
-      
-      {/* Success message */}
-      <Snackbar open={saved} autoHideDuration={3000}>
-        <Alert severity="success">
-          {configName} saved successfully!
+
+      {/* Commit Message Input */}
+      <TextField
+        label="Commit Message (Optional)"
+        value={commitMessage}
+        onChange={(e) => setCommitMessage(e.target.value)}
+        fullWidth
+        margin="normal"
+        sx={{ mb: 2 }}
+        disabled={loading}
+        helperText="Describe the changes you made."
+      />
+
+      {/* Action Buttons */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+        <Button variant="outlined" onClick={onBack} disabled={loading}>
+          Back to List
+        </Button>
+        <Button
+          variant="contained" 
+          onClick={handleSave}
+          disabled={loading || saved || yaml === undefined}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Save Configuration'}
+        </Button>
+      </Box>
+
+      {/* Snackbar for feedback */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbarSeverity} sx={{ width: '100%' }} onClose={() => setSnackbarOpen(false)}>
+          {snackbarMessage}
         </Alert>
       </Snackbar>
-      
-      {/* Discard dialog */}
-      <Dialog open={showDiscardDialog} onClose={handleDiscardCancel}>
-        <DialogTitle>Discard Changes?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            You have unsaved changes. Are you sure you want to discard them?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDiscardCancel}>Cancel</Button>
-          <Button onClick={handleDiscardConfirm} color="error">Discard</Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
-
-// Simple error boundary component
-class ErrorBoundary extends React.Component<{
-  children: React.ReactNode;
-  onError: (error: Error) => void;
-}, {
-  hasError: boolean;
-}> {
-  constructor(props: { children: React.ReactNode; onError: (error: Error) => void }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    this.props.onError(error);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return null;
-    }
-    return this.props.children;
-  }
-}
 
 export default ConfigEditor;

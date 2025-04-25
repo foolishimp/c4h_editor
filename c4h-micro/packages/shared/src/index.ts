@@ -1,26 +1,30 @@
-// File: packages/shared/src/index.ts
 /**
+ * /packages/shared/src/index.ts
  * Main entry point for shared package
  * Exports all shared types, utilities, components and services
  */
 
-// Export shared types
-export * from './types/workorder';
-export * from './types/job';
-export * from './types/config';
+// Use 'export type' for modules that primarily export types,
+// required when 'isolatedModules' is true in tsconfig.
+export type * from './types/workorder';
+export type * from './types/config';
 
-// Export config registry
+// Export types and values for job.ts - we need the JobStatus enum as a value
+export * from './types/job';           
+export * from './types/shell';         
+export * from './types/iframe';        
+export * from './types/events';        
+
+// Use regular 'export' for modules that export runtime values (or mixed)
 export * from './config/configTypes';
-export * from './config/remotes';
 
-// Export utils
-export { default as eventBus } from './utils/eventBus';
+// Export runtime utilities/values
+export { eventBus } from './utils/eventBus';
 
-// Export shared components
+// Export shared components (runtime values)
 export { default as TimeAgo } from './components/TimeAgo';
 export { default as DiffViewer } from './components/DiffViewer';
-export { default as RemoteComponent } from './components/RemoteComponent';
 
-// Export API service
-export { apiService, api } from './services/apiService';
+// Export API service (runtime values) AND configuration function
+export { apiService, api, configureApiService } from './services/apiService';
 export { API_ENDPOINTS } from './config/api';

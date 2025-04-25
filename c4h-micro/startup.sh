@@ -14,7 +14,10 @@ NC='\033[0m' # No Color
 
 # Microfrontend configuration
 PACKAGES=("shared" "yaml-editor" "config-selector" "job-management" "shell")
-PORTS=(0 3002 3003 3004 3000)
+BASE_PORTS=(0 3002 3003 3004 3000)
+PORTS=(0 3002 3003 3004 3000) # Will be modified if any port is taken
+PORT_INCREMENT=100
+PORT_OFFSET=0
 
 # Array to track running PIDs
 PIDS=()
@@ -24,24 +27,42 @@ print_header() {
   echo -e "\n${BLUE}========== $1 ==========${NC}"
 }
 
-# Function to check port availability
-check_port() {
-  local port=$1
-  if lsof -ti:$port > /dev/null; then
-    echo -e "${YELLOW}⚠️ Port $port is in use${NC}"
-    read -p "Would you like to kill the process using port $port? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-      lsof -ti:$port | xargs kill -9 2>/dev/null
-      echo -e "${GREEN}✅ Process killed${NC}"
-    else
-      echo -e "${RED}❌ Cannot continue with port $port in use${NC}"
-      return 1
+# Function to check if any port is in use
+check_ports() {
+  local any_port_taken=false
+  
+  # First check if any port is taken
+  for i in "${!PACKAGES[@]}"; do
+    port=${PORTS[$i]}
+    if [ "$port" != "0" ] && lsof -ti:$port > /dev/null; then
+      echo -e "${YELLOW}⚠️ Port $port is in use by ${PACKAGES[$i]}${NC}"
+      any_port_taken=true
     fi
+  done
+  
+  # If any port is taken, increment all ports by PORT_INCREMENT
+  if [ "$any_port_taken" = true ]; then
+    PORT_OFFSET=$((PORT_OFFSET + PORT_INCREMENT))
+    echo -e "${YELLOW}Increasing all ports by $PORT_INCREMENT (offset now: $PORT_OFFSET)${NC}"
+    
+    # Update all ports
+    for i in "${!PACKAGES[@]}"; do
+      if [ "${BASE_PORTS[$i]}" != "0" ]; then
+        PORTS[$i]=$((BASE_PORTS[$i] + PORT_OFFSET))
+      fi
+    done
+    
+    # Recursively check again
+    check_ports
   else
-    echo -e "${GREEN}✅ Port $port is free${NC}"
+    # All ports are available
+    echo -e "${GREEN}✅ All required ports are free:${NC}"
+    for i in "${!PACKAGES[@]}"; do
+      if [ "${PORTS[$i]}" != "0" ]; then
+        echo -e "  - ${PACKAGES[$i]}: ${PORTS[$i]}"
+      fi
+    done
   fi
-  return 0
 }
 
 # Function to build a package
@@ -77,10 +98,10 @@ start_service() {
   
   if [ "$package" == "shell" ]; then
     echo -e "${YELLOW}🚀 Starting $package in development mode on port $port...${NC}"
-    npm run start &
+    npm run start -- --port $port --strictPort &
   else
     echo -e "${YELLOW}🚀 Starting $package in preview mode on port $port...${NC}"
-    npm run preview &
+    npm run preview -- --port $port --strictPort &
   fi
   
   local pid=$!
@@ -105,6 +126,36 @@ cleanup() {
   exit 0
 }
 
+# Function to update module federation remotes with new ports
+update_remotes_config() {
+  local yaml_port=${PORTS[1]}
+  local config_port=${PORTS[2]}
+  local job_port=${PORTS[3]}
+  
+  print_header "UPDATING MODULE FEDERATION CONFIG"
+  echo -e "${YELLOW}Updating vite.config.ts for shell with new ports${NC}"
+  
+  local shell_config="$ROOT_DIR/packages/shell/vite.config.ts"
+  
+  # Create a backup
+  cp "$shell_config" "${shell_config}.bak"
+  
+  # Update remotes in shell config
+  sed -i.tmp "s|yamlEditor: 'http://localhost:[0-9]*/assets/remoteEntry.js'|yamlEditor: 'http://localhost:${yaml_port}/assets/remoteEntry.js'|g" "$shell_config"
+  sed -i.tmp "s|configSelector: 'http://localhost:[0-9]*/assets/remoteEntry.js'|configSelector: 'http://localhost:${config_port}/assets/remoteEntry.js'|g" "$shell_config"
+  sed -i.tmp "s|jobManagement: 'http://localhost:[0-9]*/assets/remoteEntry.js'|jobManagement: 'http://localhost:${job_port}/assets/remoteEntry.js'|g" "$shell_config"
+  
+  # Update remote in config-selector
+  local config_selector_config="$ROOT_DIR/packages/config-selector/vite.config.ts"
+  cp "$config_selector_config" "${config_selector_config}.bak"
+  sed -i.tmp "s|yamlEditor: 'http://localhost:[0-9]*/assets/remoteEntry.js'|yamlEditor: 'http://localhost:${yaml_port}/assets/remoteEntry.js'|g" "$config_selector_config"
+  
+  # Clean up temp files
+  rm "${shell_config}.tmp" "${config_selector_config}.tmp" 2>/dev/null
+  
+  echo -e "${GREEN}✅ Configuration files updated with new ports${NC}"
+}
+
 # Register cleanup handler
 trap cleanup SIGINT SIGTERM
 
@@ -113,13 +164,12 @@ print_header "STARTING C4H EDITOR WITH MICROFRONTENDS"
 
 # Check all ports first
 print_header "CHECKING PORTS"
-for i in "${!PACKAGES[@]}"; do
-  package=${PACKAGES[$i]}
-  port=${PORTS[$i]}
-  if [ "$port" != "0" ]; then
-    check_port $port || exit 1
-  fi
-done
+check_ports
+
+# Update configs if ports were changed
+if [ "$PORT_OFFSET" -gt 0 ]; then
+  update_remotes_config
+fi
 
 # Build shared package first (dependency for all)
 print_header "BUILDING PACKAGES"
@@ -168,6 +218,11 @@ for i in "${!PACKAGES[@]}"; do
     echo -e "  - ${BLUE}$package:${NC} http://localhost:$port"
   fi
 done
+
+# Report port offset if used
+if [ "$PORT_OFFSET" -gt 0 ]; then
+  echo -e "\n${YELLOW}Note: All ports increased by $PORT_OFFSET from original configuration${NC}"
+fi
 
 echo -e "\n${YELLOW}Press Ctrl+C to stop all servers${NC}"
 

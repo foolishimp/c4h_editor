@@ -1,10 +1,16 @@
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { configTypes, ConfigTypeMetadata } from '../config/configTypes'; 
-import { Job, JobStatus, JobListResponse, JobConfigReference } from '../types/job';
+/**
+ * /packages/shared/src/services/apiService.ts
+ * Centralized API service for making requests to backend services
+ */
+import axios, { AxiosRequestConfig } from 'axios';
+import { configTypes } from '../config/configTypes';
+import { Job, JobConfigReference } from '../types/job';
+import { Config } from '../types/config';
+import { ShellPreferencesRequest } from '../types/shell';
 
-const API_BASE_URL = typeof process !== 'undefined' && process.env && process.env.VITE_API_BASE_URL 
-  ? process.env.VITE_API_BASE_URL 
-  : 'http://localhost:8000';
+// --- Base URL Handling ---
+// Start with a default URL - will be configured by the shell
+const API_BASE_URL = 'http://localhost:8000';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -14,16 +20,29 @@ const axiosInstance = axios.create({
   }
 });
 
+// --- Dynamic Configuration Function ---
+export const configureApiService = (baseUrl: string | undefined) => {
+  const finalBaseUrl = baseUrl || API_BASE_URL; // Use provided URL or fallback
+  if (axiosInstance.defaults.baseURL !== finalBaseUrl) {
+    console.log(`Configuring apiService baseURL to: ${finalBaseUrl}`);
+    axiosInstance.defaults.baseURL = finalBaseUrl;
+  } else {
+    console.log(`apiService baseURL already set to: ${finalBaseUrl}`);
+  }
+};
+
+// --- Interceptor ---
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
-); 
+);
 
+// --- ApiService Class ---
 class ApiService {
-  async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  private async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await axiosInstance.get<T>(url, config);
     return response.data;
   }
@@ -38,11 +57,12 @@ class ApiService {
     return response.data;
   }
 
-  async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  private async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await axiosInstance.delete<T>(url, config);
     return response.data;
   }
-  
+
+  // --- Public Methods ---
   async getConfigs(configType: string) {
     const endpoint = configTypes[configType]?.apiEndpoints.list;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
@@ -50,12 +70,12 @@ class ApiService {
     const response = await this.get<any[]>(endpoint);
     console.log(`API: Received ${response.length} configs from server`);
     return response;
-  } 
+  }
 
-  async getConfig(configType: string, id: string): Promise<any> {
+  async getConfig(configType: string, id: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.get(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
-    if (id === 'new') {
+    if (id === 'new' || id === '') {
       console.log(`API: Creating new empty config of type ${configType}`);
       return this.createEmptyConfig(configType, '');
     }
@@ -72,86 +92,83 @@ class ApiService {
     }
   }
   
-  private createEmptyConfig(configType: string, id: string): any {
+  private createEmptyConfig(configType: string, id: string): Config {
     const defaultContent = configTypes[configType]?.defaultContent || {};
     console.log(`API: Creating empty config of type ${configType} with ID ${id || 'empty'}`);
-    
     return {
       id: id,
       content: defaultContent,
       metadata: {
-        description: "", // Explicitly initialize description
+        description: "",
         author: "Current User",
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         tags: [],
-        version: "1.0.0"
-      }
+        version: "1.0.0",
+        archived: false
+      },
+      config_type: configType,
+      lineage: []
     };
   }
   
-  async createConfig(configType: string, data: any): Promise<any> {
+  async createConfig(configType: string, data: Config, commitMessage?: string, author?: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.create;
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Creating config of type ${configType} with ID ${data.id} at ${endpoint}`);
-    
-    // Add missing required fields
+
     const requestData = {
-      ...data,
-      commit_message: data.commit_message || `Create new ${configType}`,
-      author: data.author || data.metadata?.author || "Current User"
+      id: data.id,
+      content: data.content,
+      metadata: data.metadata,
+      commit_message: commitMessage || `Create new ${configType} ${data.id}`,
+      author: author || data.metadata?.author || "Current User"
     };
-    console.log(`API: Submitting config create request:`, {
+
+    console.debug(`API: Submitting config create request:`, {
       id: data.id, endpoint, description: data.metadata?.description
     });
-    
     try {
-      return this.post<any>(endpoint, requestData);
+      return await this.post<Config>(endpoint, requestData);
     } catch (error: any) {
       if (error.response?.status === 409) {
         console.log(`Config with ID ${data.id} already exists, updating instead`);
-        return this.updateConfig(configType, data.id, {
-          content: data.content,
-          metadata: data.metadata,
-          commit_message: requestData.commit_message,
-          author: requestData.author
-        });
+        return this.updateConfig(configType, data.id, data, requestData.commit_message, requestData.author);
       }
       throw error;
     }
   }
-  
-  async updateConfig(configType: string, id: string, data: any): Promise<any> {
+
+  async updateConfig(configType: string, id: string, data: Config, commitMessage?: string, author?: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.update(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Updating config ${id} of type ${configType} at ${endpoint}`);
-    
-    // Add missing required fields
+
     const requestData = {
-      ...data,
-      commit_message: data.commit_message || `Update ${configType}`,
-      author: data.author || data.metadata?.author || "Current User"
+      content: data.content,
+      metadata: data.metadata,
+      commit_message: commitMessage || `Update ${configType} ${id}`,
+      author: author || data.metadata?.author || "Current User"
     };
-    console.log(`API: Submitting config update request:`, {
+
+    console.debug(`API: Submitting config update request:`, {
       id, endpoint, description: data.metadata?.description
     });
-
     try {
-      return this.put<any>(endpoint, requestData);
+      return await this.put<Config>(endpoint, requestData);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        console.log(`Config ${id} not found, creating new`);
-        return this.createConfig(configType, { id, ...data });
+        console.log(`Config ${id} not found, cannot update.`);
+        throw new Error(`Configuration with ID ${id} not found for update.`);
       }
       throw error;
     }
   }
-  
+
   async deleteConfig(configType: string, id: string, commitMessage: string = "Deleted via UI", author: string = "Current User") {
     const endpoint = configTypes[configType]?.apiEndpoints.delete(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Deleting config ${id} of type ${configType} at ${endpoint}`);
-    // Pass parameters as query params
     return this.delete<{ message: string }>(endpoint, { 
       params: { 
         commit_message: commitMessage,
@@ -164,7 +181,6 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.archive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Archiving config ${id} of type ${configType} at ${endpoint}`);
-    // Pass author as a query parameter
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
    
@@ -172,30 +188,28 @@ class ApiService {
     const endpoint = configTypes[configType]?.apiEndpoints.unarchive(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Unarchiving config ${id} of type ${configType} at ${endpoint}`);
-    // Pass author as a query parameter
     return this.post<{ message: string }>(endpoint, {}, { params: { author } });
   }
   
-  async cloneConfig(configType: string, id: string, newId: string) {
+  async cloneConfig(configType: string, id: string, newId: string): Promise<Config> {
     const endpoint = configTypes[configType]?.apiEndpoints.clone(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Cloning config ${id} of type ${configType} to ${newId} at ${endpoint}`);
-    // Pass new_id as a query parameter
     return this.post<any>(endpoint, {}, { params: { new_id: newId, author: "Current User" } });
   }
   
-  async getConfigHistory(configType: string, id: string) {
+  async getConfigHistory(configType: string, id: string): Promise<any> {
     const endpoint = configTypes[configType]?.apiEndpoints.history(id);
     if (!endpoint) throw new Error(`Unknown config type: ${configType}`);
     console.log(`API: Fetching history for config ${id} of type ${configType} at ${endpoint}`);
-    return this.get<{ config_id: string; config_type: string; versions: Array<{ version: string; commit_hash: string; created_at: string; author: string; message: string; }> }>(endpoint);
+    return this.get<any>(endpoint);
   }
 
   // Job API methods
   async getJobs() {
     console.log('API: Fetching all jobs from /api/v1/jobs');
     try {
-      const response = await this.get<JobListResponse>('/api/v1/jobs');
+      const response = await this.get<any>('/api/v1/jobs');
       console.log(`API: Received ${response.items?.length || 0} jobs`);
       return response;
     } catch (error) {
@@ -204,7 +218,7 @@ class ApiService {
     }
   }
   
-  async getJob(id: string) {
+  async getJob(id: string): Promise<Job> {
     console.log(`API: Fetching job ${id} from /api/v1/jobs/${id}`);
     try {
       const response = await this.get<any>(`/api/v1/jobs/${id}`);
@@ -215,17 +229,15 @@ class ApiService {
       throw error;
     }
   }
-  
+
   async submitJob(params: {
     workorder: string,
     teamconfig: string,
     runtimeconfig: string,
     userId?: string,
     jobConfiguration?: Record<string, any>
-  }) {
+  }): Promise<Job> {
     console.log('API: Submitting job with configs:', params);
-    
-    // Format the request according to the API expectations
     const requestData = {
       workorder: { id: params.workorder, version: "latest", config_type: "workorder" },
       team: { id: params.teamconfig, version: "latest", config_type: "teamconfig" },
@@ -236,58 +248,43 @@ class ApiService {
     
     return this.post<any>('/api/v1/jobs', requestData);
   }
-  
-  async submitJobTuple(workorderId: string, teamconfigId: string, runtimeconfigId: string, userId?: string) {
-    // Legacy method - uses the old format
-    console.log(`API: Submitting job tuple with workorder=${workorderId}, team=${teamconfigId}, runtime=${runtimeconfigId}`);
-    
-    const requestData = {
-      configurations: {
-        workorder: { id: workorderId, version: "latest", config_type: "workorder" },
-        team: { id: teamconfigId, version: "latest", config_type: "teamconfig" },
-        runtime: { id: runtimeconfigId, version: "latest", config_type: "runtimeconfig" },
-      },
-      user_id: userId || 'current-user',
-      job_configuration: { max_runtime: 3600, notify_on_completion: true }
-    };
-    
-    return this.post<any>('/api/v1/jobs', requestData);
-  }
 
   async submitJobConfigs(
     configs: JobConfigReference[],
     userId?: string,
     jobConfiguration?: Record<string, any>
-  ) {
+  ): Promise<Job> {
     console.log('API: Submitting job with configurations list:', configs);
-
     if (!configs || configs.length === 0) {
       throw new Error('At least one configuration must be provided');
     }
 
-    // Fill in default version if not provided
     const configurations = configs.map(config => ({
       ...config,
       version: config.version || 'latest'
     }));
 
-    // Create request data with configurations list
     const requestData = {
       configurations,
       user_id: userId || 'current-user',
       job_configuration: jobConfiguration || { max_runtime: 3600, notify_on_completion: true }
     };
-    return this.post<any>('/api/v1/jobs/multi-config', requestData); // Use the new endpoint
+    return this.post<any>('/api/v1/jobs/multi-config', requestData);
   }
   
-  async cancelJob(id: string) {
+  async cancelJob(id: string): Promise<Job> {
     console.log(`API: Cancelling job ${id}`);
     return this.post<any>(`/api/v1/jobs/${id}/cancel`, {}); 
   }
-  
+
   async getJobHistory(id: string) {
     console.log(`API: Fetching history for job ${id}`);
     return this.get<any>(`/api/v1/jobs/${id}/history`);
+  }
+
+  // Shell Preferences API
+  async saveShellPreferences(preferences: ShellPreferencesRequest): Promise<{ message: string }> {
+    return this.put<{ message: string }>('/api/v1/shell/preferences', preferences);
   }
 }
 

@@ -1,0 +1,42 @@
+{
+  "availableApps": [
+    {
+      "id": "config-selector-workorders",
+      "name": "Workorder Config Manager",
+      "scope": "configSelector",
+      "module": "./ConfigManager",
+      "url": ""
+    },
+    {
+      "id": "config-selector-teams",
+      "name": "Team Config Manager",
+      "scope": "configSelector",
+      "module": "./ConfigManager",
+      "url":  ""
+    },
+    {
+      "id": "config-selector-runtime",
+      "name": "Runtime Config Manager",
+      "scope": "configSelector",
+      "module": "./ConfigManager",
+      "url": ""
+    },
+    {
+      "id": "job-management",
+      "name": "Job Manager",
+      "scope": "jobManagement",
+      "module": "./JobManager",
+      "url": ""
+    },
+    {
+      "id": "test-app",
+      "name": "Test App",
+      "scope": "testApp",
+      "module": "./TestApp",
+      "url":  ""
+    }
+  ],
+  "defaultEndpoints": {
+    "jobConfigServiceUrl": "http://localhost:8000"
+  }
+}

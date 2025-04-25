@@ -1,76 +1,59 @@
-// File: packages/shell/vite.config.ts
-/// <reference path="../shared/src/types/federation.d.ts" />
-
+/**
+ * /packages/shell/vite.config.ts
+ * Vite configuration for the shell application
+ * --- UPDATED: Removed serveSharedPlugin ---
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import federation from '@originjs/vite-plugin-federation';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Recreate __dirname functionality in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// --- Removed serveSharedPlugin function ---
 
 export default defineConfig({
   plugins: [
-    react(),
-    federation({
-      name: 'shell',
-      remotes: {
-        yamlEditor: 'http://localhost:3002/assets/remoteEntry.js',
-        configSelector: 'http://localhost:3003/assets/remoteEntry.js',
-        jobManagement: 'http://localhost:3004/assets/remoteEntry.js'
-      },
-      shared: {
-        react: { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        'react-dom': { 
-          singleton: true, 
-          requiredVersion: '*',  // Change from '^18.0.0' to '*'
-          eager: true
-        },
-        '@mui/material': { 
-          singleton: true, 
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        '@mui/icons-material': { 
-          singleton: true, 
-          requiredVersion: '^5.0.0',
-          eager: true
-        },
-        'shared': {
-          singleton: true,
-          eager: true
-        }
-      }
-    })
+    react()
+    // serveSharedPlugin() // <-- REMOVED
   ],
-  build: {
-    modulePreload: false,
+  // configureServer hook removed
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2022'
+    },
+    include: ['shared'] // Keep this alias target if shell imports shared directly
+  },
+  esbuild: {
+    target: 'es2022'
+  },
+  build: { // Build config for shell app itself
     target: 'esnext',
     minify: false,
     cssCodeSplit: false,
     rollupOptions: {
       output: {
         format: 'esm',
-        entryFileNames: '[name].js',
-        chunkFileNames: '[name].js'
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'shared': path.resolve(__dirname, '../shared/dist')
+      // Alias for shell's internal use during dev/build
+      'shared': path.resolve(__dirname, '../shared/src') 
     }
   },
+  // server/preview port config removed
   server: {
-    port: 3000,
-    strictPort: true,
     cors: true
   },
   preview: {
-    port: 3000,
-    strictPort: true,
     cors: true
   }
 });

@@ -1,26 +1,22 @@
 {
   "name": "c4h-micro",
   "private": true,
+  "version": "0.1.0",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "build:shared": "cd packages/shared && npm run build",
-    "build:yaml-editor": "cd packages/yaml-editor && npm run build",
-    "build:config-selector": "cd packages/config-selector && npm run build",
-    "build:job-management": "cd packages/job-management && npm run build",
     "build:shell": "cd packages/shell && npm run build",
-    
-    "preview:yaml-editor": "cd packages/yaml-editor && npm run preview",
-    "preview:config-selector": "cd packages/config-selector && npm run preview",
-    "preview:job-management": "cd packages/job-management && npm run preview",
-    
-    "start:shell": "cd packages/shell && npm run start",
-    
-    "start": "./startup.sh",
-    "build-all": "npm run build:shared && npm run build:yaml-editor && npm run build:config-selector && npm run build:job-management && npm run build:shell"
+    "build:yaml-editor": "cd packages/yaml-editor && npm run build",
+    "build:job-management": "cd packages/job-management && npm run build",
+    "build:config-selector": "cd packages/config-selector && npm run build",
+    "build:test-app": "cd packages/test-app && npm run build",
+    "build:all": "npm run build:shared && npm run build:shell && npm run build:yaml-editor && npm run build:job-management && npm run build:config-selector && npm run build:test-app",
+    "start": "cd packages/shell && npm start",
+    "install:all": "npm install && npm run build:shared"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "rimraf": "^5.0.5"
   }
 }

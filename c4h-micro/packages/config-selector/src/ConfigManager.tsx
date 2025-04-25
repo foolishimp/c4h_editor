@@ -1,123 +1,73 @@
-// File: /packages/config-selector/src/ConfigManager.tsx
-import { useState, useEffect } from 'react';
-import { Box, Typography, CircularProgress } from '@mui/material';
-import { useParams, useNavigate } from 'react-router-dom';
+/**
+ * /packages/config-selector/src/ConfigManager.tsx
+ */
+import { useState } from 'react';
+import { Box, Typography } from '@mui/material';
 import { ConfigProvider } from './contexts/ConfigContext';
 import ConfigList from './components/ConfigList';
 import ConfigEditor from './components/ConfigEditor';
 import { configTypes } from 'shared';
 
-interface ConfigManagerProps {
-  configType?: string;
+export interface ConfigManagerProps {
+  configType: string;
   configId?: string;
+  onNavigateBack?: () => void;
+  onNavigateTo?: (configId: string) => void;
+  domElement?: HTMLElement;
 }
 
 function ConfigManager(props: ConfigManagerProps) {
-  const { configType: propConfigType, configId: propConfigId } = props;
-  const params = useParams<{ configType?: string, id?: string }>();
-  
-  // Use navigate if available (inside Router context)
-  let navigate: ReturnType<typeof useNavigate>;
-  try {
-    navigate = useNavigate();
-  } catch (e) {
-    // Navigation is handled through direct props in non-Router context
-  }
-  
-  // Use the config type from props or URL params
-  const configType = propConfigType || params?.configType;
-  // Use the config ID from props or URL params
-  const configId = propConfigId || params?.id;
-  
-  // State to track UI view
-  const [view, setView] = useState<'list' | 'editor'>(configId ? 'editor' : 'list');
-  const [currentConfigId, setCurrentConfigId] = useState<string | undefined>(configId);
-  const [loading, setLoading] = useState<boolean>(true);
-  
-  // Debug log
-  console.log('ConfigManager mounted with:', { 
-    propConfigType, 
-    propConfigId,
-    params,
-    configType,
-    configId,
-    view,
-    currentConfigId
-  });
-  
-  useEffect(() => {
-    // Reset view when configId changes
-    if (configId) {
-      setView('editor');
-      setCurrentConfigId(configId);
-    } else {
-      // Only reset to list if we're not already in editor view with a currentConfigId
-      // This prevents losing editor state when props/params don't have configId yet
-      if (view === 'editor' && !currentConfigId) {
-        setView('list');
-      }
-    }
-    
-    setLoading(false);
-  }, [configId]);
-  
-  // Handle navigation
-  const handleEditConfig = (configId: string) => {
-    if (navigate) {
-      navigate(`/configs/${configType}/${configId}`);
-    } else {
-      setView('editor');
-      setCurrentConfigId(configId);
+  const {
+    configType: propConfigType,
+    configId: propConfigId,
+    onNavigateBack,
+    onNavigateTo
+  } = props;
+
+  // Local state to track if viewing a config or list
+  const [viewingConfigId, setViewingConfigId] = useState<string | null>(propConfigId || null);
+
+  // Navigation handlers that use callbacks
+  const handleEditConfig = (id: string) => {
+    console.log(`ConfigManager: Requesting navigation to edit ${id}`);
+    setViewingConfigId(id);
+    if (onNavigateTo) {
+      onNavigateTo(id);
     }
   };
-  
+
   const handleCreateNew = () => {
-    console.log('Creating new config of type:', configType);
-    if (navigate) {
-      navigate(`/configs/${configType}/new`);
-    } else {
-      // Directly set the view and ID even without navigation
-      setView('editor');
-      setCurrentConfigId('new');
+    console.log('ConfigManager: Requesting navigation to create new');
+    setViewingConfigId('new');
+    if (onNavigateTo) {
+      onNavigateTo('new');
     }
   };
-  
+
   const handleBackToList = () => {
-    if (navigate) {
-      navigate(`/configs/${configType}`);
-    } else {
-      setView('list');
-      setCurrentConfigId(undefined);
+    console.log('ConfigManager: Requesting navigation back to list');
+    setViewingConfigId(null);
+    if (onNavigateBack) {
+      onNavigateBack();
     }
   };
-  
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-  
-  if (!configType) {
+
+  if (!propConfigType) {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" color="error">
-          No configuration type specified
-        </Typography>
-        <Typography variant="body1">
-          Please specify a configuration type to manage.
+          Configuration type not provided via props.
         </Typography>
       </Box>
     );
   }
-  
+
   // Check if the config type is valid
-  if (!configTypes[configType]) {
+  if (!configTypes[propConfigType]) {
     return (
       <Box sx={{ p: 3 }}>
         <Typography variant="h5" color="error">
-          Invalid configuration type: {configType}
+          Invalid configuration type: {propConfigType}
         </Typography>
         <Typography variant="body1">
           The specified configuration type is not supported.
@@ -125,21 +75,22 @@ function ConfigManager(props: ConfigManagerProps) {
       </Box>
     );
   }
-  
+
+  // Main component render
   return (
-    <ConfigProvider configType={configType}>
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          {configTypes[configType].name} Management
+    <ConfigProvider configType={propConfigType}>
+      <Box sx={{ p: 3, height: '100%' }}>
+        <Typography variant="h4" gutterBottom data-testid="config-heading">
+          {configTypes[propConfigType].name} Management
         </Typography>
-        
-        {view === 'editor' ? (
-          <ConfigEditor 
-            configId={currentConfigId || 'new'} 
-            onBack={handleBackToList} 
+
+        {viewingConfigId ? (
+          <ConfigEditor
+            configId={viewingConfigId}
+            onBack={handleBackToList}
           />
         ) : (
-          <ConfigList 
+          <ConfigList
             onEdit={handleEditConfig}
             onCreateNew={handleCreateNew}
           />
