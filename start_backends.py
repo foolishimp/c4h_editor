@@ -175,7 +175,7 @@ def get_port_for_service(json_key: str, default_port: int) -> int:
     
 
 # --- start_service function remains the same ---
-def start_service(service_name: str, port: int, uvicorn_target: str):
+def start_service(service_name: str, port: int, uvicorn_target: str, json_key: str): # Added json_key
     """Starts a backend service using uvicorn."""
     log_file = os.path.join(ROOT_DIR, f"{service_name}_server.log")
     service_dir = os.path.join(ROOT_DIR, service_name)
@@ -192,10 +192,40 @@ def start_service(service_name: str, port: int, uvicorn_target: str):
         print(f"{YELLOW}⚠️ Log configuration file not found: {LOG_CONFIG_FILE}{NC}")
         print(f"{YELLOW}   Starting {service_name} on port {port} without specific log configuration.{NC}")
 
+    # --- Start Modification ---
     env = os.environ.copy()
     python_path = env.get('PYTHONPATH', '')
     env['PYTHONPATH'] = f"{ROOT_DIR}{os.pathsep}{python_path}"
     env['PORT'] = str(port) # Set PORT env var for the service
+    env['APP_ENV'] = APP_ENV # Pass current environment
+
+    # Extract and set data paths from the global environment_config
+    service_env_config = environment_config.get(json_key, {}) # Use json_key ('main_backend', 'prefs_service')
+    data_paths = service_env_config.get('data_paths', {})
+    print(f"  Data paths config for {service_name} ({json_key}): {data_paths}")
+
+    if service_name == "backend": # service_name is the directory name
+        repo_root = data_paths.get('repositories_root')
+        job_path = data_paths.get('jobs_path')
+        if repo_root:
+            env['C4H_BACKEND_REPO_ROOT'] = repo_root
+            print(f"  Setting C4H_BACKEND_REPO_ROOT={repo_root}")
+        else:
+            print(f"  {YELLOW}C4H_BACKEND_REPO_ROOT not set (using default in service){NC}")
+        if job_path:
+            env['C4H_BACKEND_JOB_PATH'] = job_path
+            print(f"  Setting C4H_BACKEND_JOB_PATH={job_path}")
+        else:
+            print(f"  {YELLOW}C4H_BACKEND_JOB_PATH not set (using default in service){NC}")
+
+    elif service_name == "shell_service": # service_name is the directory name
+        db_url = data_paths.get('database_url')
+        if db_url:
+            env['DATABASE_URL'] = db_url # This matches the existing env var used by shell_service
+            print(f"  Setting DATABASE_URL={db_url}")
+        else:
+            print(f"  {YELLOW}DATABASE_URL for shell_service not set (using default in service){NC}")
+    # --- End Modification ---
 
     cmd = [
         sys.executable, "-m", "uvicorn",
@@ -212,7 +242,7 @@ def start_service(service_name: str, port: int, uvicorn_target: str):
             stdout=open(log_file, 'w'),
             stderr=subprocess.STDOUT,
             cwd=ROOT_DIR,
-            env=env,
+            env=env, # Use the modified environment
             # Make the child process a group leader on Unix-like systems
             preexec_fn=os.setsid if sys.platform != "win32" else None
         )
@@ -344,9 +374,11 @@ if __name__ == "__main__":
     print_header("STARTING SERVICES")
     start_failed = False
     # Iterate using tuple unpacking from services_to_start_info
-    for service_name, _, uvicorn_target, _ in services_to_start_info:
+    # Make sure services_to_start_info contains the json_key (4th element)
+    for service_name, _, uvicorn_target, json_key in services_to_start_info: # Added json_key
          port = final_ports[service_name] # Get the final port determined earlier
-         if not start_service(service_name, port, uvicorn_target):
+         # Pass json_key to start_service
+         if not start_service(service_name, port, uvicorn_target, json_key):
              start_failed = True
              print(f"{RED}❌ Failed to start {service_name}. Stopping already started services...{NC}")
              cleanup()
@@ -371,3 +403,4 @@ if __name__ == "__main__":
                     # Optionally cleanup() here if one dying means all should stop
     except KeyboardInterrupt:
         cleanup()
+        

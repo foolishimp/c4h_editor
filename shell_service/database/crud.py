@@ -283,17 +283,23 @@ async def get_service_endpoints() -> ServiceEndpoints:
         return DEFAULT_ENDPOINTS
 
 async def initialize_default_data():
-    # (Code remains the same as previous correct version)
+    """Initialize/Check default apps and endpoints in the database."""
     try:
         if not await db.check_health():
             logger.warning("Database unavailable during initialize_default_data. Cannot initialize.")
-            return
+            # Return False or raise an exception if DB connection is critical for startup
+            return False # Indicate initialization failed
 
+        # --- Initialize Apps ---
+        # Note: The log shows DEFAULT_AVAILABLE_APPS is empty, which might be intended
+        # or might indicate an issue where it's defined/loaded.
+        # This code assumes it *could* have data.
         if not DEFAULT_AVAILABLE_APPS:
              logger.warning("DEFAULT_AVAILABLE_APPS list is empty in crud.py. Cannot populate default apps.")
         else:
             logger.info(f"Initializing/Checking {len(DEFAULT_AVAILABLE_APPS)} default apps...")
             for app in DEFAULT_AVAILABLE_APPS:
+                # Using ON CONFLICT DO NOTHING is simpler if updates aren't needed here
                 await db.execute(
                     """
                     INSERT INTO available_apps(id, name, scope, module, url) VALUES($1, $2, $3, $4, $5)
@@ -304,6 +310,7 @@ async def initialize_default_data():
                 )
             logger.info("Default apps checked/inserted.")
 
+        # --- Initialize Endpoints ---
         logger.info(f"Initializing/Checking default endpoints with URL: {DEFAULT_ENDPOINTS.jobConfigServiceUrl}")
         if DEFAULT_ENDPOINTS and DEFAULT_ENDPOINTS.jobConfigServiceUrl is not None:
             await db.execute(
@@ -311,9 +318,10 @@ async def initialize_default_data():
                 INSERT INTO service_endpoints(id, job_config_service_url)
                 VALUES('default', $1)
                 ON CONFLICT (id) DO UPDATE SET
-                    job_config_service_url = $1
+                    job_config_service_url = $2 -- Use $2 for the second placeholder
                 """,
-                DEFAULT_ENDPOINTS.jobConfigServiceUrl,
+                # Provide the argument twice for the UPSERT statement
+                DEFAULT_ENDPOINTS.jobConfigServiceUrl, DEFAULT_ENDPOINTS.jobConfigServiceUrl,
                 fetch_type="status"
             )
             logger.info("Default endpoints checked/upserted.")
@@ -321,7 +329,7 @@ async def initialize_default_data():
              logger.warning("DEFAULT_ENDPOINTS not configured correctly, skipping endpoint initialization.")
 
         logger.info("Default data initialization check/update completed successfully")
-        return True
+        return True # Indicate success
     except Exception as e:
          logger.error(f"Error during default data initialization: {e}", exc_info=True)
-         return False
+         return False # Indicate failure
