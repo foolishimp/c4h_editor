@@ -78,12 +78,12 @@ data/lineage/*
 !data/lineage/README.md
 data/backups/*
 !data/backups/README.md
+!/data/layouts
 *.log
 logs/
 *.db
 *.sqlite3
 *.txt
-environments.json
 
 # OS specific
 .DS_Store
@@ -94,7 +94,7 @@ environments.json
 ehthumbs.db
 Thumbs.db
 /backup_txt/
-/data/
+/data
 workspaces/
 repositories/workorders
 repositories/teamconfigs
