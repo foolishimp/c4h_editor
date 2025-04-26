@@ -93,7 +93,7 @@ logs/
 ehthumbs.db
 Thumbs.db
 /backup_txt/
-/data/
+./data
 workspaces/
 repositories/workorders
 repositories/teamconfigs
