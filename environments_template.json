@@ -1,31 +1,45 @@
 {
   "development": {
-    "main_backend":  { "url": "http://localhost:8010" },
-    "prefs_service": { "url": "http://localhost:8011" },
-
+    "main_backend": {
+      "url": "http://localhost:8010",
+      "data_paths": {
+        "repositories_root": "/Users/jim/src/apps/c4h_data/",
+        "jobs_path": "/Users/jim/src/apps/c4h_data/jobs"
+      }
+    },
+    "prefs_service": {
+      "url": "http://localhost:8011",
+      "data_paths": {
+        "database_url": "sqlite:////Users/jim/src/apps/c4h_data/shell_data/c4h_prefs.db"
+      }
+    },
     "shell":         { "url": "http://localhost:3100" },
-
     "yaml-editor":   { "url": "http://localhost:3105/src/main.tsx" },
-
     "workorder":     { "url": "http://localhost:3101/src/main.tsx" },
     "teamconfig":    { "url": "http://localhost:3101/src/main.tsx" },
     "runtimeconfig": { "url": "http://localhost:3101/src/main.tsx" },
-
     "job-management":{ "url": "http://localhost:3104/src/main.tsx" },
     "test-app":      { "url": "http://localhost:3106/src/main.tsx" }
   },
   "production": {
-    "main_backend":  { "url": "https://api.example.com" },
-    "prefs_service": { "url": "https://prefs.example.com" },
-
+    "main_backend": {
+      "url": "https://api.example.com",
+      "data_paths": {
+        "repositories_root": "/data/prod/c4h/repositories",
+        "jobs_path": "/data/prod/c4h/jobs"
+      }
+    },
+    "prefs_service": {
+      "url": "https://prefs.example.com",
+      "data_paths": {
+        "database_url": "postgresql://user:pass@prod-db-host:5432/c4h_prefs"
+      }
+    },
     "shell":         { "url": "https://app.example.com" },
-
     "yaml-editor":   { "url": "https://cdn.example.com/yaml-editor/latest/assets/yaml-editor.js" },
-
-    "workorder":     { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" }, 
-    "teamconfig":    { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" }, 
-    "runtimeconfig": { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" }, 
-
+    "workorder":     { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" },
+    "teamconfig":    { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" },
+    "runtimeconfig": { "url": "https://cdn.example.com/config-selector/latest/assets/config-selector.js" },
     "job-management":{ "url": "https://cdn.example.com/job-management/latest/assets/job-management.js" },
     "test-app":      { "url": "https://cdn.example.com/test-app/latest/assets/test-app.js" }
   }
