@@ -84,6 +84,7 @@ logs/
 *.db
 *.sqlite3
 *.txt
+environments.json 
 
 # OS specific
 .DS_Store
