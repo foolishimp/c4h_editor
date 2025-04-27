@@ -13,63 +13,68 @@ interface TestAppProps {
     eventBus?: typeof localEventBus; // Allow passing bus via props (though likely unused now)
 }
 
-// Extend Window interface if necessary, or use type assertion carefully
+// *** FIX START: Augment the global Window interface ***
 declare global {
     interface Window {
+        // Declare the custom property and its expected type
         __C4H_EVENT_BUS__?: typeof localEventBus;
     }
 }
+// *** FIX END ***
 
 const TestApp: React.FC<TestAppProps> = (props) => {
     const [messageCount, setMessageCount] = useState(0);
-    const [lastMessage, setLastMessage] = useState<any>(null);
 
     // --- Determine which bus instance to use ---
     // Prioritize window global, fall back to local import
+    // Accessing window.__C4H_EVENT_BUS__ is now type-safe
     const bus = window.__C4H_EVENT_BUS__ || localEventBus;
     const busSource = window.__C4H_EVENT_BUS__ ? 'window.__C4H_EVENT_BUS__' : 'localEventBus import';
     // Log which bus instance is selected on initial render
     console.log(`[TestApp] Initializing. Using event bus instance from: ${busSource}`);
     // --- End Bus Instance Determination ---
 
+    // Keep stable reference to lastMessage using ref instead of state
+    const lastMessageRef = React.useRef<any>(null);
+    const [lastMessage, setLastMessage] = useState<any>(null);
 
-    // Callback to handle received messages
+    // Stable callback to handle received messages
     const handleTestMessage = useCallback((detail: any) => {
-         // --- ADDED LOG: Confirm handler execution ---
-         console.log('[TestApp] handleTestMessage received:', detail);
-         console.log('[TestApp] Current messageCount state BEFORE update:', messageCount);
+        console.log('[TestApp] handleTestMessage received:', detail);
+        lastMessageRef.current = detail;
         setLastMessage(detail);
-        setMessageCount((prevCount) => {
-             const newCount = prevCount + 1;
-             // --- ADDED LOG: Confirm state update logic ---
-             console.log(`[TestApp] Updating messageCount from ${prevCount} to ${newCount}`);
-             return newCount;
-         });
-    }, [messageCount]); // Include messageCount dependency if needed by logic inside, though likely not needed here
+        setMessageCount(prev => {
+            const newCount = prev + 1;
+            console.log(`[TestApp] Updating messageCount from ${prev} to ${newCount}`);
+            return newCount;
+        });
+    }, []); // No dependencies needed
 
     // Effect for subscribing and unsubscribing
     useEffect(() => {
-        // --- ADDED LOG: Log which bus instance useEffect is using ---
         console.log(`[TestApp] useEffect running. Subscribing using bus from: ${busSource}`);
-
-        // Subscribe using the selected bus instance
+        bus.publish('test:mounted', {
+            source: 'test-app',
+            payload: { timestamp: Date.now(), message: 'TestApp mounted' }
+        });
         const unsubscribe = bus.subscribe('test:ping', handleTestMessage);
-
-        // Return cleanup function
+        setTimeout(() => {
+            console.log('[TestApp] Sending initial self-ping test message');
+            bus.publish('test:ping', {
+                source: 'test-app',
+                payload: { timestamp: Date.now(), text: 'Self-ping on mount' }
+            });
+        }, 500);
         return () => {
             console.log(`[TestApp] useEffect cleanup. Unsubscribing using bus from: ${busSource}`);
             unsubscribe();
+            bus.publish('test:unmounted', { source: 'test-app', payload: { timestamp: Date.now() } });
         };
-    // Dependency array includes 'bus' to re-subscribe if the instance changes (unlikely now)
-    // and handleTestMessage to ensure the latest callback is used.
-    }, [bus, handleTestMessage, busSource]); // Added busSource for logging clarity
-
+    }, [bus, handleTestMessage, busSource]); // Dependencies are correct
 
     const handleSendMessage = () => {
         const message = { timestamp: Date.now(), text: 'Ping from TestApp' };
-         // --- ADDED LOG: Confirm message sending ---
          console.log(`[TestApp] Sending 'test:ping' using bus from: ${busSource}`, message);
-        // Publish using the selected bus instance
         bus.publish('test:ping', { source: 'test-app', payload: message });
     };
 
@@ -78,14 +83,16 @@ const TestApp: React.FC<TestAppProps> = (props) => {
             <Typography variant="h6">Test App</Typography>
             <Typography>Loaded successfully!</Typography>
             <Typography>Messages Received: {messageCount}</Typography>
-            <Typography>Last Message:</Typography>
+            <Typography>
+                Last Message:
+                {lastMessage ? '' : ' (None yet - try clicking the button below)'}
+            </Typography>
             <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f0f0f0', padding: '5px' }}>
                 {JSON.stringify(lastMessage, null, 2)}
             </pre>
             <Button variant="contained" onClick={handleSendMessage} sx={{ mt: 1 }}>
                 Send Test Message (Ping)
             </Button>
-             {/* Log the bus source being used */}
             <Typography variant="caption" display="block" sx={{ mt: 2, color: 'text.secondary' }}>
                 Using Event Bus from: {busSource}
             </Typography>

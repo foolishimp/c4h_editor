@@ -1,4 +1,3 @@
-# backend/config/config_types.py
 """
 Configuration type registry for the C4H Editor backend.
 Defines supported configuration types and their properties.
@@ -8,6 +7,7 @@ from typing import Dict, Any, List, Optional
 import json
 import logging
 from pathlib import Path
+import os # Added import
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +133,35 @@ def get_repo_path(type_key: str) -> str:
         
     Returns:
         Path to repository
+        Resolved absolute path to repository
     """
     config_type = get_config_type(type_key)
     if not config_type:
         raise ValueError(f"Invalid configuration type: {type_key}")
         
-    return config_type.get("repository", {}).get("path", f"repositories/{type_key}")
+    # Check environment variable for root path
+    repo_root_env = os.environ.get("C4H_BACKEND_REPO_ROOT")
+
+    if repo_root_env:
+        # Use the environment variable as the base path
+        base_path = Path(repo_root_env)
+        logger.info(f"Using repository root from env var C4H_BACKEND_REPO_ROOT: {base_path}")
+    else:
+        # Fallback to default relative path if env var not set
+        # Assumes the service runs with the project root as the CWD
+        base_path = Path(".")
+        logger.warning("C4H_BACKEND_REPO_ROOT env var not set. Using default relative base path '.'")
+
+    # Get specific path segment from config type definition (e.g., "repositories/workorders")
+    relative_path_str = config_type.get("repository", {}).get("path", f"repositories/{type_key}")
+    relative_path = Path(relative_path_str)
+
+    # Join base path and relative path
+    full_path = base_path / relative_path
+
+    # Ensure the parent directory exists before resolving
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+
+    resolved_path = str(full_path.resolve()) # Return resolved absolute path
+    logger.debug(f"Resolved repo path for {type_key}: {resolved_path}")
+    return resolved_path

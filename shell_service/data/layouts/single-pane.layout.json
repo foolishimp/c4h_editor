@@ -1,0 +1,7 @@
+{
+  "id": "single-pane",
+  "name": "Single Pane",
+  "description": "A single window taking the full content area.",
+  "containerStyle": { "display": "flex", "height": "100%", "width": "100%" },
+  "windows": [ { "id": 1, "style": { "flex": "1 1 auto", "overflow": "auto" } } ]
+}

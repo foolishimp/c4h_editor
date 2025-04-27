@@ -1,0 +1,10 @@
+{
+  "id": "two-column",
+  "name": "Two Column (50/50)",
+  "description": "Two windows arranged side-by-side, equal width.",
+  "containerStyle": { "display": "flex", "flexDirection": "row", "height": "100%", "width": "100%", "gap": "8px" },
+  "windows": [
+    { "id": 1, "style": { "flex": "1 1 50%", "overflow": "auto", "borderRight": "1px solid #e0e0e0" } },
+    { "id": 2, "style": { "flex": "1 1 50%", "overflow": "auto" } }
+  ]
+}

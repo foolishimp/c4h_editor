@@ -6,6 +6,7 @@ Focused on generic configuration management and C4H service access.
 from fastapi import Depends
 from pathlib import Path
 import logging
+import os # Added import
 
 from backend.services.config_repository import ConfigRepository
 from backend.services.job_repository import JobRepository
@@ -38,13 +39,25 @@ def get_config_repository(config_type: str) -> ConfigRepository:
     return _repositories[config_type]
 
 def get_job_repository():
-    """Get or create a job repository instance."""
+    """Get or create a job repository instance, prioritizing env var."""
     global _job_repository
     if _job_repository is None:
-        job_path = Path("./data/jobs")
+        # Check environment variable first
+        job_path_env = os.environ.get("C4H_BACKEND_JOB_PATH")
+
+        if job_path_env:
+            job_path = Path(job_path_env)
+            logger.info(f"Using job path from env var C4H_BACKEND_JOB_PATH: {job_path}")
+        else:
+            # Fallback to default relative path
+            # Assumes the service runs with the project root as the CWD
+            job_path = Path("./data/jobs")
+            logger.warning("C4H_BACKEND_JOB_PATH env var not set. Using default relative path './data/jobs'")
+
         job_path.parent.mkdir(exist_ok=True)
-        _job_repository = JobRepository(str(job_path))
-        logger.info(f"Created JobRepository at {job_path}")
+        resolved_path = str(job_path.resolve()) # Resolve to absolute path
+        _job_repository = JobRepository(resolved_path) # Pass resolved path
+        logger.info(f"Created JobRepository at {resolved_path}")
     return _job_repository
 
 def get_c4h_service():

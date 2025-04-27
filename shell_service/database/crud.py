@@ -37,7 +37,7 @@ async def get_user_frames(user_id: str) -> List[Frame]:
         if is_healthy:
             rows = await db.execute(
                 """
-                SELECT id, name, "order", assigned_apps
+                SELECT id, name, "order", layout_id, assigned_apps
                 FROM frames
                 WHERE user_id = $1
                 ORDER BY "order"
@@ -60,9 +60,10 @@ async def get_user_frames(user_id: str) -> List[Frame]:
                     frame_id = row[0]
                     frame_name = row[1]
                     frame_order = row[2]
-                    assigned_apps_raw = row[3]
+                    layout_id = row[3]
+                    assigned_apps_raw = row[4]
 
-                    if frame_id is None or frame_name is None or frame_order is None:
+                    if frame_id is None or frame_name is None or frame_order is None:  # layout_id can be None
                         logger.warning(f"[GET FRAMES] Row {i} - Missing essential data from DB query result (id='{frame_id}', name='{frame_name}', order='{frame_order}'). Skipping.")
                         continue
 
@@ -76,7 +77,17 @@ async def get_user_frames(user_id: str) -> List[Frame]:
                         temp_app_assignments = []
                         parse_success = True
                         for app_index, app_dict in enumerate(assigned_apps_data):
-                             if isinstance(app_dict, dict) and 'appId' in app_dict:
+                             if isinstance(app_dict, dict) and 'appId' in app_dict:                                 
+                                 # Handle case where windowId might be missing (backward compatibility)
+                                 if 'windowId' not in app_dict:
+                                     logger.warning(f"[GET FRAMES] Row {i} App {app_index} - Missing windowId in assigned_apps, defaulting to 1: {app_dict}")
+                                     app_dict['windowId'] = 1  # Default to window 1 for backward compatibility
+                                     
+                                 # Ensure windowId is an integer
+                                 try:
+                                     app_dict['windowId'] = int(app_dict['windowId'])
+                                 except (ValueError, TypeError):
+                                     app_dict['windowId'] = 1  # Default to window 1 if conversion fails
                                  try:
                                      temp_app_assignments.append(AppAssignment(**app_dict))
                                  except ValidationError as app_ve:
@@ -95,12 +106,13 @@ async def get_user_frames(user_id: str) -> List[Frame]:
                         assigned_apps_list = []
 
                     log_data = { "id": frame_id, "name": frame_name, "order": frame_order, "assignedApps": assigned_apps_list }
-                    logger.debug(f"[GET FRAMES] Row {i} - Attempting Frame construction with data: {log_data}")
+                    logger.debug(f"[GET FRAMES] Row {i} - Attempting Frame construction with data: {log_data}, layoutId: {layout_id}")
 
                     try:
                         frame_to_add = Frame(
                             id=str(frame_id),
                             name=str(frame_name),
+                            layoutId=str(layout_id) if layout_id is not None else None,
                             order=int(frame_order),
                             assignedApps=assigned_apps_list
                         )
@@ -150,12 +162,12 @@ async def save_user_frames(user_id: str, frames: List[Frame]) -> bool:
                 logger.debug(f"[SAVE FRAMES] Inserting frame ID {frame.id}, Order {frame.order}, Apps JSON: {assigned_apps_json[:100]}...")
                 await db.execute(
                     """
-                    INSERT INTO frames(id, user_id, name, "order", assigned_apps)
-                    VALUES($1, $2, $3, $4, $5)
+                    INSERT INTO frames(id, user_id, name, "order", layout_id, assigned_apps)
+                    VALUES($1, $2, $3, $4, $5, $6)
                     """,
                     frame.id or str(uuid.uuid4()),
-                    user_id, frame.name,
-                    frame.order,
+                    user_id, frame.name, 
+                    frame.order, frame.layoutId,
                     assigned_apps_json,
                     fetch_type="status"
                 )
@@ -271,17 +283,23 @@ async def get_service_endpoints() -> ServiceEndpoints:
         return DEFAULT_ENDPOINTS
 
 async def initialize_default_data():
-    # (Code remains the same as previous correct version)
+    """Initialize/Check default apps and endpoints in the database."""
     try:
         if not await db.check_health():
             logger.warning("Database unavailable during initialize_default_data. Cannot initialize.")
-            return
+            # Return False or raise an exception if DB connection is critical for startup
+            return False # Indicate initialization failed
 
+        # --- Initialize Apps ---
+        # Note: The log shows DEFAULT_AVAILABLE_APPS is empty, which might be intended
+        # or might indicate an issue where it's defined/loaded.
+        # This code assumes it *could* have data.
         if not DEFAULT_AVAILABLE_APPS:
              logger.warning("DEFAULT_AVAILABLE_APPS list is empty in crud.py. Cannot populate default apps.")
         else:
             logger.info(f"Initializing/Checking {len(DEFAULT_AVAILABLE_APPS)} default apps...")
             for app in DEFAULT_AVAILABLE_APPS:
+                # Using ON CONFLICT DO NOTHING is simpler if updates aren't needed here
                 await db.execute(
                     """
                     INSERT INTO available_apps(id, name, scope, module, url) VALUES($1, $2, $3, $4, $5)
@@ -292,6 +310,7 @@ async def initialize_default_data():
                 )
             logger.info("Default apps checked/inserted.")
 
+        # --- Initialize Endpoints ---
         logger.info(f"Initializing/Checking default endpoints with URL: {DEFAULT_ENDPOINTS.jobConfigServiceUrl}")
         if DEFAULT_ENDPOINTS and DEFAULT_ENDPOINTS.jobConfigServiceUrl is not None:
             await db.execute(
@@ -299,9 +318,10 @@ async def initialize_default_data():
                 INSERT INTO service_endpoints(id, job_config_service_url)
                 VALUES('default', $1)
                 ON CONFLICT (id) DO UPDATE SET
-                    job_config_service_url = $1
+                    job_config_service_url = $2 -- Use $2 for the second placeholder
                 """,
-                DEFAULT_ENDPOINTS.jobConfigServiceUrl,
+                # Provide the argument twice for the UPSERT statement
+                DEFAULT_ENDPOINTS.jobConfigServiceUrl, DEFAULT_ENDPOINTS.jobConfigServiceUrl,
                 fetch_type="status"
             )
             logger.info("Default endpoints checked/upserted.")
@@ -309,7 +329,7 @@ async def initialize_default_data():
              logger.warning("DEFAULT_ENDPOINTS not configured correctly, skipping endpoint initialization.")
 
         logger.info("Default data initialization check/update completed successfully")
-        return True
+        return True # Indicate success
     except Exception as e:
          logger.error(f"Error during default data initialization: {e}", exc_info=True)
-         return False
+         return False # Indicate failure

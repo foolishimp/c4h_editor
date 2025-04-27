@@ -1,0 +1,16 @@
+{
+  "id": "header-two-column-grid",
+  "name": "Header + Two Columns (Grid)",
+  "description": "Full-width header window above two equal columns (uses Grid).",
+  "containerStyle": {
+    "display": "grid",
+    "gridTemplateRows": "auto 1fr",
+    "gridTemplateColumns": "1fr 1fr",
+    "height": "100%", "width": "100%", "gap": "8px"
+  },
+  "windows": [
+    { "id": 1, "style": { "gridColumn": "1 / -1", "gridRow": "1 / 2", "borderBottom": "1px solid #e0e0e0", "overflow": "auto" } },
+    { "id": 2, "style": { "gridColumn": "1 / 2", "gridRow": "2 / 3", "borderRight": "1px solid #e0e0e0", "overflow": "auto" } },
+    { "id": 3, "style": { "gridColumn": "2 / 3", "gridRow": "2 / 3", "overflow": "auto" } }
+  ]
+}

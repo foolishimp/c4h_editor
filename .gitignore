@@ -78,6 +78,7 @@ data/lineage/*
 !data/lineage/README.md
 data/backups/*
 !data/backups/README.md
+!/data/layouts
 *.log
 logs/
 *.db
@@ -93,7 +94,7 @@ logs/
 ehthumbs.db
 Thumbs.db
 /backup_txt/
-./data
+/data
 workspaces/
 repositories/workorders
 repositories/teamconfigs
