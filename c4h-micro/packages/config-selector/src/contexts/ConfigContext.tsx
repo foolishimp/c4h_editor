@@ -320,7 +320,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
         setCurrentConfig(null); setYaml(''); setSaved(false);
       }
       // *** Publish event after successful delete and list reload ***
-      eventBus.publish('configListUpdated', { configType });
+      eventBus.publish('configListUpdated', { source: 'config-selector', payload: { configType } });
       console.log(`ConfigContext: Published configListUpdated event for type ${configType} after delete.`);
     } catch (err: any) {
       setError(err.message || `Failed to delete configuration: ${id}`); console.error('Error deleting configuration:', err); // [cite: 1419]
@@ -343,7 +343,7 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children, config
         await loadConfig(id); // Reload to get updated metadata
       }
       // *** Publish event after successful archive/unarchive and list reload ***
-      eventBus.publish('configListUpdated', { configType });
+      eventBus.publish('configListUpdated', { source: 'config-selector', payload: { configType } });
       console.log(`ConfigContext: Published configListUpdated event for type ${configType} after archive/unarchive.`);
     } catch (err: any) {
       const action = archive ? 'archive' : 'unarchive';
