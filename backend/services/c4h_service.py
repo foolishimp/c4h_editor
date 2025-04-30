@@ -100,7 +100,7 @@ class C4HService:
         try:
             # --- Logging logic moved inside the main try block ---
             payload = {"configs": config_contents}
-            log_limit = 2000
+            log_limit = 20000
             try:
                 # Attempt to serialize and log the payload (truncated)
                 payload_str = json.dumps(payload, indent=2, default=str)
